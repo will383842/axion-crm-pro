@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports'];
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations'];
 
     /**
      * Ordre d'insertion. Les parents d'abord : chaque table n'apparaît qu'après
@@ -219,6 +219,8 @@ final class SemeurTablesScopees
         'envoi_campagnes',
         'envoi_campagnes_journal',
         'envoi_campagne_codes',
+        // Envoi X1-L1 : matérialisation (FK composites vers `envoi_campagnes` ET `envoi_sequences`) : APPEND_SEUL_AVEC_FK.
+        'envoi_campagnes_materialisations',
         // Envoi R08b : modèles de message (parent) puis leurs versions (FK composite) : APPEND_SEUL_AVEC_FK.
         'envoi_modeles',
         'envoi_modele_versions',
@@ -645,6 +647,8 @@ final class SemeurTablesScopees
             'campagne_id' => $campagne, 'transition' => 'brouillon>a_valider', 'auteur' => 'zz-etancheite',
             'motif' => 'zz-etancheite', 'cle_idempotence' => 'zz-etancheite-' . $marque,
         ]);
+        // Envoi X1-L1 : matérialisation de cette campagne (sans lien de séquence : le lien est posé par l'application, pas par le semeur).
+        $inserer('envoi_campagnes_materialisations', ['campagne_id' => $campagne]);
         $inserer('envoi_campagne_codes', ['campagne_id' => $campagne, 'empreinte' => hash_hmac('sha256', 'zz-etancheite', 'cle-de-semeur-seulement'), 'cle_version' => 1, 'expire_le' => '2026-01-01 00:00:00+00']);
         $modele = (string) Str::uuid();
         $inserer('envoi_modeles', ['id' => $modele, 'nom' => 'zz-etancheite', 'cree_par' => 'zz-etancheite']);

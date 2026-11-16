@@ -111,8 +111,14 @@ test('le rejeu ne se contourne pas en changeant l’écriture de la signature (p
 })->with('route signée sans idempotence');
 
 test('TÉMOIN : le même corps re-signé avec un autre horodatage passe (nouvelle tentative de l’émetteur)', function (string $route, string $corps) {
-    appelCanalSigne($route, $corps, entetesSignes($corps, (string) time()))->assertStatus(503);
-    appelCanalSigne($route, $corps, entetesSignes($corps, (string) (time() - 1)))->assertStatus(503);
+    // UNE seule lecture de l'horloge. Avec deux `time()`, un changement de
+    // seconde entre les appels donnait au second le MÊME horodatage que le
+    // premier (N-1 puis N-1) : même corps, même signature, donc un vrai rejeu
+    // refusé en 401 au lieu du 503 attendu. Le refus du rejeu reste prouvé par
+    // les tests « REJOUÉE » et « préfixe sha256= » ci-dessus.
+    $maintenant = time();
+    appelCanalSigne($route, $corps, entetesSignes($corps, (string) $maintenant))->assertStatus(503);
+    appelCanalSigne($route, $corps, entetesSignes($corps, (string) ($maintenant - 1)))->assertStatus(503);
 })->with('routes signées par le site');
 
 test('sans horodatage : refus AVANT tout calcul de signature', function (string $route, string $corps) {

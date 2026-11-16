@@ -397,7 +397,8 @@ test('M4 : rejeu des intentions non acquittées, idempotent par commande_id', fu
     $perdue = envoiCmd();
     $livree = envoiCmd();
     $client = app(CommandeurServeur::class);
-    expect(fn () => $client->commander($this->ws, 'srv1', $perdue, 'pause'))->toThrow(ServeurEnvoiRefuse::class);
+    // E4 : une pause perdue suivie d'une reprise livrée n'est plus rejouée (état périmé, cf. tests E4) ; un RETRAIT, lui, l'est toujours.
+    expect(fn () => $client->commander($this->ws, 'srv1', $perdue, 'retrait'))->toThrow(ServeurEnvoiRefuse::class);
     $panne = false;
     $client->commander($this->ws, 'srv1', $livree, 'reprise');
     Http::assertSentCount(2);
@@ -405,7 +406,7 @@ test('M4 : rejeu des intentions non acquittées, idempotent par commande_id', fu
     $bilan = app(RejoueurCommandes::class)->rejouer();
     expect($bilan)->toBe(['rejouees' => 1, 'echecs' => 0]);
     Http::assertSentCount(3);
-    Http::assertSent(fn (Request $r) => str_contains($r->body(), $perdue) && str_ends_with($r->url(), '/v1/commandes/pause'));
+    Http::assertSent(fn (Request $r) => str_contains($r->body(), $perdue) && str_ends_with($r->url(), '/v1/commandes/retrait'));
 
     // Idempotent : plus rien à rejouer, aucun nouvel appel, aucun doublon d'acquittement.
     expect(app(RejoueurCommandes::class)->rejouer())->toBe(['rejouees' => 0, 'echecs' => 0]);

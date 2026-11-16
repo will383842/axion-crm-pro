@@ -35,11 +35,14 @@ class ContactsGestesController extends ConsoleController
 
         $r = WorkspaceContext::run($workspaceId, fn () => (new GestesContact)->modifier($workspaceId, (int) $contactId, $champs));
 
+        if ($r['etat'] === 'ok') {
+            return response()->json(['data' => app(ContactsController::class)->present($r['contact'], MasquageCoordonnees::requis(), $r['opposition'])] + ['opposition' => $r['opposition']]);
+        }
+
         return match ($r['etat']) {
-            'introuvable' => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
             'doublon' => response()->json(['error' => 'doublon', 'message' => 'Une autre fiche porte déjà ce nom dans cette entreprise (peut-être dans la corbeille).'], 409),
             'champ_non_modifiable' => response()->json(['error' => 'champ_non_modifiable', 'message' => "L'étape se change sur l'entreprise."], 422),
-            default => response()->json(['data' => app(ContactsController::class)->present($r['contact'], MasquageCoordonnees::requis(), $r['opposition'])] + ['opposition' => $r['opposition']]),
+            default => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
         };
     }
 }

@@ -22,7 +22,7 @@ final class GestesContact
 
     /**
      * @param  array<string, mixed>  $champs  champs déjà validés (les clés inconnues sont ignorées)
-     * @return array{etat: 'ok'|'introuvable'|'doublon'|'champ_non_modifiable', contact?: Contact, champs?: list<string>, opposition?: array{opposee: bool, motifs: list<string>}}
+     * @return array{etat: 'introuvable'|'doublon'|'champ_non_modifiable'}|array{etat: 'ok', contact: Contact, champs: list<string>, opposition: array{opposee: bool, motifs: list<string>}}
      */
     public function modifier(string $workspaceId, int $contactId, array $champs): array
     {

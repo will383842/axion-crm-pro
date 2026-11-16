@@ -11,7 +11,7 @@ use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\FabriqueLecteurFixe;
 use App\Envoi\Imap\FabriqueLecteurs;
-use App\Envoi\Imap\FabriqueLecteursNonFournie;
+use App\Envoi\Imap\FabriqueLecteursBoites;
 use App\Envoi\Imap\LecteurBoiteMemoire;
 use App\Envoi\Imap\MessageBrut;
 use App\Envoi\Imap\RecepteurRetours;
@@ -176,11 +176,11 @@ test('la commande tourne de bout en bout : rebonds, plainte, réponse humaine, a
 });
 
 test('sans fabrique réelle : la commande échoue de façon visible et propre, sans réseau', function () {
-    expect(app(FabriqueLecteurs::class))->toBeInstanceOf(FabriqueLecteursNonFournie::class);
+    expect(app(FabriqueLecteurs::class))->toBeInstanceOf(FabriqueLecteursBoites::class);
     $d = brancheeDestinataire($this, 'sansboite');
 
     expect(Artisan::call(ReleveImapCommande::SIGNATURE_PLANIFIEE))->toBe(1)
-        ->and(Artisan::output())->toContain('aucune fabrique de lecteurs IMAP')
+        ->and(Artisan::output())->toContain('aucun accès IMAP posé pour une boîte')
         ->and(DB::table('envoi_curseurs_imap')->count())->toBe(0)
         ->and(DB::table('envoi_evenements')->count())->toBe(0)
         ->and($d['adresse'])->not->toBe('');

@@ -3,6 +3,8 @@
 namespace App\Providers\Envoi;
 
 use App\Envoi\Imap\DepotAccesImap;
+use App\Envoi\Imap\FabriqueLecteurs;
+use App\Envoi\Imap\FabriqueLecteursBoites;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -14,6 +16,8 @@ class ReleveRetoursServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(DepotAccesImap::class);
+        // Remplace FabriqueLecteursNonFournie (liée avant ce fournisseur) : inerte tant que les drapeaux d'envoi sont éteints.
+        $this->app->bind(FabriqueLecteurs::class, FabriqueLecteursBoites::class);
     }
 
     public function boot(): void

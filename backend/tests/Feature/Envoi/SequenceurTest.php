@@ -475,6 +475,20 @@ test('un contact inscrit aux séquences A et B qui répond STOP sur A ne reçoit
         ->and(DB::table('envoi_inscriptions')->where('id', $insB)->value('statut'))->toBe('terminee');
 })->with([Evenement::STOP, Evenement::OPPOSITION, Evenement::REBOND_DUR]);
 
+test('P2-B : STOP, opposition ou rebond dur sur A => une inscription B de la MÊME adresse créée ensuite ne reçoit rien', function (string $evenement) {
+    $a = seqSequence($this, 3);
+    $b = seqSequence($this, 3);
+    [, $c] = seqFiche($this, "ab2-{$evenement}@zz-client.example.invalid");
+    $insA = seqInscrire($this, $a, $c);
+    (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $insA, $evenement, $this->maintenant);
+    $insB = seqInscrire($this, $b, $c); // permise par l'index : A n'est plus active
+
+    expect($insB)->not->toBe('')
+        ->and(($this->seq)()->executer($this->ws, $this->maintenant))->not->toHaveKey(Sequenceur::ENVOYE)
+        ->and(seqMessages($insB))->toBe([])->and($this->faux->appels)->toBe(0)
+        ->and(DB::table('envoi_inscriptions')->where('id', $insB)->value('statut'))->toBe('arretee');
+})->with([Evenement::STOP, Evenement::OPPOSITION, Evenement::REBOND_DUR]);
+
 test('STOP : refusé aussi pour une inscription créée APRÈS le STOP (sans passer par evenement()) — filet dans traiter()', function () {
     $a = seqSequence($this, 1);
     $b = seqSequence($this, 1);
@@ -487,7 +501,7 @@ test('STOP : refusé aussi pour une inscription créée APRÈS le STOP (sans pas
         ->and($this->faux->appels)->toBe(0)->and(seqMessages($insB))->toBe([]);
 });
 
-test('une réponse arrête, par l\'entreprise, les autres séquences de la même personne', function () {
+test('une réponse arrête, par l\'entreprise, les autres séquences d\'une autre personne de la même entreprise', function () {
     $a = seqSequence($this, 1);
     $b = seqSequence($this, 1);
     [$e, $c] = seqFiche($this, 'rep@zz-client.example.invalid');

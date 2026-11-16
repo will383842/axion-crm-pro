@@ -113,7 +113,8 @@ function sansFuiteVerifier(array $signales, array $journal, string $sqlstate, st
 it('Dockerfile.laravel garde zend.exception_ignore_args=On (arguments de trace jamais envoyés)', function () {
     $dockerfile = dirname(base_path()) . '/Dockerfile.laravel';
     expect(is_file($dockerfile))->toBeTrue();
-    expect(file_get_contents($dockerfile))->toContain('zend.exception_ignore_args=On');
+    // Ligne exacte, ancrée en début de ligne : ni commentaire, ni valeur voisine (Off, Onx), ni simple mention.
+    expect(file_get_contents($dockerfile))->toMatch('/^RUN echo "zend\.exception_ignore_args=On" > \/usr\/local\/etc\/php\/conf\.d\/zz-exceptions-prod\.ini$/m');
 });
 
 it('signalerSansBloquer ne laisse fuir ni empreinte complète, ni adresse, ni SQL, ni précédente', function (string $sqlstate) {
@@ -182,3 +183,47 @@ it('crm:outbound-rattraper ne signale jamais la QueryException brute', function 
     });
     sansFuiteVerifier($signales, $journal, $sqlstate, $empreinte);
 })->with('sqlstates');
+
+/** Faux `DB::table()` dont la lecture par curseur (hors du try par ligne du rattrapage) échoue avec `$echec`. */
+function sansFuiteCurseurEnPanne(Throwable $echec): void
+{
+    DB::shouldReceive('raw')->andReturn('x');
+    DB::shouldReceive('table')->andReturnUsing(static fn () => new class($echec)
+    {
+        public function __construct(private Throwable $echec) {}
+
+        public function __call($n, $a)
+        {
+            return $this;
+        }
+
+        public function cursor(): never
+        {
+            throw $this->echec;
+        }
+    });
+}
+
+it('crm:outbound-rattraper : une panne SQL HORS du try par ligne ne remonte jamais la QueryException brute', function (string $sqlstate) {
+    $empreinte = hash('sha256', 'a@clients.example.test');
+    sansFuiteCurseurEnPanne(sansFuiteEchec($sqlstate, $empreinte));
+    try {
+        Artisan::call('crm:outbound-rattraper', ['--depuis' => '2000-01-01', '--appliquer' => true]);
+        $this->fail('Une exception était attendue.');
+    } catch (Throwable $e) {
+        expect($e)->not->toBeInstanceOf(QueryException::class)
+            ->and($e->getPrevious())->toBeNull()
+            ->and($e->getMessage())->toContain($sqlstate)->not->toContain($empreinte)->not->toContain('example.test')->not->toContain('select');
+    }
+})->with('sqlstates');
+
+it('crm:outbound-rattraper : une erreur non SQL hors du try par ligne est conservée telle quelle', function () {
+    $erreur = new LogicException('panne applicative');
+    sansFuiteCurseurEnPanne($erreur);
+    try {
+        Artisan::call('crm:outbound-rattraper', ['--depuis' => '2000-01-01']);
+        $this->fail('Une exception était attendue.');
+    } catch (Throwable $e) {
+        expect($e)->toBe($erreur);
+    }
+});

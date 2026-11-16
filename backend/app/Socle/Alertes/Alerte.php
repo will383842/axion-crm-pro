@@ -52,7 +52,10 @@ final class Alerte
         Log::critical('[ALERTE] ' . $titre, $contexte + ['corps' => $corps]);
 
         if (! filter_var(config('alertes.actif', false), FILTER_VALIDATE_BOOLEAN)) {
-            if (! self::$absenceSignalee) {
+            if (config('alertes.essai_a_blanc') === true) {
+                // Coupure VOLONTAIRE le temps d'un essai à blanc (EssaiABlanc) : pas le réglage réel, pas de faux diagnostic.
+                Log::info('Alertes coupées le temps d\'un essai à blanc : l\'alerte reste dans le journal, le réglage est rétabli ensuite.');
+            } elseif (! self::$absenceSignalee) {
                 self::$absenceSignalee = true;
                 Log::warning(
                     'Alertes console + e-mail ÉTEINTES : une alerte vient de rester dans le journal. '

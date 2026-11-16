@@ -113,7 +113,7 @@ components:
           type: integer
           minimum: 1
           maximum: 4
-          description: Nombre de messages de la séquence (1 à 4).
+          description: Nombre de messages de la séquence (1 à 3).
     StatutBoite:
       type: string
       description: Statut d'une boîte ou d'une adresse IP ; `inconnu` (ajouté de façon compatible) quand la santé n'est pas mesurable.

@@ -130,8 +130,8 @@ class EnvoiMessagesController extends ApiController
         $corps = $request->json()->all();
         $etapes = $corps['sequence'] ?? null;
         $repli = $corps['repli'] ?? [];
-        if (! is_array($corps['cible'] ?? null) || ! is_array($etapes) || $etapes === [] || count($etapes) > 4 || ! is_array($repli)) {
-            return $this->erreur('validation', 'La cible et une séquence de 1 à 4 messages sont obligatoires.', 422);
+        if (! is_array($corps['cible'] ?? null) || ! is_array($etapes) || $etapes === [] || count($etapes) > 3 || ! is_array($repli)) {
+            return $this->erreur('validation', 'La cible et une séquence de 1 à 3 messages sont obligatoires.', 422);
         }
 
         return $this->dansEspace(function (string $ws) use ($etapes, $repli) {

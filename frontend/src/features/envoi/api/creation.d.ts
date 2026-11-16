@@ -452,7 +452,7 @@ export interface components {
             cible: components["schemas"]["CibleCampagne"];
             cree_le: components["schemas"]["Horodatage"];
             envoyes: number;
-            /** @description Nombre de messages de la séquence (1 à 4). */
+            /** @description Nombre de messages de la séquence (1 à 3). */
             etapes: number;
             id: components["schemas"]["Identifiant"];
             nom: string;

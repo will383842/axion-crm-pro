@@ -14,6 +14,10 @@ describe('PARTI_EN_REEL', () => {
     'envoi réel effectué',
     'Les courriels sont envoyés pour de vrai',
     'Message parti bien en réel',
+    'Tout est parti en réel',
+    'Le message est bien parti en réel',
+    'parti en réel',
+    'Messages envoyés pour de vrai.',
   ])('attrape « %s »', (texte) => {
     expect(PARTI_EN_REEL.test(texte)).toBe(true);
   });
@@ -24,6 +28,11 @@ describe('PARTI_EN_REEL', () => {
     'Campagne programmée',
     'Un frein est actif',
     'Envois arrêtés',
+    'Le message n’est pas parti en réel',
+    'Aucun message n’est parti en réel',
+    'Rien n’est parti pour de vrai',
+    'Jamais envoyé en réel',
+    'Les messages ne sont pas envoyés pour de vrai',
   ])('laisse passer « %s »', (texte) => {
     expect(PARTI_EN_REEL.test(texte)).toBe(false);
   });

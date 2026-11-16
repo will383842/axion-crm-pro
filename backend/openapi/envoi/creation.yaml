@@ -5,7 +5,7 @@ info:
   description: |
     Assistant de création en 5 étapes (cible, messages, boîtes et rythme,
     programmation, contrôles), brouillon enregistré à chaque étape. Cible par
-    liste, audience ou étiquette, exclusions, séquence de 1 à 4 messages, A/B
+    liste, audience ou étiquette, exclusions, séquence de 1 à 3 messages, A/B
     d'objet, 7
     contrôles, validation par code e-mail, annulation possible pendant 5 min.
     Messages types versionnés, aperçu, « m'envoyer un test ». Lot : DM2-ASS.

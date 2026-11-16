@@ -1,4 +1,4 @@
-/** Étape 2 — Quel message ? Séquence de 1 à 4 messages, objets A/B, champs et valeurs de repli. */
+/** Étape 2 — Quel message ? Séquence de 1 à 3 messages, objets A/B, champs et valeurs de repli. */
 import { useState } from 'react';
 import { Plus, Send, X } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
@@ -132,7 +132,7 @@ export function EtapeMessage({
           </li>
         ))}
       </ol>
-      {saisie.sequence.length < 4 ? (
+      {saisie.sequence.length < 3 ? (
         <Button
           className="mt-3"
           variant="secondary"

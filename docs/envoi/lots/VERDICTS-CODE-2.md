@@ -23,4 +23,5 @@ suppression de verdict ni de donnée de personne (INSERT seulement). Fichiers ch
 la nouvelle tâche planifiée. Rien d'autre régénéré (`nr06`, `nr20` laissés tels quels).
 
 ## Tests
+`PointsEntreeV0Test` : le test V0 « fichiers vides » accepte UNE tâche, la nôtre (renforcé : exactement une).
 `RafraichissementVerdictsTest` (T2.1 à T2.8, T2.10), `VerdictsRoleApplicatifTest` (T2.9, sous `pgsql_app`).

@@ -614,6 +614,7 @@ Schedule::command(EnvoiTemoinsReleve::SIGNATURE_PLANIFIEE)
 require __DIR__ . '/console/envoi-orchestration.php';
 require __DIR__ . '/console/envoi-retention.php';
 require __DIR__ . '/console/envoi-materialisation.php';
+require __DIR__ . '/console/envoi-campagnes.php';
 require __DIR__ . '/console/envoi-verdicts.php';
 require __DIR__ . '/console/envoi-transport.php';
 require __DIR__ . '/console/envoi-releve.php';

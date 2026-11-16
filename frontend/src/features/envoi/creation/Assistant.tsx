@@ -36,6 +36,8 @@ export function Assistant({
         ? { ...SAISIE_INITIALE, cible: { type: cibleInitiale.type, reference: cibleInitiale.reference, libelle: cibleInitiale.libelle }, nom: `Campagne ${cibleInitiale.libelle}` }
         : SAISIE_INITIALE,
   );
+  // Brouillon rouvert (par ex. copie sans ses destinataires) mais sans cible : on le dit.
+  const [rechoisirCible] = useState(() => brouillonInitial !== null && saisieDepuis(brouillonInitial).cible === null);
   const reprise = brouillonInitial ? Math.min(5, Math.max(1, brouillonInitial.etape_courante)) : 1;
   const [etape, setEtape] = useState(reprise);
   const [plusLoin, setPlusLoin] = useState(reprise);
@@ -159,7 +161,7 @@ export function Assistant({
             <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800 ring-1 ring-rose-200">{erreurSuite}</p>
           ) : null}
           {etape === 1 ? (
-            <EtapeCible saisie={saisie} modifier={modifier} cibles={cibles} brouillonId={brouillonId} suite={() => { continuer(1); }} />
+            <EtapeCible saisie={saisie} modifier={modifier} cibles={cibles} brouillonId={brouillonId} rechoisir={rechoisirCible && saisie.cible === null} suite={() => { continuer(1); }} />
           ) : null}
           {etape === 2 ? (
             <EtapeMessage

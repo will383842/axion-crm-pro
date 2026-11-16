@@ -251,7 +251,7 @@ export function CampagneSuiviPage() {
             maintenant={fiche.maintenant}
             variante="entete"
             avant={
-              c.statut === 'brouillon' || c.statut === 'a_valider' ? (
+              c.statut === 'brouillon' ? (
                 <Link
                   to="/envoi/campagnes/nouvelle"
                   search={{ brouillon: String(c.id) }}

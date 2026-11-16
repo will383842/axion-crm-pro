@@ -6,9 +6,9 @@
  */
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { isAxiosError } from 'axios';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
+import { messageErreur as messageErreurServeur } from '../../infrastructure/composants/format';
 import { CalendarClock, Copy, Pause, Play, Square } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
 import { cn } from '@/components/ui/cn';
@@ -38,13 +38,8 @@ export function gestesPermis(statut: Campagne['statut']) {
   };
 }
 
-function messageErreur(e: unknown): string {
-  if (isAxiosError(e)) {
-    const m = (e.response?.data as { message?: unknown } | undefined)?.message;
-    if (typeof m === 'string' && m !== '') return m;
-  }
-  return 'Le geste n’a pas abouti. Rien n’a changé : réessayez dans un instant.';
-}
+const REPLI_GESTE = 'Le geste n’a pas abouti. Rien n’a changé : réessayez dans un instant.';
+const messageErreur = (e: unknown): string => messageErreurServeur(e, REPLI_GESTE);
 
 const TACTILE = 'max-md:h-11 max-md:text-sm';
 

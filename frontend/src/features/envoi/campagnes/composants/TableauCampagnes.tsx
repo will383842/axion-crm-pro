@@ -40,10 +40,15 @@ export function TableauCampagnes({ campagnes, maintenant }: { campagnes: readonl
         {campagnes.map((c) => {
           const id = String(c.id);
           const prochain = (c.statut === 'en_cours' || c.statut === 'programmee') && c.prochain_envoi_le !== null ? dateRelative(c.prochain_envoi_le, maintenant) : '—';
+          // Seul un brouillon mène à l'assistant ; « à valider » retourne au suivi.
           const lien =
-            c.statut === 'a_valider' || c.statut === 'brouillon' ? (
-              <Link to="/envoi/campagnes/nouvelle" search={{ brouillon: id }} className={BOUTON_LIEN} aria-label={`${c.statut === 'a_valider' ? 'Relire et valider' : 'Ouvrir'} : ${c.nom}`}>
-                {c.statut === 'a_valider' ? 'Relire et valider' : 'Ouvrir'}
+            c.statut === 'brouillon' ? (
+              <Link to="/envoi/campagnes/nouvelle" search={{ brouillon: id }} className={BOUTON_LIEN} aria-label={`Ouvrir : ${c.nom}`}>
+                Ouvrir
+              </Link>
+            ) : c.statut === 'a_valider' ? (
+              <Link to="/envoi/campagnes/$campagneId" params={{ campagneId: id }} className={BOUTON_LIEN} aria-label={`Relire et valider : ${c.nom}`}>
+                Relire et valider
               </Link>
             ) : null;
           return (

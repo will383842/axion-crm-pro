@@ -36,7 +36,7 @@ export function libelleAccord(n: number): string {
 export const RAPPEL_ENVOI_REEL = 'Accorder le feu vert n’active pas l’envoi réel : l’envoi réel reste une décision d’exploitation, prise hors de cet écran.';
 
 /** Ce qui se passe après le feu vert : une décision écrite, hors de cet écran. */
-export const ETAPE_SUIVANTE = 'Après le feu vert, l’ouverture de l’envoi réel est une décision écrite du fondateur, appliquée sur le serveur.';
+export const ETAPE_SUIVANTE = 'Après le feu vert, l’ouverture de l’envoi réel est une décision écrite du propriétaire de l’espace, appliquée ensuite par l’exploitant.';
 
 /** « 3 points validés sur 15 » et « 12 points restants » (jamais « Prêt » : le feu vert n'est pas l'envoi). */
 export function libelleAvancement(r: Pick<Recap, 'faits' | 'total'>): { valides: string; restants: string } {

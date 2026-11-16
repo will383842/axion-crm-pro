@@ -560,3 +560,16 @@ test('X1-L3 concurrence en processus réels : trois construire = un 0 et deux 2 
         }
     }
 });
+
+test('X1-L3 identifiant de campagne : non UUID = introuvable (jamais erreur_base) ; MAJUSCULES = même campagne (dejaFaite)', function () {
+    foreach (CNS_MODES as $mode) {
+        $ws = cnsEspace();
+        foreach (['pas-un-uuid', '', "1'; DROP TABLE x;--"] as $mauvais) {
+            expect(cnsMotif(fn () => cnsConstruire($mode, $ws, $mauvais)))->toBe('introuvable', "{$mode} « {$mauvais} »");
+        }
+        $p = cnsProgrammee($ws);
+        $un = cnsConstruire($mode, $ws, $p['id']);
+        $deux = cnsConstruire($mode, $ws, strtoupper($p['id']));
+        expect($deux->dejaFaite)->toBeTrue($mode)->and($deux->sequenceId)->toBe($un->sequenceId);
+    }
+});

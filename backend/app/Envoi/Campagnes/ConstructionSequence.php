@@ -26,6 +26,10 @@ final class ConstructionSequence
     /** @throws ConstructionRefusee */
     public function construire(string $ws, string $campagneId): ResultatConstruction
     {
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $campagneId) !== 1) {
+            throw new ConstructionRefusee('introuvable', false, 'Campagne introuvable dans cet espace.');
+        }
+
         return self::relancer(fn () => $this->depot->sousVerrou($ws, $campagneId, fn () => $this->executer($ws, $campagneId)));
     }
 
@@ -77,7 +81,7 @@ final class ConstructionSequence
 
         if ($c->sequence_id !== null) {
             $liee = DB::selectOne('SELECT campagne_id FROM envoi_sequences WHERE workspace_id = ? AND id = ?', [$ws, $c->sequence_id]);
-            if ($liee !== null && $liee->campagne_id === $campagneId) {
+            if ($liee !== null && strtolower((string) $liee->campagne_id) === strtolower($campagneId)) {
                 return new ResultatConstruction((string) $c->sequence_id, (int) $c->version, true);
             }
             throw new ConstructionRefusee('sequence_incoherente', false, 'La campagne est liée à une séquence qui n\'est pas la sienne.');

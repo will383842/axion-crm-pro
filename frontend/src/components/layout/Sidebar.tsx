@@ -128,7 +128,10 @@ const SECTION_ACCUEIL: NavSection = {
   id: 'accueil',
   title: 'Accueil',
   sansTitre: true,
-  items: [{ to: '/', label: 'Tableau de bord', icon: icone(LayoutDashboard), dataTour: 'nav-dashboard' }],
+  items: [
+    { to: '/', label: 'Tableau de bord', icon: icone(LayoutDashboard), dataTour: 'nav-dashboard' },
+    { to: '/taches', label: 'Mes tâches', icon: icone(ListChecks) },
+  ],
 };
 
 /**

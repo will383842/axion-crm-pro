@@ -27,6 +27,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
+use Tests\Support\FauxProtocoleImap;
+use Tests\Support\FauxServeurImap as Faux;
 use Tests\TestCase;
 use Webklex\PHPIMAP\Config;
 use Webklex\PHPIMAP\Connection\Protocols\ImapProtocol;
@@ -290,4 +292,26 @@ test('délais réseau : le lecteur réel règle le délai de la bibliothèque (1
         // attendu : arrêt avant tout réseau
     }
     expect($vu->timeout)->toBe(LecteurBoiteWebklex::DELAI_RESEAU_SECONDES)->toBe(15);
+});
+
+test('G8 : INTERNALDATE illisible ⇒ le message n\'est jamais « récent » ; le STOP qui suit est lu (pas de blocage sans fin)', function () {
+    Faux::reinitialiser();
+    [$boite] = $this->boites;
+    Faux::deposer(1, Faux::brut('xx1@zz-client.example.test', 'Merci.'), 'xx');
+    Faux::deposer(2, Faux::brut('xx2@zz-client.example.test', 'STOP, ne me contactez plus'));
+    $lecteurReel = new LecteurBoiteWebklex(
+        ['host' => 'imap.zz.example.test', 'username' => 'u', 'password' => 'p'],
+        $boite,
+        'INBOX',
+        static fn () => new FauxProtocoleImap(Config::make(), true, 'ssl'),
+    );
+    $releve = new ReleveImap($lecteurReel, $this->registre, new RecepteurRetoursCrm);
+
+    $lus = 0;
+    for ($i = 0; $i < 5; $i++) {
+        $lus += $releve->relever($this->ws, $boite)->lus;
+        Carbon::setTestNow(now()->addHours(6));
+    }
+
+    expect($lus)->toBe(2)->and(vgCurseur($boite))->toBe(2);
 });

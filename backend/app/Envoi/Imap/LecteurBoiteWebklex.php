@@ -39,10 +39,10 @@ final class LecteurBoiteWebklex implements LecteurBoite
     /** Au-delà : message écarté (« à rattacher », sans effet), jamais téléchargé. */
     public const MAX_OCTETS = 262_144;
 
-    /** Chiffrement imposé : aucun paramètre ne permet de l'affaiblir. */
     /** Délai réseau (secondes) : connexion ET lecture du flux (un seul réglage dans la bibliothèque). */
     public const DELAI_RESEAU_SECONDES = 15;
 
+    /** Chiffrement imposé : aucun paramètre ne permet de l'affaiblir. */
     private const CHIFFREMENTS = ['ssl', 'tls', 'starttls'];
 
     private ?ImapProtocol $protocole = null;
@@ -115,7 +115,8 @@ final class LecteurBoiteWebklex implements LecteurBoite
                 if (! isset($meta[$uid])) {
                     continue; // disparu entre la recherche et la lecture : rien à lire
                 }
-                $recuLe = $meta[$uid]['date'] ?? CarbonImmutable::now('UTC');
+                // Date inconnue : jamais « récente » (sinon le délai de grâce bloquerait la boîte sans fin, D1 § 5.3).
+                $recuLe = $meta[$uid]['date'] ?? CarbonImmutable::now('UTC')->subSeconds(ReleveImap::DELAI_GRACE_SECONDES + 1);
                 if ($depuis !== null && $recuLe < $depuis) {
                     continue; // filtré APRÈS la pagination sur les UID bruts
                 }

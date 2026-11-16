@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Contacts\AjoutContact;
 use App\Crm\Contacts\GestesContact;
+use App\Crm\Contacts\ImportContacts;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\Contact;
 use App\Support\MasquageCoordonnees;
@@ -13,7 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
-/** Gestes « Contacts » de la console (G1-A : modifier ; G1-B : retirer, restaurer, corbeille douce ; G1-C : ajout rapide). */
+/** Gestes « Contacts » de la console (G1-A : modifier ; G1-B : retirer, restaurer, corbeille douce ; G1-C : ajout rapide ; G1-D : import). */
 class ContactsGestesController extends ConsoleController
 {
     use VerrouOptimiste;
@@ -110,6 +111,62 @@ class ContactsGestesController extends ConsoleController
             'fusion_invalide' => response()->json(['error' => 'fusion_invalide', 'message' => 'Indiquez la fiche à compléter.'], 422),
             default => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
         };
+    }
+
+    /** Contrôle d'un fichier avant import : AUCUNE écriture ; numéros de ligne et codes seulement. */
+    public function importControle(Request $request): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('importer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $lignes = $this->lignesImport($request);
+
+        return response()->json(WorkspaceContext::run($workspaceId, fn () => (new ImportContacts)->controle($workspaceId, $lignes)));
+    }
+
+    /** Import synchrone (1 000 lignes au plus) : rapport gardé 1 h, lisible par le seul lanceur. */
+    public function importer(Request $request): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('importer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $lignes = $this->lignesImport($request);
+        $userId = (string) $this->currentUser($request)->getKey();
+
+        $travail = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $lignes, $userId): array {
+            $service = new ImportContacts;
+
+            return $service->memoriser($workspaceId, $userId, $service->importer($workspaceId, $lignes, $userId));
+        });
+
+        return response()->json($travail);
+    }
+
+    /** Relit le rapport d'un import (même utilisateur, même espace) ; sinon 404. */
+    public function importSuivi(Request $request, string $id): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('importer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $t = (new ImportContacts)->suivi($workspaceId, (string) $this->currentUser($request)->getKey(), $id);
+
+        return $t === null ? response()->json(['error' => 'introuvable', 'message' => 'Import introuvable.'], 404) : response()->json($t);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function lignesImport(Request $request): array
+    {
+        $max = ImportContacts::MAX_CHAMP;
+        $d = $request->validate([
+            'lignes' => ['required', 'array', 'min:1', 'max:' . ImportContacts::MAX_LIGNES],
+            'lignes.*' => ['array'],
+            'lignes.*.ligne' => ['required', 'integer', 'min:0'],
+            'lignes.*.prenom' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.nom' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.email' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.organisation' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.fonction' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.provenance' => ['nullable', 'string', 'max:' . $max],
+        ]);
+
+        return array_values($d['lignes']);
     }
 
     /** Retirer = corbeille douce, restaurable. Idempotent. Rien n'est effacé. */

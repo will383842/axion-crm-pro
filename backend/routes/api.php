@@ -562,6 +562,10 @@ Route::prefix('v1')->group(function () {
             // G1-C : ajout rapide. Avant `/contacts/{contactId}` (sinon `doublons` serait pris pour un identifiant).
             Route::get('/contacts/doublons', [ContactsGestesController::class, 'doublons'])->middleware(['throttle:scraper-list', 'permission:companies.view']);
             Route::post('/contacts', [ContactsGestesController::class, 'ajouter'])->middleware('permission:companies.create');
+            // G1-D : import. Avant `/contacts/{contactId}` ; synchrone (1 000 lignes au plus).
+            Route::post('/contacts/import/controle', [ContactsGestesController::class, 'importControle'])->middleware(['permission:companies.create', 'delai-sql:300']);
+            Route::post('/contacts/import', [ContactsGestesController::class, 'importer'])->middleware(['throttle:6,1', 'permission:companies.create', 'delai-sql:300']);
+            Route::get('/contacts/import/{id}', [ContactsGestesController::class, 'importSuivi'])->whereUuid('id')->middleware(['permission:companies.create', 'delai-sql:300']);
             Route::get('/contacts/corbeille', [ContactsGestesController::class, 'corbeille'])->middleware('permission:companies.view');
             Route::post('/contacts/{contactId}/retirer', [ContactsGestesController::class, 'retirer'])->whereNumber('contactId')->middleware('permission:companies.delete');
             Route::post('/contacts/{contactId}/restaurer', [ContactsGestesController::class, 'restaurer'])->whereNumber('contactId')->middleware('permission:companies.delete');

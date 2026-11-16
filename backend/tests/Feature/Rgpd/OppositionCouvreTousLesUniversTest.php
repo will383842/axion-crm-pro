@@ -303,6 +303,10 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // G4-API (2026-11-14) : +1. `Crm\Opposition\StatutOpposition` LIT `opt_out` et `email_suppressions`
     // en portée `business` (jamais le vivier), par lot, pour afficher « opposée » dans le CRM. Lecture
     // seule : il n'écrit, n'efface ni n'émet rien vers le site.
+    // Filet modifié : pourquoi — VERDICTS-CODE-1 (2026-11-16) : +1. `Envoi\Verdicts\VerificateurInterne` LIT
+    // `email_suppressions` en portée `business` (jamais le vivier), motif `hard_bounce` seul, pour classer une
+    // adresse déjà rebondie `invalide/rebond_dur`. Lecture seule : il n'écrit, n'efface ni ne modifie rien ;
+    // l'effacement couvre la liste elle-même (`ListeSuppression`), et la porte refuse toujours opposition et plainte.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
         'app/Crm/Ingest/DossierClientIngest.php',
@@ -317,6 +321,7 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
         'app/Crm/Rgpd/SiteGdprService.php',
         'app/Crm/Scraping/ScrapedRecordIngestService.php',
         'app/Envoi/Conformite/RegistreOppositionManuel.php',
+        'app/Envoi/Verdicts/VerificateurInterne.php',
         'app/Services/Dedup/DeduplicationService.php',
         'app/Support/EligibiliteCampagne.php',
         'app/Support/ListeSuppression.php',

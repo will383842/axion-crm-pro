@@ -67,7 +67,7 @@ final class EtalementEcheances
         $total = 0;
         foreach (self::jours($seuil) as $jour) {
             for ($k = max(0, $dejaParJour[$jour->format('Y-m-d')] ?? 0); $k < $p; $k++) {
-                if (self::creneau($fenetre, $jour, $k, $p, self::ALEA_MAX) >= $seuil) {
+                if (self::creneau($fenetre, $jour, $k, $p, self::ALEA_MIN) >= $seuil) {
                     $total++;
                 }
             }

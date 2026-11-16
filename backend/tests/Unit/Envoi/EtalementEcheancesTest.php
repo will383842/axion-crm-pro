@@ -116,3 +116,14 @@ it('ne place jamais une échéance à moins de 5 minutes de maintenant', functio
         expect($r['c|k']->getTimestamp())->toBeGreaterThanOrEqual($maintenant->modify('+5 minutes')->getTimestamp());
     }
 });
+
+it('capacite est une borne basse : repartir place au moins capacite clés', function () {
+    $f = new FenetreHoraire(8, 19);
+    foreach (range(0, 659) as $m) {
+        $now = etParis('2026-03-02 08:00')->modify("+{$m} minutes");
+        $cap = EtalementEcheances::capacite($f, $now, $now, 20, []);
+        foreach (['g', 'h', 'z'] as $g) {
+            expect(count(EtalementEcheances::repartir($f, $now, $now, 20, [], etCles($cap), $g)))->toBeGreaterThanOrEqual($cap);
+        }
+    }
+});

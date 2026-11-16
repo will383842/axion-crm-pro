@@ -17,4 +17,10 @@ class ContactPolicy extends BasePolicy
     {
         return $user->hasPermissionTo('companies.delete');
     }
+
+    /** Ajouter un contact : même droit que la création d'une entreprise. */
+    public function creer(User $user): bool
+    {
+        return $user->hasPermissionTo('companies.create');
+    }
 }

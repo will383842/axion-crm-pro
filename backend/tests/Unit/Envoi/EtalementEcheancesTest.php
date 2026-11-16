@@ -127,3 +127,9 @@ it('capacite est une borne basse : repartir place au moins capacite clés', func
         }
     }
 });
+
+it('un créneau qui tombe exactement sur une heure ronde est décalé (jamais HH:00:00)', function () {
+    $m = new ReflectionMethod(EtalementEcheances::class, 'creneau');
+    $d = $m->invoke(null, new FenetreHoraire(8, 19), etParis('2026-03-02 00:00'), 0, 20, 0.0);
+    expect($d->setTimezone(new DateTimeZone('Europe/Paris'))->format('H:i:s'))->not->toEndWith(':00:00');
+});

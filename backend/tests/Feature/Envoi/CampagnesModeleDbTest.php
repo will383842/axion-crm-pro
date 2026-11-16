@@ -273,9 +273,13 @@ test('R08 sequence_id s\'écrit uniquement via un lien unique, une seule fois, a
     $id = campCreer($ws);
     expect(fn () => app(DepotCampagnes::class)->modifier($ws, $id, 1, ['sequence_id' => (string) Str::uuid()]))->toThrow(CampagneRefusee::class, 'non modifiable');
     expect(DB::table('envoi_campagnes')->where('id', $id)->value('sequence_id'))->toBeNull();
-    // la source du dépôt n'écrit pas la colonne (elle ne la mentionne que pour la lire ou la refuser)
+    // la source du dépôt n'écrit la colonne qu'à UN seul endroit : la méthode lierSequence (X1-L3)
     $source = (string) file_get_contents(app_path('Envoi/Campagnes/DepotCampagnes.php'));
-    expect($source)->not->toContain("'sequence_id' =>")->and($source)->not->toContain("['sequence_id']");
+    expect(substr_count($source, "'sequence_id' =>"))->toBe(1)->and($source)->not->toContain("['sequence_id']");
+    $debut = strpos($source, 'function lierSequence');
+    $fin = strpos($source, 'function ', $debut + 10);
+    $position = strpos($source, "'sequence_id' =>");
+    expect($debut)->not->toBeFalse()->and($position)->toBeGreaterThan($debut)->and($fin === false || $position < $fin)->toBeTrue();
     // INSERT : jamais de sequence_id (aucun droit de colonne pour le rôle applicatif : 42501)
     expect(campEchec(fn () => campCommeApp($ws, fn () => DB::table('envoi_campagnes')->insert([
         'workspace_id' => $ws, 'nom' => 'x', 'cible' => json_encode(campCible()), 'nb_etapes' => 1, 'cree_par' => 'r', 'sequence_id' => (string) Str::uuid(),

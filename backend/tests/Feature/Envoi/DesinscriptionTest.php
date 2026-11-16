@@ -552,6 +552,8 @@ test('concurrence RÉELLE : deux processus simultanés sur le même lien = une o
         $proprio->table('email_suppressions')->where('email_hash', $h)->delete();
         $proprio->table('envoi_oppositions')->where('workspace_id', $ws)->delete();
         $proprio->table('envoi_liens_desinscription')->where('workspace_id', $ws)->delete();
+        // C3-3 : l'opposition écrit une demande de retrait (ajout seul, FK vers l'espace) : nettoyée avant l'espace, sans orphelin.
+        $proprio->table('envoi_retraits_demandes')->where('workspace_id', $ws)->delete();
         $proprio->table('workspaces')->where('id', $ws)->delete();
         $proprio->statement("SET session_replication_role = 'origin'");
         $proprio->disconnect();

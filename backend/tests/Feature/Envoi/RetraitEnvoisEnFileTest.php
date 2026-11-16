@@ -103,16 +103,16 @@ function retrInterrupteurs(bool $actifs): void
  * @param  list<array{adaptateur?: string, rang?: int, cree_le?: string}>  $injections
  * @return list<string>
  */
-function retrInscription(string $ws, string $empreinte, array $injections, int $contact = 1): array
+function retrInscription(string $ws, string $empreinte, array $injections, int $contact = 1, string $statut = 'active'): array
 {
     $ids = [];
-    WorkspaceContext::run($ws, function () use ($ws, $empreinte, $injections, $contact, &$ids) {
+    WorkspaceContext::run($ws, function () use ($ws, $empreinte, $injections, $contact, $statut, &$ids) {
         $sid = (string) Str::uuid();
         DB::table('envoi_sequences')->insert(['id' => $sid, 'workspace_id' => $ws, 'nom' => 'Séquence fictive']);
         $ins = (string) Str::uuid();
         DB::table('envoi_inscriptions')->insert([
             'id' => $ins, 'workspace_id' => $ws, 'sequence_id' => $sid, 'contact_id' => $contact, 'entreprise_id' => 9000 + $contact,
-            'empreinte_adresse' => $empreinte, 'prochaine_echeance' => now()->addDay()->format('c'), 'version_figee' => '{}',
+            'empreinte_adresse' => $empreinte, 'statut' => $statut, 'prochaine_echeance' => now()->addDay()->format('c'), 'version_figee' => '{}',
         ]);
         foreach ($injections as $i => $inj) {
             $id = (string) Str::uuid();
@@ -255,7 +255,7 @@ test('C3-3 (2 bis) rejeu d\'une commande non acquittée : le MÊME corps (mêmes
     expect(retrPosts())->toHaveCount(1);
 
     // Une injection de plus est réservée entre-temps : le rejeu ne doit PAS la glisser dans la même commande.
-    retrInscription($this->ws, $this->empreinte, [['rang' => 1]], 3);
+    retrInscription($this->ws, $this->empreinte, [['rang' => 1]], 3, 'terminee'); // une seule inscription ACTIVE par adresse (P2-B)
     retrStatut(200);
     $rejeu = app(RejoueurCommandes::class)->rejouer();
     expect($rejeu['rejouees'])->toBe(1);

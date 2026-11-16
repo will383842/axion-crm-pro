@@ -217,7 +217,10 @@ final class ServiceReponses
             if ($l === null) {
                 return ['inconnue', null];
             }
-            if (! DB::table('envoi_injections_smtp')->where('workspace_id', $ws)->where('id_injection', $injection)->exists()) {
+            // Même règle que le déclencheur de base : l'identifiant du registre vit dans l'une OU l'autre table, pour cet espace.
+            $connue = DB::table('envoi_injections_smtp')->where('workspace_id', $ws)->where('id_injection', $injection)->exists()
+                || DB::table('envoi_injections_locales')->where('workspace_id', $ws)->where('id_injection', $injection)->exists();
+            if (! $connue) {
                 return ['inconnue_injection', null];
             }
             try {

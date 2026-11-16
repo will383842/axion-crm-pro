@@ -45,8 +45,13 @@ final class Inscriptions
             'version_figee' => json_encode($figee, JSON_THROW_ON_ERROR),
         ]);
 
-        return (string) DB::table('envoi_inscriptions')->where('workspace_id', $ws)
+        $id = DB::table('envoi_inscriptions')->where('workspace_id', $ws)
             ->where('sequence_id', $sequenceId)->where('contact_id', $contactId)->value('id');
+        if ($id === null) { // ligne ignorée par l'index « une inscription active par adresse » (P2-B)
+            throw new InvalidArgumentException('Adresse déjà inscrite à une séquence active dans cet espace.');
+        }
+
+        return (string) $id;
     }
 
     /** Arrêt de l'inscription (+ de toute l'adresse pour stop/opposition/rebond dur, + de toute l'entreprise pour réponse/opposition). Retourne le nombre d'inscriptions arrêtées. */

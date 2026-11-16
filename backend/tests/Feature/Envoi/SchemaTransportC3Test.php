@@ -183,6 +183,15 @@ test('C3-0 registre Kumo : seq posé ne change plus, posé une première fois il
     expect(c3Sous($mode, $ws, fn () => DB::statement("UPDATE envoi_kumo_injections SET etat = 'echec' WHERE cle_idempotence = ?", [$cle])))->toBeNull();
 })->with(C3_MODES);
 
+test('C3-0 registre Kumo : envoi_kumo_etat, changer d’espace est refusé (identité figée)', function (string $mode) {
+    $a = c3Espace();
+    $b = c3Espace();
+    DB::table('envoi_kumo_etat')->insert(['workspace_id' => $a]);
+    $code = c3Sous($mode, $a, fn () => DB::statement('UPDATE envoi_kumo_etat SET workspace_id = ? WHERE workspace_id = ?', [$b, $a]));
+    expect($code)->toBe($mode === 'proprio' ? 'P0001' : $code)->not->toBeNull();
+    expect(c3Sous($mode, $a, fn () => DB::statement('UPDATE envoi_kumo_etat SET en_pause = true WHERE workspace_id = ?', [$a])))->toBeNull();
+})->with(C3_MODES);
+
 test('C3-0 registre Kumo : CHECK de clé, état, jeton et code', function (string $mode) {
     $ws = c3Espace();
     foreach ([['cle_idempotence' => ''], ['cle_idempotence' => str_repeat('x', 201)], ['etat' => 'inconnu'], ['jeton' => 'ZZ'], ['code' => 199], ['code' => 600]] as $mauvais) {

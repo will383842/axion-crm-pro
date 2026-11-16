@@ -613,3 +613,8 @@ Schedule::command(EnvoiTemoinsReleve::SIGNATURE_PLANIFIEE)
 // Envoi S0 : planifications d'envoi rangées par fichier (vides tant que L8-ORCH et R06-ARCH ne les remplissent pas).
 require __DIR__ . '/console/envoi-orchestration.php';
 require __DIR__ . '/console/envoi-retention.php';
+require __DIR__ . '/console/envoi-materialisation.php';
+require __DIR__ . '/console/envoi-verdicts.php';
+require __DIR__ . '/console/envoi-transport.php';
+require __DIR__ . '/console/envoi-releve.php';
+require __DIR__ . '/console/envoi-reactions.php';

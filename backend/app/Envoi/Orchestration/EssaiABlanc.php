@@ -52,7 +52,8 @@ use Throwable;
  *  - la chaîne est construite ICI : jamais le `ServeurEnvoi` du conteneur, ni `RecepteurRetoursCrm` (espace commercial, cache,
  *    fichier temporaire), ni le cache, ni `Alerte` réelle (un faux exemplaire muet, un vrai provoquerait un courriel) ;
  *  - le faux serveur est construit APRÈS l'ouverture de la transaction (il refuse d'injecter à un niveau plus élevé) ;
- *  - la porte « envoi réel » n'est ouverte que pour la passerelle locale d'ici, par une fermeture : la configuration n'est jamais modifiée ;
+ *  - la porte « envoi réel » n'est ouverte que pour la passerelle locale d'ici, par une fermeture, sans toucher à la configuration d'envoi. Seule exception, le temps du relevé :
+ *    `alertes.actif` est forcé à faux (et `alertes.essai_a_blanc` à vrai), puis restauré dans un `finally` ;
  *  - jour fictif lointain (horloge injectée) : le verrou consultatif du vrai jour n'est jamais pris ;
  *  - aucune requête HTTP (`preventStrayRequests`).
  */
@@ -113,6 +114,8 @@ final class EssaiABlanc
             'reussi' => $erreur === null && $rapport->reussi(), 'etapes' => json_encode($rapport->pourBase(), JSON_THROW_ON_ERROR),
         ]));
         if ($erreur !== null) {
+            // Relance brute volontaire : l'essai ne manipule que des données FICTIVES (`*.example.test`, espace jetable annulé),
+            // l'exception ne peut donc embarquer ni adresse ni empreinte réelles.
             throw $erreur;
         }
 
@@ -296,11 +299,12 @@ final class EssaiABlanc
             $muette,
         );
         $actifAvant = config('alertes.actif');
-        config(['alertes.actif' => false]);
+        $essaiAvant = config('alertes.essai_a_blanc');
+        config(['alertes.actif' => false, 'alertes.essai_a_blanc' => true]);
         try {
             $releve->relever($ws, $boite);
         } finally {
-            config(['alertes.actif' => $actifAvant]);
+            config(['alertes.actif' => $actifAvant, 'alertes.essai_a_blanc' => $essaiAvant]);
         }
     }
 

@@ -76,6 +76,17 @@ class CrmOutboundRattraper extends Command
 
     public function handle(OppositionSortante $sortante): int
     {
+        try {
+            return $this->rattraper($sortante);
+        } catch (Throwable $e) {
+            // Toute requête hors du try par ligne (curseur, lecture des événements, origines des demandes) : une QueryException
+            // contient le SQL et les valeurs liées (adresses chiffrées, empreintes). Jamais relancée brute ; le reste est conservé.
+            throw OppositionSortante::porteUneRequete($e) ? OppositionSortante::exceptionSansFuite($e, '') : $e;
+        }
+    }
+
+    private function rattraper(OppositionSortante $sortante): int
+    {
         $depuisBrut = $this->option('depuis');
         if (! is_string($depuisBrut) || trim($depuisBrut) === '') {
             $this->error('--depuis est obligatoire (ex. --depuis=2026-11-14) : aucun défaut, envoyer l\'historique est une décision écrite.');
@@ -155,8 +166,8 @@ class CrmOutboundRattraper extends Command
                 }
             } catch (Throwable $e) {
                 $bilan['erreurs']++;
-                // Jamais l'exception brute : SQL et valeurs liées (empreinte complète) dans le message.
-                report(OppositionSortante::exceptionSansFuite($e, (string) $l->email_hash));
+                // Jamais une QueryException brute : SQL et valeurs liées (empreinte complète) dans le message.
+                report(OppositionSortante::porteUneRequete($e) ? OppositionSortante::exceptionSansFuite($e, (string) $l->email_hash) : $e);
             }
         }
 

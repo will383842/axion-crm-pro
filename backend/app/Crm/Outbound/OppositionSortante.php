@@ -6,6 +6,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -161,6 +162,10 @@ final class OppositionSortante
      */
     public static function exceptionSansFuite(Throwable $e, string $empreinte): RuntimeException
     {
+        if ($empreinte === '') {
+            return new RuntimeException(sprintf('Rattrapage sortant impossible (SQLSTATE %s).', self::sqlstateDe($e)));
+        }
+
         return new RuntimeException(sprintf(
             'Signalement sortant impossible (SQLSTATE %s, empreinte %s).',
             self::sqlstateDe($e),
@@ -168,11 +173,11 @@ final class OppositionSortante
         ));
     }
 
-    /** Vrai si l'exception ou l'une de ses précédentes est une QueryException (SQL et valeurs liées dans le message). */
+    /** Vrai si l'exception ou l'une de ses précédentes est une QueryException ou une PDOException (SQL et valeurs liées dans le message). */
     public static function porteUneRequete(Throwable $e): bool
     {
         for ($c = $e; $c !== null; $c = $c->getPrevious()) {
-            if ($c instanceof QueryException) {
+            if ($c instanceof QueryException || $c instanceof PDOException) {
                 return true;
             }
         }
@@ -184,7 +189,7 @@ final class OppositionSortante
     private static function sqlstateDe(Throwable $e): string
     {
         for ($c = $e; $c !== null; $c = $c->getPrevious()) {
-            $code = $c instanceof QueryException ? ($c->errorInfo[0] ?? $c->getCode()) : $c->getCode();
+            $code = ($c instanceof QueryException || $c instanceof PDOException) ? ($c->errorInfo[0] ?? $c->getCode()) : $c->getCode();
             if (is_string($code) && preg_match('/^[0-9A-Z]{5}$/', $code) === 1) {
                 return $code;
             }

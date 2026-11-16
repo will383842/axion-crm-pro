@@ -270,9 +270,11 @@ test('l\'alerte de l\'essai est construite sans réflexion et reste muette même
     $src = (string) file_get_contents(app_path('Envoi/Orchestration/EssaiABlanc.php'));
     expect($src)->not->toContain('ReflectionClass')->not->toContain('newInstanceWithoutConstructor');
     config(['alertes.actif' => true]);
+    expect(config('alertes.essai_a_blanc'))->toBeNull();
     Mail::fake();
 
     app(EssaiABlanc::class)->executer($this->ws, 'test-essai');
+    expect(config('alertes.essai_a_blanc'))->toBeNull();
 
     Mail::assertNothingSent();
     Mail::assertNothingQueued();

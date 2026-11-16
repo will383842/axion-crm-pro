@@ -77,15 +77,38 @@ final class GardeChauffe
         if ($humain === Freins::RALENTI) {
             $quota = (int) floor($quota * Seuils::HUMAIN_FACTEUR_RALENTI);
         }
-        if ($this->depot->envoyesBoite($ws, $boite, $jour) + $enCours['boite'] >= $quota) {
+        $domaine = Fournisseur::domaine($m->expediteur);
+        // Reculs posés à l'écran sur ce domaine : ils ne font jamais MONTER la limite (min), seulement la baisser.
+        $plafond = $this->plafondDomaineAvecReculs($ws, $domaine, $jour, $s['jour_effectif_part']);
+        $limiteBoite = $plafond === null ? $quota : min($quota, $plafond);
+        if ($this->depot->envoyesBoite($ws, $boite, $jour) + $enCours['boite'] >= $limiteBoite) {
             return self::QUOTA_ATTEINT;
         }
         // Quota du DOMAINE d'envoi : créer des boîtes sur le même domaine ne multiplie pas la montée de chauffe.
-        if ($this->depot->envoyesDomaine($ws, Fournisseur::domaine($m->expediteur), $jour) + $enCours['domaine'] >= Seuils::DOMAINE_FACTEUR * $quota) {
+        $limiteDomaine = Seuils::DOMAINE_FACTEUR * $quota;
+        if ($plafond !== null) {
+            $limiteDomaine = min($limiteDomaine, $plafond);
+        }
+        if ($this->depot->envoyesDomaine($ws, $domaine, $jour) + $enCours['domaine'] >= $limiteDomaine) {
             return self::QUOTA_DOMAINE_ATTEINT;
         }
 
         return null;
+    }
+
+    /**
+     * Budget total du domaine d'après ses reculs (table P1-P8), ou null s'il n'a AUCUN recul daté d'au plus $jour
+     * (comportement strictement inchangé). Le recul d'un domaine porte sur toutes ses boîtes.
+     */
+    private function plafondDomaineAvecReculs(string $ws, string $domaine, DateTimeImmutable $jour, float $part): ?int
+    {
+        $reculs = $this->depot->reculsDe($ws, BudgetChauffe::RESSOURCE_DOMAINE, $domaine, $jour);
+        if ($reculs === []) {
+            return null;
+        }
+        $effectifs = BudgetChauffe::joursEffectifs($this->depot->volumesRessource($ws, BudgetChauffe::RESSOURCE_DOMAINE, $domaine, $jour), $part, $reculs);
+
+        return CourbeChauffe::quotaRessourceEtendu(CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $jour));
     }
 
     /**

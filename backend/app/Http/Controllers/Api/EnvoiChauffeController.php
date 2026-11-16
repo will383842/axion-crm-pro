@@ -128,7 +128,7 @@ class EnvoiChauffeController extends ApiController
     private function vue(string $ws, string $type, string $cle, int $envoyes, DateTimeImmutable $jour): array
     {
         $reculs = $this->depot->reculsDe($ws, $type, $cle, $jour);
-        $effectifs = BudgetChauffe::joursEffectifs($type === BudgetChauffe::RESSOURCE_DOMAINE ? $this->depot->volumesParJourDomaine($ws, $cle, $jour) : $this->depot->volumesParJour($ws, $cle, $jour, $type), Seuils::JOUR_EFFECTIF_PART, $reculs);
+        $effectifs = BudgetChauffe::joursEffectifs($this->depot->volumesRessource($ws, $type, $cle, $jour), Seuils::JOUR_EFFECTIF_PART, $reculs);
         $jc = CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $jour);
         $palier = CourbeChauffe::palierEtendu($jc);
         $fin = null;

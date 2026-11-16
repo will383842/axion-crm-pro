@@ -91,6 +91,24 @@ final class DepotChauffe
     }
 
     /**
+     * Volumes par jour d'UNE ressource nommée (IP ou domaine), STRICTEMENT avant $jour : UNE SEULE source pour le recul,
+     * l'écran et la garde. Pour un domaine : lignes écrites sous le nom du domaine + boîtes sommées.
+     *
+     * @return array<string, int>
+     */
+    public function volumesRessource(string $ws, string $type, string $ressource, DateTimeImmutable $jour): array
+    {
+        $volumes = $this->volumesParJour($ws, $ressource, $jour, $type);
+        if ($type === BudgetChauffe::RESSOURCE_DOMAINE) {
+            foreach ($this->volumesParJourDomaine($ws, $ressource, $jour) as $j => $n) { // nom de domaine : boîtes sommées
+                $volumes[$j] = ($volumes[$j] ?? 0) + $n;
+            }
+        }
+
+        return $volumes;
+    }
+
+    /**
      * Noms de domaine d'envoi de l'espace avec leurs envois du jour (une ligne par domaine, boîtes sommées).
      *
      * @return array<string, int> domaine => envoyés à $jour
@@ -510,13 +528,7 @@ final class DepotChauffe
                 return false;
             }
         }
-        $volumes = $this->volumesParJour($ws, $ressource, $civil, $ressourceType);
-        if ($ressourceType === BudgetChauffe::RESSOURCE_DOMAINE) {
-            foreach ($this->volumesParJourDomaine($ws, $ressource, $civil) as $j => $n) { // nom de domaine : boîtes sommées
-                $volumes[$j] = ($volumes[$j] ?? 0) + $n;
-            }
-        }
-        $effectifs = BudgetChauffe::joursEffectifs($volumes, Seuils::JOUR_EFFECTIF_PART, $reculs);
+        $effectifs = BudgetChauffe::joursEffectifs($this->volumesRessource($ws, $ressourceType, $ressource, $civil), Seuils::JOUR_EFFECTIF_PART, $reculs);
         if (CourbeChauffe::palierEtendu(CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $civil)) === 'P1') {
             throw ReculRefuse::dejaAuPlusBas($ressourceType, $ressource);
         }

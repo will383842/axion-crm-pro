@@ -28,7 +28,7 @@ test('la liste des scripts ouvriers est EXACTEMENT celle attendue (un ajout ou u
 });
 
 test('les sous-processus de concurrence posent la garde en première instruction', function () {
-    foreach (['arret-general-concurrent.php', 'opposition-concurrente.php', 'campagne-code-concurrent.php', 'ouvrier_sequenceur.php'] as $script) {
+    foreach (['arret-general-concurrent.php', 'lever-tout-arreter-concurrent.php', 'opposition-concurrente.php', 'campagne-code-concurrent.php', 'ouvrier_sequenceur.php'] as $script) {
         $src = (string) file_get_contents(dirname(__DIR__, 2) . '/Support/' . $script);
         $apresEntete = preg_replace('~^<\?php\s*(?:/\*.*?\*/\s*)?(?:use [^;]+;\s*)*~s', '', $src);
         expect($apresEntete)->toStartWith("require __DIR__ . '/garde_environnement_ouvrier.php';", "{$script} : la garde doit être la première instruction");

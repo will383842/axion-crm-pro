@@ -112,7 +112,7 @@ components:
         etapes:
           type: integer
           minimum: 1
-          maximum: 4
+          maximum: 3
           description: Nombre de messages de la séquence (1 à 3).
     StatutBoite:
       type: string
@@ -240,7 +240,7 @@ components:
         etape:
           type: integer
           minimum: 0
-          maximum: 4
+          maximum: 3
           description: Dernier message de la séquence envoyé (0 = aucun).
         etat: { $ref: '#/components/schemas/EtatDestinataire' }
         dernier_evenement_le:

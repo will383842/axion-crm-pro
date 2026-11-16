@@ -18,6 +18,13 @@ describe('PARTI_EN_REEL', () => {
     'Le message est bien parti en réel',
     'parti en réel',
     'Messages envoyés pour de vrai.',
+    'Pas de souci : tout est parti en réel',
+    'Aucune erreur, message parti en réel',
+    'Sans erreur, les messages sont partis en réel',
+    'Rien à signaler, messages envoyés pour de vrai',
+    'Ne fermez pas la page, envoi réel en cours',
+    'Campagne sans frein : envoi réel lancé',
+    'N’attendez plus : messages envoyés en réel',
   ])('attrape « %s »', (texte) => {
     expect(PARTI_EN_REEL.test(texte)).toBe(true);
   });

@@ -227,3 +227,23 @@ it('crm:outbound-rattraper : une erreur non SQL hors du try par ligne est conser
         expect($e)->toBe($erreur);
     }
 });
+
+it('porteUneRequete reconnaît une PDOException brute, même en précédente, et le message signalé ne fuit pas', function () {
+    $brut = new PDOException('SQLSTATE[23505]: DETAIL: Key (email)=(a@clients.example.test) already exists');
+    $brut->errorInfo = ['23505', 7, 'DETAIL: Key (email)=(a@clients.example.test) already exists'];
+
+    expect(OppositionSortante::porteUneRequete($brut))->toBeTrue()
+        ->and(OppositionSortante::porteUneRequete(new RuntimeException('enveloppe', 0, $brut)))->toBeTrue()
+        ->and(OppositionSortante::porteUneRequete(new RuntimeException('sans requête')))->toBeFalse();
+
+    $signale = OppositionSortante::exceptionSansFuite($brut, hash('sha256', 'a@clients.example.test'));
+    expect($signale->getMessage())->not->toContain('example.test')->toContain('23505')
+        ->and($signale->getPrevious())->toBeNull();
+});
+
+it('exceptionSansFuite sans empreinte donne un libellé sans « empreinte » vide', function () {
+    $e = new QueryException('pgsql', 'select 1', [], new PDOException('x'));
+    $message = OppositionSortante::exceptionSansFuite($e, '')->getMessage();
+
+    expect($message)->toContain('Rattrapage sortant impossible (SQLSTATE')->not->toContain('empreinte')->not->toContain(' )');
+});

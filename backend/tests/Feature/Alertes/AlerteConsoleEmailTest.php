@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -265,4 +266,24 @@ test('S9 — Telegram n existe plus : ni configuration, ni appel, ni etape de de
 
     $alias = (string) file_get_contents(app_path('Services/Alertes/AlerteTelegram.php'));
     expect($alias)->not->toContain('api.telegram.org')->and($alias)->not->toContain('Http::');
+});
+
+test('essai_a_blanc : seul === true coupe l\'envoi sans faux diagnostic ; null ou absent ne le coupe pas', function () {
+    Mail::fake();
+    Log::spy();
+    config(['alertes.actif' => false]);
+    Alerte::oublierLAvertissement();
+
+    config(['alertes.essai_a_blanc' => true]);
+    expect(app(Alerte::class)->envoyer('Titre essai', 'Corps'))->toBeFalse();
+    Log::shouldHaveReceived('info')->withArgs(fn ($m) => str_contains((string) $m, 'essai à blanc'))->once();
+    Log::shouldNotHaveReceived('warning');
+
+    foreach ([null, 'oui', 1] as $valeur) {
+        config(['alertes.essai_a_blanc' => $valeur]);
+        Alerte::oublierLAvertissement();
+        expect(app(Alerte::class)->envoyer('Titre réel', 'Corps'))->toBeFalse();
+    }
+    Log::shouldHaveReceived('warning')->withArgs(fn ($m) => str_contains((string) $m, 'ÉTEINTES'))->times(3);
+    Mail::assertNothingSent();
 });

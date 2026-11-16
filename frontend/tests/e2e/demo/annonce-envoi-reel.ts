@@ -1,11 +1,15 @@
 /**
  * Ce qu'aucun écran de la démo ne doit annoncer : un message parti pour de vrai. Le motif couvre les accords
  * (« partis », « envoyées »), l'ordre des mots (« en réel » avant ou après) et les formules d'état de l'envoi réel.
- * Une négation dans la même phrase (« pas parti en réel », « aucun message n’est parti… ») n'est pas une annonce.
+ * Seule une négation collée au verbe (« pas parti en réel », « n’est parti… ») n'est pas une annonce.
  * Garde : tests/lib/annonce-envoi-reel.test.ts.
  */
-/** Négation ou exclusion (mot entier, ou « n’ » élidé) : une phrase qui la porte n'annonce PAS un envoi réel. */
-const NEGATION = String.raw`(?:(?<!\p{L})(?:pas|jamais|aucune?s?|rien|nulle?|sans|ne)(?!\p{L})|(?<!\p{L})n['’])`;
+/**
+ * Négation COLLÉE au verbe, rien d'autre entre les deux (ni ponctuation ni autre mot) : « n’est pas », « ne sont pas »,
+ * « n’a pas été », « jamais », « pas ». Une négation plus loin (« Sans erreur, … », « Ne fermez pas la page, … »)
+ * n'annule rien : en cas de doute la garde détecte.
+ */
+const NEGATION_COLLEE = String.raw`(?:(?<!\p{L})(?:n['’]\s?|ne\s+)(?:est|sont|a|ont)\s+(?:(?:pas|jamais|plus)\s+)?(?:été\s+)?|(?<!\p{L})(?:pas|jamais)\s+(?:été\s+)?)`;
 
 const ANNONCES = [
   // « message(s) (est/sont/a été/ont été) parti(s)/envoyé(s)/émis/expédié(s) (…) en réel / pour de vrai »
@@ -20,5 +24,5 @@ const ANNONCES = [
   String.raw`(?:parti|envoyé)e?s?\s+\S+\s+en réel`,
 ];
 
-// Le lookbehind refuse toute annonce précédée, dans la même phrase (40 caractères au plus), d'une négation.
-export const PARTI_EN_REEL = new RegExp(`(?<!${NEGATION}[^.!?\\n]{0,40})(?:${ANNONCES.join('|')})`, 'iu');
+// Le lookbehind refuse l'annonce uniquement si une négation collée la précède immédiatement.
+export const PARTI_EN_REEL = new RegExp(`(?<!${NEGATION_COLLEE})(?:${ANNONCES.join('|')})`, 'iu');

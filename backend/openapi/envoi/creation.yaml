@@ -117,7 +117,10 @@ paths:
   /envoi/brouillons/{id}/apercu:
     post:
       operationId: apercuMessage
-      summary: Aperçu d'un message pour un destinataire exemple
+      summary: Aperçu d'une étape rendu pour 3 vrais destinataires de la cible
+      description: >-
+        Lecture seule (F2a-2) : les 3 premiers destinataires RETENUS de la cible du brouillon (ordre des clés, jamais un opposé),
+        objet et corps rendus avec les mêmes valeurs que l'envoi. Aucune adresse n'est rendue. Étape hors séquence : 422.
       parameters:
         - $ref: './commun.yaml#/components/parameters/Identifiant'
       requestBody:
@@ -129,21 +132,12 @@ paths:
               required: [etape]
               properties:
                 etape: { type: integer, minimum: 1, maximum: 3 }
-                variante: { type: string, enum: [a, b] }
-                destinataire_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
       responses:
         '200':
-          description: Message rendu.
+          description: Messages rendus.
           content:
             application/json:
-              schema:
-                type: object
-                required: [objet, corps, de]
-                properties:
-                  objet: { type: string }
-                  corps: { type: string }
-                  de: { type: string }
-        '501': { $ref: './commun.yaml#/components/responses/Erreur' }
+              schema: { $ref: '#/components/schemas/ApercuReel' }
   /envoi/brouillons/{id}/test:
     post:
       operationId: envoyerTest
@@ -361,6 +355,10 @@ paths:
     get:
       operationId: listerDestinatairesExemples
       summary: Destinataires pour l'aperçu réel d'un message
+      description: >-
+        Avec `brouillon_id`, les 3 premiers destinataires retenus de la cible (sans adresse) ; sans, les premiers contacts de l'espace (écran des messages types).
+      parameters:
+        - { name: brouillon_id, in: query, required: false, schema: { type: string, format: uuid } }
       responses:
         '200':
           description: Destinataires exemples.
@@ -394,6 +392,7 @@ paths:
                 repli:
                   type: object
                   additionalProperties: { type: string }
+                brouillon_id: { type: string, format: uuid, description: 'Présent ⇒ vrais comptes sur la cible retenue ; absent ⇒ `manquants_connus` faux.' }
       responses:
         '200':
           description: Champs utilisés.
@@ -610,10 +609,29 @@ components:
         libelle: { type: string }
         prenom: { oneOf: [{ type: string }, { type: 'null' }] }
         organisation: { oneOf: [{ type: string }, { type: 'null' }] }
+    ApercuReel:
+      type: object
+      required: [destinataires]
+      properties:
+        destinataires:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            required: [id, libelle, objet, corps, replis]
+            properties:
+              id: { type: integer, description: Identifiant du contact. }
+              libelle: { type: string, description: 'Ex. « Destinataire 1 » : jamais une adresse.' }
+              objet: { type: string }
+              corps: { type: string }
+              replis: { type: array, items: { type: string }, description: Champs pour lesquels le repli a servi. }
     ChampUtilise:
       type: object
       required: [nom, obligatoire, manquants, repli, bloquant]
       properties:
+        sur: { type: integer, minimum: 0, description: 'Destinataires retenus parcourus pour le compte (0 si `manquants_connus` est faux).' }
+        partiel: { type: boolean, description: 'Vrai si le compte porte sur les 5 000 premiers destinataires seulement.' }
+        manquants_connus: { type: boolean, description: "Faux sans `brouillon_id` (la cible n'est pas parcourue)." }
         nom: { type: string, description: 'Nom du champ sans accolades, ex. `prénom`.' }
         obligatoire: { type: boolean }
         manquants:

@@ -166,6 +166,7 @@ export function Assistant({
           {etape === 2 ? (
             <EtapeMessage
               saisie={saisie}
+              brouillonId={brouillonId}
               modifier={modifier}
               suite={() => avancer(2)}
               retour={() => { aller(1); }}

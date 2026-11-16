@@ -90,4 +90,21 @@ Idempotence : la passerelle réserve `(espace, id_injection)` AVANT d'appeler le
 SHA-256) ⇒ réponse rejouée, un seul appel ; même id et autre corps ⇒ `409 id_injection_deja_utilise` ; un espace n'en voit jamais un
 autre. Succès : `202 {"id_injection", "etat": "en_file"}`. Moteur injoignable avant acceptation : `503 indisponible`, réservation rendue
 (rejouable). La table ne garde ni adresse ni message, et n'est jamais vidée. Le message n'est jamais journalisé ni rendu.
-`POST /v1/commandes/injecter` reste `404`. À venir (C2-3) : `GET /v1/injections/{id}`, codes SMTP 4xx/5xx, `504`.
+`POST /v1/commandes/injecter` reste `404`.
+
+Traduction des réponses du moteur (C2-3, ADR K0 D7) :
+
+| Moteur | Réponse | État gardé |
+| --- | --- | --- |
+| refus SMTP 4xx | `429` + `Retry-After: 900` + `{"code_smtp": 451}` | aucun (réservation rendue : rejouable) |
+| refus SMTP 5xx | `422 {"erreur":"refus_definitif","code_smtp":550}` | `refuse` (rejoué, jamais ré-exécuté) |
+| injoignable avant acceptation | `503 indisponible` | aucun (rejouable) |
+| plus de 20 s (`Kumo::DELAI_MAX_SECONDES`) après l'envoi | `504 issue_incertaine` | `incertain` (rejoué, JAMAIS renvoyé) |
+
+`code_smtp` est le code rendu par le moteur (451 et 550 ne sont que des exemples).
+
+## `GET /v1/injections/{id}` — état d'une injection (C2-3)
+
+Chaîne de requête vide (sinon `400 requete`) ; autre méthode : `405`. Réponse `200 {"id_injection", "etat"}` avec `etat` dans
+`en_file | refuse | incertain | retire | inconnu`. Une ligne absente, une simple réservation ou l'identifiant d'un autre espace donnent
+`inconnu` (jamais `404` : l'existence dans un autre espace n'est pas révélée). Lecture seule : aucune écriture, aucun appel au moteur.

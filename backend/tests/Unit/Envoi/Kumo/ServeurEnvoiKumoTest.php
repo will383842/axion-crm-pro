@@ -720,3 +720,14 @@ test('accepté (250) : aucun code conservé', function () {
 
     expect($r->accepte)->toBeTrue()->and($r->codeSmtp)->toBeNull();
 });
+
+test('C2-4 : idInjection (C1) repris comme identifiant ; jeton = UUID sans tirets ; sans idInjection, dérivation inchangée', function () {
+    $t = new FauxTransportKumo;
+    $reg = new RegistreMemoire;
+    $id = '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
+    $m = new MessageAEnvoyer(WS_K9, 'temoin@example.test', 'from@example.test', 'S', 'C', 'c24', $id, 'rb-0123456789abcdef0123456789abcdef0123456789@bounce.example.test');
+    $r = kumoFabrique($t, null, null, $reg)->injecter($m);
+    expect($r->accepte)->toBeTrue()->and($r->idInjection)->toBe($id)->and($t->dernierJeton)->toBe('0a1b2c3d4e5f4a6b8c7d9e0f1a2b3c4d');
+    $r2 = kumoFabrique($t, null, null, new RegistreMemoire)->injecter(msgK9('sans-id'));
+    expect($r2->idInjection)->not->toBe($id)->and(strlen((string) $t->dernierJeton))->toBe(32);
+});

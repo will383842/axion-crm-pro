@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Envoi\Campagnes\SelectionRefusee;
+use App\Envoi\Creation\ApercuReel;
 use App\Envoi\Creation\ServiceMessagesTypes;
 use App\Envoi\Exceptions\ModeleRefuse;
 use App\Envoi\Message\MessageRefuse;
+use App\Envoi\Message\VariablesMessage;
 use App\Support\WorkspaceContext;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -21,7 +24,7 @@ use Illuminate\Support\Str;
  */
 class EnvoiMessagesController extends ApiController
 {
-    public function __construct(private readonly ServiceMessagesTypes $service) {}
+    public function __construct(private readonly ServiceMessagesTypes $service, private readonly ApercuReel $apercuReel) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -124,17 +127,22 @@ class EnvoiMessagesController extends ApiController
         return response()->json(['maintenant' => now()->utc()->toIso8601String(), 'fuseau' => (string) config('app.timezone')]);
     }
 
-    /** Champs de fusion de la séquence : `manquants` vaut 0 (la cible n'est pas parcourue à ce palier). */
+    /**
+     * Champs de fusion de la séquence. Avec `brouillon_id` : vrais comptes sur la cible retenue (jusqu'à 5 000 premiers, `partiel`) ;
+     * sans : `manquants_connus` vaut faux (la cible n'est pas parcourue). `repli` = celui ÉCRIT dans le message (V9 : la saisie
+     * d'un repli à l'écran reste sans effet à l'envoi, traité dans F2a-bis). Nom hors liste fermée ⇒ `bloquant`.
+     */
     public function champs(Request $request): JsonResponse
     {
         $corps = $request->json()->all();
         $etapes = $corps['sequence'] ?? null;
-        $repli = $corps['repli'] ?? [];
-        if (! is_array($corps['cible'] ?? null) || ! is_array($etapes) || $etapes === [] || count($etapes) > 3 || ! is_array($repli)) {
+        $brouillon = $corps['brouillon_id'] ?? null;
+        if (! is_array($corps['cible'] ?? null) || ! is_array($etapes) || $etapes === [] || count($etapes) > 3 || ! (is_array($corps['repli'] ?? []))
+            || ($brouillon !== null && ! is_string($brouillon))) {
             return $this->erreur('validation', 'La cible et une séquence de 1 à 3 messages sont obligatoires.', 422);
         }
 
-        return $this->dansEspace(function (string $ws) use ($etapes, $repli) {
+        return $this->dansEspace(function (string $ws) use ($etapes, $brouillon) {
             $textes = [];
             $replis = [];
             foreach ($etapes as $e) {
@@ -151,13 +159,20 @@ class EnvoiMessagesController extends ApiController
                 [$nom, $r] = array_pad(explode('|', $i, 2), 2, '');
                 $replis[trim($nom)] ??= trim($r) === '' ? null : trim($r);
             }
-            $champs = array_map(static function (string $nom) use ($replis, $repli): array {
-                $r = isset($repli[$nom]) && is_string($repli[$nom]) && trim($repli[$nom]) !== '' ? trim($repli[$nom]) : ($replis[$nom] ?? null);
+            $noms = ServiceMessagesTypes::champs(...$textes);
+            try {
+                $comptes = is_string($brouillon) ? $this->apercuReel->compter($ws, $brouillon, $noms) : null;
+            } catch (SelectionRefusee $e) {   // échec fermé : pas de compte inventé
+                return $this->erreur($e->reessayable ? 'indisponible' : 'non_trouve', $e->getMessage(), $e->reessayable ? 503 : 404);
+            }
+            $champs = array_map(static function (string $nom) use ($replis, $comptes): array {
+                $c = $comptes[$nom] ?? null;
 
-                return ['nom' => $nom, 'obligatoire' => false, 'manquants' => 0, 'repli' => $r, 'bloquant' => false];
-            }, ServiceMessagesTypes::champs(...$textes));
+                return ['nom' => $nom, 'obligatoire' => false, 'manquants' => $c['manquants'] ?? 0, 'sur' => $c['sur'] ?? 0, 'partiel' => $c['partiel'] ?? false,
+                    'manquants_connus' => $c !== null, 'repli' => $replis[$nom] ?? null, 'bloquant' => ! in_array($nom, VariablesMessage::NOMS, true)];
+            }, $noms);
 
-            return response()->json(['champs' => $champs, 'bloquants' => 0]);
+            return response()->json(['champs' => $champs, 'bloquants' => count(array_filter($champs, static fn (array $c): bool => $c['bloquant']))]);
         });
     }
 

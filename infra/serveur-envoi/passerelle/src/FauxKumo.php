@@ -11,6 +11,9 @@ final class FauxKumo implements Kumo
 
     public bool $echec = false;
 
+    /** Code SMTP (400 à 599) du refus que le moteur rend à `injecter` ; null : le moteur accepte. */
+    public ?int $refus = null;
+
     /** Crochet de test, appelé PENDANT l'appel (simule une requête concurrente ou une panne). */
     public ?\Closure $pendant = null;
 
@@ -24,6 +27,9 @@ final class FauxKumo implements Kumo
         $this->appels[] = ['workspace_id' => $workspaceId, 'operation' => $operation, 'params' => $params];
         if ($this->pendant !== null) {
             ($this->pendant)();
+        }
+        if ($this->refus !== null && $operation === 'injecter') {
+            throw new Injection\RefusKumo($this->refus);
         }
         if ($this->echec) {
             array_pop($this->appels);

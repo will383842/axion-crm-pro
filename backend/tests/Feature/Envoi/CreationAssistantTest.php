@@ -151,7 +151,7 @@ test('apercu : rendu sans envoi ; test : 409 envoi_ferme_palier_0 sans aucun eff
     $this->actingAs($this->owner)->postJson(CRE . "/{$id}/test", ['etape' => 1])->assertStatus(409)->assertJsonPath('error', 'envoi_ferme_palier_0');
     Mail::assertNothingSent();
     expect(DB::table('envoi_campagnes')->count())->toBe($avant)->and($this->resolutions)->toBe(0);
-    $this->actingAs($this->owner)->postJson(CRE . "/{$id}/apercu", ['etape' => 1])->assertStatus(501)->assertJsonPath('error', 'apercu_non_branche');
+    $this->actingAs($this->owner)->postJson(CRE . "/{$id}/apercu", ['etape' => 1])->assertStatus(422)->assertJsonPath('error', 'etape_inconnue');   // F2a-2 : plus de 501 ; ce brouillon n'a pas de séquence
 });
 
 test('destinataires-exemples : 3 fiches au plus, champs du contrat seulement ; cibles et boîtes conformes', function () {

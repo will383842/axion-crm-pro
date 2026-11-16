@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api\Crm;
 
+use App\Crm\Contacts\AjoutContact;
 use App\Crm\Contacts\GestesContact;
+use App\Crm\Contacts\ImportContacts;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\Contact;
 use App\Support\MasquageCoordonnees;
@@ -10,8 +12,9 @@ use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
-/** Gestes « Contacts » de la console (G1-A : modifier ; G1-B : retirer, restaurer, corbeille douce). */
+/** Gestes « Contacts » de la console (G1-A : modifier ; G1-B : retirer, restaurer, corbeille douce ; G1-C : ajout rapide ; G1-D : import). */
 class ContactsGestesController extends ConsoleController
 {
     use VerrouOptimiste;
@@ -52,6 +55,118 @@ class ContactsGestesController extends ConsoleController
             'champ_non_modifiable' => response()->json(['error' => 'champ_non_modifiable', 'message' => "L'étape se change sur l'entreprise."], 422),
             default => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
         };
+    }
+
+    /** Doublons probables pendant la saisie (lecture seule, adresses masquées si requis). */
+    public function doublons(Request $request): JsonResponse
+    {
+        $workspaceId = $this->businessWorkspace($request);
+        $q = $request->validate([
+            'email' => ['sometimes', 'nullable', 'string', 'max:254'],
+            'prenom' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'nom' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'organisation' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'company_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+        ]);
+
+        $data = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $q): array {
+            $service = new AjoutContact;
+            $e = $service->entreprise($workspaceId, isset($q['company_id']) ? (int) $q['company_id'] : null, $q['organisation'] ?? null);
+
+            return $service->doublons($workspaceId, $q['email'] ?? null, $q['prenom'] ?? null, $q['nom'] ?? null, is_array($e) ? $e['id'] : null);
+        });
+
+        return response()->json(['data' => $data]);
+    }
+
+    /** Ajout rapide : la provenance est obligatoire ; jamais d'entreprise créée ; une personne opposée n'est pas ajoutée. */
+    public function ajouter(Request $request): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('creer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+
+        $d = $request->validate([
+            'first_name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'last_name' => ['required', 'string', 'min:1', 'max:120'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:254'],
+            'organisation' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'company_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'fonction' => ['sometimes', 'nullable', 'string', 'max:200'],
+            'provenance' => ['required', 'string', Rule::in(AjoutContact::PROVENANCES)],
+            'doublon' => ['sometimes', 'nullable', Rule::in(['fusionner', 'garder'])],
+            'fusionner_avec' => ['sometimes', 'nullable', 'integer', 'min:1'],
+        ]);
+        $userId = (string) $this->currentUser($request)->getKey();
+
+        $r = WorkspaceContext::run($workspaceId, fn () => (new AjoutContact)->ajouter($workspaceId, $d, $userId));
+
+        return match ($r['etat']) {
+            'cree' => response()->json(['resultat' => 'cree', 'fiche' => $r['fiche']], 201),
+            'fusionne' => response()->json(['resultat' => 'fusionne', 'fiche' => $r['fiche']]),
+            'doublons' => response()->json(['error' => 'doublons', 'message' => 'Une fiche proche existe déjà.', 'doublons' => $r['doublons']], 409),
+            'doublon' => response()->json(['error' => 'doublon', 'message' => 'Une fiche porte déjà ce nom dans cette entreprise (peut-être dans la corbeille).'], 409),
+            'organisation_ambigue' => response()->json(['error' => 'organisation_ambigue', 'message' => 'Plusieurs entreprises portent ce nom : choisissez-la dans la recherche.'], 422),
+            'organisation_introuvable' => response()->json(['error' => 'organisation_introuvable', 'message' => 'Entreprise introuvable : choisissez une entreprise existante.'], 422),
+            'opposition' => response()->json(['error' => 'opposition', 'message' => 'Cette adresse a demandé à ne plus être contactée.'], 422),
+            'fusion_invalide' => response()->json(['error' => 'fusion_invalide', 'message' => 'Indiquez la fiche à compléter.'], 422),
+            default => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
+        };
+    }
+
+    /** Contrôle d'un fichier avant import : AUCUNE écriture ; numéros de ligne et codes seulement. */
+    public function importControle(Request $request): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('importer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $lignes = $this->lignesImport($request);
+
+        return response()->json(WorkspaceContext::run($workspaceId, fn () => (new ImportContacts)->controle($workspaceId, $lignes)));
+    }
+
+    /** Import synchrone (1 000 lignes au plus) : rapport gardé 1 h, lisible par le seul lanceur. */
+    public function importer(Request $request): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('importer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $lignes = $this->lignesImport($request);
+        $userId = (string) $this->currentUser($request)->getKey();
+
+        $travail = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $lignes, $userId): array {
+            $service = new ImportContacts;
+
+            return $service->memoriser($workspaceId, $userId, $service->importer($workspaceId, $lignes, $userId));
+        });
+
+        return response()->json($travail);
+    }
+
+    /** Relit le rapport d'un import (même utilisateur, même espace) ; sinon 404. */
+    public function importSuivi(Request $request, string $id): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('importer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $t = (new ImportContacts)->suivi($workspaceId, (string) $this->currentUser($request)->getKey(), $id);
+
+        return $t === null ? response()->json(['error' => 'introuvable', 'message' => 'Import introuvable.'], 404) : response()->json($t);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function lignesImport(Request $request): array
+    {
+        $max = ImportContacts::MAX_CHAMP;
+        $d = $request->validate([
+            'lignes' => ['required', 'array', 'min:1', 'max:' . ImportContacts::MAX_LIGNES],
+            'lignes.*' => ['array'],
+            'lignes.*.ligne' => ['required', 'integer', 'min:0'],
+            'lignes.*.prenom' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.nom' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.email' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.organisation' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.fonction' => ['nullable', 'string', 'max:' . $max],
+            'lignes.*.provenance' => ['nullable', 'string', 'max:' . $max],
+        ]);
+
+        return array_values($d['lignes']);
     }
 
     /** Retirer = corbeille douce, restaurable. Idempotent. Rien n'est effacé. */

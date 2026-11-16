@@ -6,6 +6,8 @@ use App\Envoi\Serveur\Contrat\CommandeurServeur;
 use App\Envoi\Serveur\Contrat\EvenementSuivi;
 use App\Envoi\Serveur\Contrat\LotSuivi;
 use App\Envoi\Serveur\Contrat\TireurEvenements;
+use App\Envoi\Serveur\Kumo\CoupureTransport;
+use App\Envoi\Serveur\Kumo\EchecAuthentification;
 use App\Envoi\Smtp\ResolveurHote;
 use App\Support\WorkspaceContext;
 use Carbon\Carbon;
@@ -36,6 +38,9 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
 
     /** Liste blanche des commandes. « injection » est un nom RÉSERVÉ (journal local) : jamais émis vers le serveur. */
     public const COMMANDES_AUTORISEES = ['pause', 'reprise', 'retrait'];
+
+    /** Corps JSON d'une injection (base64 du message ≤ 1 Mio, plus l'enveloppe) : plafond de la passerelle. */
+    private const MAX_INJECTION_OCTETS = 1_500_000;
 
     private const TYPE_AUTORISE = '/^[a-z][a-z0-9_]{0,63}$/';
 
@@ -101,6 +106,37 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
         }
 
         return new LotSuivi($evenements, $suivant, $epoque);
+    }
+
+    /**
+     * Injection signée (C2-4) : mêmes contrôles locaux que commander(), réponse signée exigée.
+     * Un 401 NON signé donne EchecAuthentification ; une panne réseau après l'envoi donne CoupureTransport(true).
+     *
+     * @return array{statut: int, json: array<string, mixed>} statuts lus : 202, 401 (signé), 409, 422, 429, 503, 504
+     */
+    public function injecter(string $workspaceId, string $source, string $corpsJson): array
+    {
+        $prep = $this->preparer($workspaceId, $source);
+        if (strlen($corpsJson) > self::MAX_INJECTION_OCTETS) {
+            throw ServeurEnvoiRefuse::motif('injection trop volumineuse.');
+        }
+        $retour = $this->appeler($prep, $workspaceId, 'POST', SignatureEnvoi::CHEMIN_INJECTIONS, $corpsJson, $corpsJson, [401, 409, 422, 429, 503, 504], true);
+        if (! in_array($retour['statut'], [202, 401, 409, 422, 429, 503, 504], true)) {
+            throw ServeurEnvoiRefuse::motif('réponse inattendue (statut ' . $retour['statut'] . ').');
+        }
+
+        return $retour;
+    }
+
+    /** @return array{statut: int, json: array<string, mixed>} */
+    public function etatInjection(string $workspaceId, string $source, string $idInjection): array
+    {
+        $prep = $this->preparer($workspaceId, $source);
+        if (! SignatureEnvoi::estUuid($idInjection)) {
+            throw ServeurEnvoiRefuse::motif('identifiant d\'injection : UUID exigé.');
+        }
+
+        return $this->appeler($prep, $workspaceId, 'GET', SignatureEnvoi::CHEMIN_INJECTIONS . '/' . $idInjection, '', '');
     }
 
     /** @return array{epoque: ?string, bloque: bool} */
@@ -279,7 +315,7 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
      * @param  list<int>  $statutsLus  statuts non 2xx dont le corps SIGNÉ est lu (au lieu d'un refus)
      * @return array{statut: int, json: array<string, mixed>}
      */
-    private function appeler(array $prep, string $workspaceId, string $methode, string $chemin, string $signe, string $corps, array $statutsLus = []): array
+    private function appeler(array $prep, string $workspaceId, string $methode, string $chemin, string $signe, string $corps, array $statutsLus = [], bool $injection = false): array
     {
         $secret = $prep['secret'];
         $ts = (string) Carbon::now('UTC')->getTimestamp();
@@ -298,10 +334,22 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
                 ? $requete->get($prep['cible']['base'] . $chemin . '?' . $signe)
                 : $requete->withBody($corps, 'application/json')->post($prep['cible']['base'] . $chemin);
         } catch (Throwable) {
-            throw ServeurEnvoiRefuse::motif('injoignable ou en échec réseau.');
+            // Injection : le message a pu partir avant la coupure ou le délai : sort INCERTAIN, jamais renvoyé à l'aveugle.
+            throw $injection ? new CoupureTransport(true) : ServeurEnvoiRefuse::motif('injoignable ou en échec réseau.');
+        }
+        if ($injection && $reponse->status() === 401 && ! $this->reponseSignee($reponse, $secret, $nonce, $workspaceId)) {
+            throw new EchecAuthentification; // la passerelle refuse nos identifiants : refus NON signé
         }
 
         return ['statut' => $reponse->status(), 'json' => $this->lireReponse($reponse, $secret, $nonce, $workspaceId, $statutsLus)];
+    }
+
+    private function reponseSignee(Response $reponse, #[\SensitiveParameter] string $secret, string $nonce, string $workspaceId): bool
+    {
+        [, $recue] = SignatureEnvoi::analyser($reponse->header('X-Envoi-Signature') ?: null);
+        $recue = str_starts_with($recue, 'sha256=') ? substr($recue, 7) : $recue;
+
+        return $recue !== '' && hash_equals(SignatureEnvoi::signer($secret, SignatureEnvoi::chargeReponse($nonce, $workspaceId, $reponse->status(), $reponse->body())), $recue);
     }
 
     /**

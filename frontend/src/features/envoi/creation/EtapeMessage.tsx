@@ -15,12 +15,15 @@ function versionUtilisee(m: MessageTypeEtat | undefined) {
 
 export function EtapeMessage({
   saisie,
+  brouillonId,
   modifier,
   suite,
   retour,
   assurerBrouillon,
 }: {
   saisie: Saisie;
+  /** Brouillon déjà enregistré : les champs sont alors comptés sur les vrais destinataires de la cible. */
+  brouillonId: string | null;
   modifier: (patch: Partial<Saisie>) => void;
   suite: () => Promise<void>;
   retour: () => void;
@@ -29,7 +32,7 @@ export function EtapeMessage({
 }) {
   const messages = useMessagesTypes(false);
   const liste = messages.data?.data ?? [];
-  const champs = useChamps(cibleDeContrat(saisie), sequenceDeContrat(saisie), saisie.repli);
+  const champs = useChamps(cibleDeContrat(saisie), sequenceDeContrat(saisie), saisie.repli, brouillonId);
   const [erreur, setErreur] = useState<string | null>(null);
   const [testOuvert, setTestOuvert] = useState(false);
   const [retourTest, setRetourTest] = useState<string | null>(null);
@@ -185,7 +188,8 @@ export function EtapeMessage({
                 {c.manquants > 0 ? (
                   <>
                     <p className="mt-1 text-xs text-slate-600">
-                      Vide pour {c.manquants.toLocaleString('fr-FR')} {c.manquants > 1 ? 'personnes' : 'personne'}
+                      {c.partiel === true ? 'Vide pour au moins ' : 'Vide pour '}{c.manquants.toLocaleString('fr-FR')} {c.manquants > 1 ? 'personnes' : 'personne'}
+                      {c.partiel === true ? ' sur les 5 000 premières' : ''}
                       {c.obligatoire ? ' : une valeur de repli est nécessaire.' : ' : le message s’écrit sans ce mot.'}
                     </p>
                     <label htmlFor={`repli-${c.nom}`} className="mt-2 block text-xs font-medium text-slate-600">{`Valeur de repli : {${c.nom}}`}</label>
@@ -197,6 +201,8 @@ export function EtapeMessage({
                       onChange={(ev) => { modifier({ repli: { ...saisie.repli, [c.nom]: ev.target.value } }); }}
                     />
                   </>
+                ) : c.manquants_connus === false ? (
+                  <p className="mt-1 text-xs text-slate-600">Le nombre de personnes sans cette valeur sera connu une fois la cible enregistrée.</p>
                 ) : (
                   <p className="mt-1 text-xs text-slate-600">Renseigné pour toutes les personnes.</p>
                 )}

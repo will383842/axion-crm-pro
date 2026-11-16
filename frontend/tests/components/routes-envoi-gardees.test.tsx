@@ -209,7 +209,7 @@ describe('S2-ROUTEUR — les onglets mènent aux bonnes routes', () => {
 
 describe('Routes du CRM et des écrans communs créées « en attente »', () => {
   it.each([
-    ['/taches', 'DM1-ACC'],
+    // Lot G2-B : /taches n'est plus « en attente » (le serveur a ses routes) ; voir G2bMesTachesHorsDemo.test.tsx.
     ['/affaires', 'DM1-ACC'],
     // Filet modifié : pourquoi. DM1-COM livre /compte : la page n'est plus « en attente ».
   ])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
@@ -254,6 +254,7 @@ describe('Routes du CRM et des écrans communs créées « en attente »', () =>
  */
 const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
   ['/', 'Tableau de bord'],
+  ['/taches', 'Mes tâches'],
   ['/doublons', 'Doublons à vérifier'],
   ['/rgpd/effacements', 'Effacements demandés'],
   ['/companies', 'Entreprises'],
@@ -297,7 +298,7 @@ const MENU_D_AUJOURD_HUI: ReadonlyArray<readonly [string, string]> = [
 // pour la pastille « Demandes RGPD » de L3c-0 (valeurs relevées sur la CI).
 // Filet modifié : pourquoi — PR-C : l'entrée « Effacements demandés » (À traiter, avec la pastille déplacée de « Demandes RGPD »)
 // et, console ouverte, « Origines des contacts » (Ma base). Empreintes recalées ci-dessous.
-const EMPREINTE_BARRE = 'f727efeca75cd33540cf492403a19fd9104f0f5cc4482c878222732634b2400c';
+const EMPREINTE_BARRE = '81967dbdcc760a89254c13d6d4077c672d3ba0305bba50013da152697978a16f';
 const EMPREINTE_EN_TETE = '86c431569957790ceb75e26e9bea78eca245a5627e382c0088599dc3c1c56645';
 
 describe('Sans Envoi — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
@@ -331,6 +332,7 @@ describe('Sans Envoi — le menu est IDENTIQUE à aujourd’hui (instantané)', 
 /** Les trois entrées de la console, à leur place, puis le reste à l'identique. */
 const MENU_CONSOLE_OUVERTE: ReadonlyArray<readonly [string, string]> = [
   ['/', 'Tableau de bord'],
+  ['/taches', 'Mes tâches'],
   ['/doublons', 'Doublons à vérifier'],
   ['/console/arbitrage', 'Personnes à rattacher'],
   ['/rgpd/effacements', 'Effacements demandés'],
@@ -338,9 +340,9 @@ const MENU_CONSOLE_OUVERTE: ReadonlyArray<readonly [string, string]> = [
   ['/console/contacts', 'Contacts'],
   ['/console/lettre-et-guide', 'Newsletter et guide'],
   ['/origines', 'Origines des contacts'],
-  ...MENU_D_AUJOURD_HUI.slice(5),
+  ...MENU_D_AUJOURD_HUI.slice(6),
 ];
-const EMPREINTE_BARRE_CONSOLE_OUVERTE = '1a490440adcf8051690c98d2d7324e2609706f789d39c5a9d690f49211e7ecee';
+const EMPREINTE_BARRE_CONSOLE_OUVERTE = 'f7f2477be93294cdaf370849f3f6498b13e1b6c666883aed3f58d1e303c752b5';
 
 describe('Sans Envoi, console ouverte — le menu est IDENTIQUE à aujourd’hui (instantané)', () => {
   it('mêmes entrées, même ordre, mêmes libellés ; même HTML de la barre et de l’en-tête', async () => {

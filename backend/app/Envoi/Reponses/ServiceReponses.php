@@ -37,7 +37,7 @@ final class ServiceReponses
                f.contact_id,
                (e.statut = 'rattache' OR f.contact_id IS NOT NULL
                 OR EXISTS (SELECT 1 FROM envoi_rattachements t WHERE t.workspace_id = r.workspace_id AND t.evenement_id = e.id)) AS rattachee,
-               (SELECT b.id FROM envoi_boites b WHERE b.workspace_id = r.workspace_id AND b.adresse = e.boite ORDER BY b.cree_le LIMIT 1) AS boite_id
+               (SELECT b.id FROM envoi_boites b WHERE b.workspace_id = r.workspace_id AND (b.adresse = e.boite OR b.id::text = e.boite) ORDER BY b.cree_le LIMIT 1) AS boite_id
         FROM envoi_reponses r
         JOIN envoi_evenements e ON e.id = r.evenement_id AND e.workspace_id = r.workspace_id
         JOIN LATERAL (SELECT classement, auteur FROM envoi_reponses_classements

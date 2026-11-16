@@ -13,10 +13,15 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche T-CHAUFFE, décision D5. `ENVOI_REE
 - Le budget du jour suit, par type, la ressource la plus basse (sens prudent). Sans ressource connue, la courbe vaut P1.
 - `jours_max` de P8 (palier sans fin) vaut `jours_min`.
 
-- **À faire avant le premier envoi réel (F07b)** : `GardeChauffe::jourDeChauffe` applique encore l'ancienne table P1-P3 par boîte, sans `reculsDe`. Brancher les reculs (par nom de domaine et par IP) et la table étendue P1-P8 dans la garde ; tant que ce n'est pas fait, un recul demandé ici n'abaisse pas le quota réellement appliqué à l'envoi.
+- **F07b (lot X6, fait pour les DOMAINES)** : `GardeChauffe::refus()` lit `reculsDe` du domaine d'envoi ; sans recul, comportement strictement inchangé. Avec reculs, le budget du domaine est rejoué sur la table P1-P8 (`plafondDomaineAvecReculs`) : limite du domaine = min(3 x quota de boîte, budget avec reculs), limite de la boîte = min(quota, budget avec reculs) (le recul d'un domaine porte sur toutes ses boîtes). Les deux `min` empêchent toute montée : un recul ne peut qu'abaisser. `DepotChauffe::volumesRessource` est la source unique des volumes (recul, écran, garde). `jourDeChauffe()` et la règle « palier tenu après plainte » ne changent pas.
+- **Hors lot X6 (ESCALADES, non faites)** :
+  - Reculs d'IP : aucun lien message -> IP dans la garde ; il faut que le transport fournisse l'IP d'envoi.
+  - Montée P4-P8 : elle ferait MONTER les quotas appliqués ; valeurs « hypothèses à confirmer en banc ».
+  - Alignement 30/20 sans recul : la garde plafonne le domaine à 3 x quota de boîte = 30 en P1, alors que l'écran affiche 20.
+- **Pièges connus (voulus, non corrigés)** : un recul posé pendant qu'un message est en contrôle vaut pour le message SUIVANT ; le rejeu d'une clé déjà réservée n'applique pas les quotas (`portes()`), sa place étant déjà comptée.
 
 ## Risques
-- Élevé avant F07b : écart entre ce que l'écran affiche (reculs, P1-P8) et ce que la garde applique (table P1-P3 par boîte, sans recul). Sans effet aujourd'hui (`ENVOI_REEL_ACTIF=false`), mais à fermer avant tout envoi réel.
+- Moyen après X6 : l'écart écran/garde est fermé pour les reculs de domaine ; restent les reculs d'IP, la montée P4-P8 et l'alignement 30/20 (voir « Hors lot X6 »). Sans effet aujourd'hui (`ENVOI_REEL_ACTIF=false`).
 - Journal : la ligne `envoi_chauffe_reculs` suffit comme trace d'un recul. Elle porte l'espace, la ressource, la date, l'auteur et le motif, elle est unique par ressource et par jour, et un trigger refuse UPDATE, DELETE et TRUNCATE. Un recul est un geste unitaire et idempotent, sans effet de bord à rejouer ni arrêt général à tracer ; une seconde ligne dans `envoi_journal_commandes` doublerait la même information sans rien ajouter. Le 403 de `reculer` (contrat `infrastructure.yaml`) est signalé à S2-CONTRATS ; ce fichier n'est pas touché ici.
 - Faible : lecture de compteurs ; le seul geste va dans le sens sûr, réservé au propriétaire. Cloisonnement par `workspace_id` : chaque lecture est faite sous le contexte de l'espace et filtrée explicitement.
 

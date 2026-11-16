@@ -21,7 +21,7 @@ Test modifié : pourquoi — dans `SocleFichiersCommunsTest`, l'assertion transi
 - `SocleRoutesTest` : contrat, cloisonnement par espace, idempotence, motif, 403, refus d'injection après l'arrêt, concurrence (3 processus réels), garde « aucune route de reprise ». Le test concurrent rougit si le verrou est retiré (vérifié).
 
 ## Reste (mineurs de l'audit et de la relecture, non traités ici)
-- (a) `leverToutArreter` (`DepotSocleDb`, hors liste) doit prendre le même verrou consultatif `envoi_arret_general|<espace>` que l'armement, pour qu'un arrêt simultané d'une levée ne soit pas perdu.
+- (a) FAIT (lot X6) : `DepotSocleDb::verrouArretGeneral` (même clé `envoi_arret_general|<espace>` que le contrôleur, réentrant dans la session) est la première instruction des transactions de `leverToutArreter` ET `armerToutArreter` (`EssaiABlanc` et `ToutArreter::armer` armaient sans verrou). Tests : `ArretGeneralLeveeVerrouTest` (verrou tenu par une seconde connexion, `lock_timeout` 1 s : attente puis échec, drapeau armé, aucune reprise ; armements et levées concurrents : dernière ligne du journal = drapeau).
 - (b) L'alerte d'arrêt ne nomme pas l'espace, est écrite dans l'espace du destinataire principal, et `Regroupement::dejaVue` (clé produit|gravité|titre) peut absorber l'alerte d'un second espace.
 - (c) Compteurs `en_file`, `reponses_a_traiter`, `alertes_ouvertes`, `campagnes_en_cours` peu testés ; `alertes_ouvertes` compte toutes les notifications non lues de l'espace.
 - (d) Taille ~414 lignes (plafond 400), justifiée par les instantanés JSON.

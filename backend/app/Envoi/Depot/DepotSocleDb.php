@@ -361,6 +361,7 @@ final class DepotSocleDb implements DepotSocle
     public function armerToutArreter(string $workspaceId, string $auteur): void
     {
         DB::transaction(function () use ($workspaceId, $auteur): void {
+            $this->verrouArretGeneral($workspaceId);
             $this->journaliser($workspaceId, 'tout_arreter', $auteur);
             $this->ecrireDrapeaux($workspaceId, false, fn () => DB::statement(
                 'INSERT INTO envoi_drapeaux (workspace_id, tout_arreter) VALUES (?, true)
@@ -373,6 +374,7 @@ final class DepotSocleDb implements DepotSocle
     public function leverToutArreter(string $workspaceId, string $auteur): bool
     {
         return DB::transaction(function () use ($workspaceId, $auteur): bool {
+            $this->verrouArretGeneral($workspaceId);
             if (! $this->toutArreter($workspaceId)) {
                 return false;
             }
@@ -381,6 +383,16 @@ final class DepotSocleDb implements DepotSocle
 
             return true;
         });
+    }
+
+    /**
+     * Verrou de transaction PAR ESPACE, même clé que `EnvoiSocleController::arretGeneral` : armement et levée du drapeau
+     * ne se croisent plus (la levée lisait « armé » puis reprenait pendant qu'un armement s'écrivait). Réentrant dans la
+     * même session : le contrôleur qui le tient déjà n'attend pas. Libéré à la fin de la transaction.
+     */
+    private function verrouArretGeneral(string $workspaceId): void
+    {
+        DB::select("SELECT pg_advisory_xact_lock(hashtextextended('envoi_arret_general|' || ?, 0))", [$workspaceId]);
     }
 
     /**

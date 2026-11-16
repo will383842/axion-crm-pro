@@ -36,7 +36,7 @@ final class EnvoiRetraitsDemandes
      */
     public function cibles(string $workspaceId, string $empreinteAdresse): array
     {
-        return WorkspaceContext::run($workspaceId, fn (): array => array_map(
+        return WorkspaceContext::run($workspaceId, fn (): array => array_values(array_map(
             fn ($l): string => (string) $l->id_injection,
             DB::select(
                 "SELECT l.id_injection FROM envoi_injections_locales l
@@ -47,12 +47,13 @@ final class EnvoiRetraitsDemandes
                  ORDER BY l.id_injection LIMIT " . ClientServeurEnvoiHmac::MAX_CIBLES_RETRAIT,
                 [$workspaceId, $workspaceId, $empreinteAdresse],
             ),
-        ));
+        )));
     }
 
     /** @return array{envoyees: int, sans_objet: int, echecs: int, en_attente: int, en_retard: int} */
     public function envoyer(): array
     {
+        /** @var array{envoyees: int, sans_objet: int, echecs: int, en_attente: int, en_retard: int} $bilan */
         $bilan = ['envoyees' => 0, 'sans_objet' => 0, 'echecs' => 0, 'en_attente' => 0, 'en_retard' => 0];
         if (! Schema::hasTable('envoi_retraits_demandes')) {
             return $bilan;
@@ -64,7 +65,7 @@ final class EnvoiRetraitsDemandes
         return $bilan;
     }
 
-    /** @param  array<string, int>  $bilan */
+    /** @param  array{envoyees: int, sans_objet: int, echecs: int, en_attente: int, en_retard: int}  $bilan */
     private function espace(string $ws, array &$bilan): void
     {
         $demandes = WorkspaceContext::run($ws, fn () => DB::table('envoi_retraits_demandes')->where('workspace_id', $ws)
@@ -81,7 +82,7 @@ final class EnvoiRetraitsDemandes
         }
     }
 
-    /** @param  array<string, int>  $bilan */
+    /** @param  array{envoyees: int, sans_objet: int, echecs: int, en_attente: int, en_retard: int}  $bilan */
     private function demande(string $ws, \stdClass $d, array &$bilan): void
     {
         $commandeId = is_string($d->commande_id) ? $d->commande_id : null;
@@ -123,7 +124,7 @@ final class EnvoiRetraitsDemandes
             ->update(['statut' => $statut, 'cibles_nb' => $nb, 'traite_le' => now()]));
     }
 
-    /** @param  array<string, int>  $bilan */
+    /** @param  array{envoyees: int, sans_objet: int, echecs: int, en_attente: int, en_retard: int}  $bilan */
     private function surveillerRetard(string $ws, \stdClass $d, array &$bilan): void
     {
         $statut = WorkspaceContext::run($ws, fn () => DB::table('envoi_retraits_demandes')->where('workspace_id', $ws)->where('id', $d->id)->value('statut'));

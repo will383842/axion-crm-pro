@@ -27,7 +27,7 @@ final class JournalCommandes
     {
         $details = $cibles === []
             ? ['corps_sha256' => hash('sha256', $commande)]
-            : ['corps_sha256' => hash('sha256', ClientServeurEnvoiHmac::corps($commandeId, $commande, $cibles)), 'cibles' => array_values($cibles)];
+            : ['corps_sha256' => hash('sha256', ClientServeurEnvoiHmac::corps($commandeId, $commande, $cibles)), 'cibles' => $cibles];
 
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $commandeId, $commande, $source, $details): bool {
             $pose = DB::affectingStatement(

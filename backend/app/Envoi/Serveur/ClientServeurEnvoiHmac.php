@@ -173,13 +173,17 @@ final class ClientServeurEnvoiHmac implements CommandeurServeur, TireurEvenement
     {
         $donnees = ['commande_id' => $commandeId, 'commande' => $commande];
         if ($commande === 'retrait') {
-            $donnees['cibles'] = array_values($cibles);
+            $donnees['cibles'] = $cibles;
         }
 
         return json_encode($donnees, JSON_THROW_ON_ERROR);
     }
 
-    /** Un retrait sans cible n'a aucun sens sûr : refusé ICI, avant toute trace et tout réseau. */
+    /**
+     * Un retrait sans cible n'a aucun sens sûr : refusé ICI, avant toute trace et tout réseau.
+     *
+     * @param  array<mixed>  $cibles
+     */
     private static function controlerCibles(string $commande, array $cibles): void
     {
         if ($commande !== 'retrait') {

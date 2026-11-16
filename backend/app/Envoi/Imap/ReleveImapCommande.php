@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * L8-F12 : relève IMAP planifiée de toutes les boîtes actives (une relève par boîte, isolée des autres).
+ * L8-F12 : relève IMAP planifiée de toutes les boîtes, y compris en pause (leurs STOP et réponses arrivent toujours ; une relève par boîte, isolée des autres).
  *
  * Inerte (code 0) tant que `ENVOI_REEL_ACTIF` ET `ENVOI_RELEVE_ACTIF` ne sont pas vrais : AVANT toute résolution
  * du lecteur, donc aucune connexion IMAP n'est tentée. Le lecteur et la relève viennent du conteneur (jamais de
@@ -26,7 +26,7 @@ final class ReleveImapCommande extends Command
 
     protected $signature = self::SIGNATURE_PLANIFIEE;
 
-    protected $description = 'Envoi : relève IMAP des retours (rebonds, plaintes, réponses) de chaque boîte active';
+    protected $description = 'Envoi : relève IMAP des retours (rebonds, plaintes, réponses) de chaque boîte, même en pause';
 
     public function handle(): int
     {
@@ -38,7 +38,7 @@ final class ReleveImapCommande extends Command
         $echecs = 0;
         foreach (DB::table('workspaces')->whereNull('deleted_at')->pluck('id') as $ws) {
             $boites = WorkspaceContext::run((string) $ws, fn () => DB::table('envoi_boites')
-                ->where('workspace_id', $ws)->where('etat', 'active')->pluck('id'));
+                ->where('workspace_id', $ws)->orderBy('id')->pluck('id'));
             foreach ($boites as $boite) {
                 try {
                     app(ReleveImap::class)->relever((string) $ws, (string) $boite);
@@ -47,7 +47,11 @@ final class ReleveImapCommande extends Command
                     $echecs++;
                     $this->journaliserPanne((string) $boite, $e);
                     // Message fixe et sans secret pour la fabrique absente ; sinon la classe seule (un message réseau peut porter un hôte).
-                    $this->error($e->getMessage() === FabriqueLecteursNonFournie::MESSAGE ? FabriqueLecteursNonFournie::MESSAGE : 'relève impossible : ' . $e::class);
+                    $this->error(match (true) {
+                        $e->getMessage() === FabriqueLecteursNonFournie::MESSAGE => FabriqueLecteursNonFournie::MESSAGE,
+                        $e instanceof AccesImapAbsent => AccesImapAbsent::MESSAGE,
+                        default => 'relève impossible : ' . $e::class,
+                    });
                 }
             }
         }

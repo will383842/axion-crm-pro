@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Opposition\StatutOpposition;
+use App\Http\Controllers\Api\Crm\ContactsGestesController;
 use App\Models\Contact;
 use App\Support\ContactQueryFilters;
 use App\Support\EntreprisesFermees;
@@ -110,7 +111,7 @@ class ContactsController extends ApiController
      * @param  array{opposee: bool, motifs: list<string>}|null  $opposition
      * @return array<string, mixed>
      */
-    private function present(Contact $c, bool $masquer, ?array $opposition = null): array
+    public function present(Contact $c, bool $masquer, ?array $opposition = null): array
     {
         return [
             'opposition' => $opposition ?? ['opposee' => false, 'motifs' => []],
@@ -172,7 +173,7 @@ class ContactsController extends ApiController
      *
      *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
      *
-     *     @OA\Response(response=501, description="Not implemented"))
+     *     @OA\Response(response=200, description="OK"))
      */
     public function update(Request $r, Contact $contact): JsonResponse
     {
@@ -181,7 +182,8 @@ class ContactsController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($contact);
 
-        return $this->notImplemented('5');
+        // G1-A : même geste que `PATCH /crm/contacts/{id}` (droits, espace et corbeille revérifiés par le service).
+        return app(ContactsGestesController::class)->modifier($r, $contact->id);
     }
 
     /**

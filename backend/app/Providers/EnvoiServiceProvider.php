@@ -66,9 +66,14 @@ use App\Envoi\Temoins\LecteurIndesirables;
 use App\Envoi\Temoins\LecteurIndesirablesWebklex;
 use App\Providers\Envoi\AiguillageServiceProvider;
 use App\Providers\Envoi\FeuVertDecisionServiceProvider;
+use App\Providers\Envoi\MaterialisationServiceProvider;
 use App\Providers\Envoi\OppositionsImportServiceProvider;
 use App\Providers\Envoi\OrchestrationServiceProvider;
+use App\Providers\Envoi\ReactionsServiceProvider;
+use App\Providers\Envoi\ReleveRetoursServiceProvider;
 use App\Providers\Envoi\RetentionServiceProvider;
+use App\Providers\Envoi\TransportServiceProvider;
+use App\Providers\Envoi\VerdictsAdresseServiceProvider;
 use App\Socle\Alertes\Alerte;
 use App\Support\WorkspaceContext;
 use Illuminate\Support\Facades\Event;
@@ -172,6 +177,12 @@ class EnvoiServiceProvider extends ServiceProvider
         $this->app->register(OppositionsImportServiceProvider::class);
         $this->app->register(RetentionServiceProvider::class);
         $this->app->register(FeuVertDecisionServiceProvider::class);
+        // V0 : points d'entrée vides des lots parallèles (un fournisseur par lot).
+        $this->app->register(MaterialisationServiceProvider::class);
+        $this->app->register(VerdictsAdresseServiceProvider::class);
+        $this->app->register(TransportServiceProvider::class);
+        $this->app->register(ReleveRetoursServiceProvider::class);
+        $this->app->register(ReactionsServiceProvider::class);
     }
 
     public function boot(): void

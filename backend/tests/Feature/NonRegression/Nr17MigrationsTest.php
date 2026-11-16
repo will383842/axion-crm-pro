@@ -57,6 +57,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000121_envoi_reponses_classements.php',
     // Filet modifié : pourquoi — envoi R12 : canal d'opposition `reponse` (CHECK élargi NOT VALID, aucune donnée touchée) ; la retirer fausserait le registre ; down() inerte, up() rejouable.
     '2026_12_02_000122_envoi_oppositions_canal_reponse.php',
+    // Filet modifié : pourquoi — envoi D1-L1 : accès IMAP chiffrés des boîtes, AJOUT SEUL (déclencheur UPDATE/DELETE/TRUNCATE, droits SELECT+INSERT) ; les retirer effacerait les accès posés ; down() inerte, up() rejouable (IF NOT EXISTS).
+    '2026_12_05_000400_envoi_boites_acces_imap.php',
     // Filet modifié : pourquoi — VERDICTS : colonne motif nullable + CHECK NOT VALID ; la retirer effacerait le pourquoi des verdicts ; down() inerte, up() rejouable.
     '2026_12_05_000500_envoi_verdicts_adresse_motif.php',
     // Filet modifié : pourquoi — VERDICTS : REVOKE UPDATE/DELETE du rôle applicatif sur les verdicts (ajout seul) ; rendre ces droits rouvrirait la réécriture des verdicts ; down() inerte, up() rejouable.

@@ -81,11 +81,12 @@ test('message accepté par le faux serveur : le Message-ID est enregistré puis 
     $origine = $registre->retrouver($this->ws, [$ligne->message_id]);
 
     expect($origine)->not->toBeNull()->and($origine->adresse)->toBe(REG_ADRESSE);
-    // UUID local ; l'identifiant du serveur (« sim-N ») reste dans le journal des messages.
+    // UUID du registre (C1) dans les deux colonnes de rattachement ; l'identifiant du serveur (« sim-N ») va dans id_injection_serveur.
     $local = DB::table('envoi_injections_locales')->where('workspace_id', $this->ws)->first();
     expect($local)->not->toBeNull()
         ->and($origine->idInjection)->toBe($local->id_injection)
-        ->and($ligne->id_injection)->toStartWith('sim-')
+        ->and($ligne->id_injection)->toBe($local->id_injection)
+        ->and($ligne->id_injection_serveur)->toStartWith('sim-')
         ->and($local->cle_idempotence)->toBe('seq-' . $this->ins . '-1')
         ->and(DB::table('envoi_messages_envoyes')->where('workspace_id', $this->ws)->count())->toBe(1);
 });

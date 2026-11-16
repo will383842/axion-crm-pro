@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Crm\Opposition\StatutOpposition;
+use App\Http\Controllers\Api\Crm\ContactsGestesController;
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\Contact;
 use App\Support\ContactQueryFilters;
 use App\Support\EntreprisesFermees;
@@ -15,6 +17,8 @@ use Spatie\QueryBuilder\QueryBuilder;
 
 class ContactsController extends ApiController
 {
+    use VerrouOptimiste;
+
     /**
      * @OA\Get(path="/contacts", tags={"Contacts"}, summary="Liste paginée des contacts",
      *     security={{"sanctumCookie":{}}},
@@ -172,7 +176,7 @@ class ContactsController extends ApiController
      *
      *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
      *
-     *     @OA\Response(response=501, description="Not implemented"))
+     *     @OA\Response(response=200, description="OK"))
      */
     public function update(Request $r, Contact $contact): JsonResponse
     {
@@ -181,7 +185,11 @@ class ContactsController extends ApiController
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($contact);
 
-        return $this->notImplemented('5');
+        // Deux saisies concurrentes ne s'écrasent pas en silence (`If-Match` ou `updated_at`, G43-005).
+        $this->refuserSiVersionPerimee($r, $contact);
+
+        // G1-A : même geste que `PATCH /crm/contacts/{id}` (droits, espace et corbeille revérifiés par le service).
+        return app(ContactsGestesController::class)->modifier($r, $contact->id);
     }
 
     /**

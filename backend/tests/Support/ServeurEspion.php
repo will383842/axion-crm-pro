@@ -20,6 +20,9 @@ class ServeurEspion implements ServeurEnvoi
     /** @var list<int> niveau de transaction vu à chaque appel */
     public array $niveaux = [];
 
+    /** @var list<MessageAEnvoyer> messages reçus, dans l'ordre */
+    public array $recus = [];
+
     /** @param  Closure(MessageAEnvoyer, self): ResultatInjection  $comportement */
     public function __construct(private readonly Closure $comportement) {}
 
@@ -27,6 +30,7 @@ class ServeurEspion implements ServeurEnvoi
     {
         $this->appels++;
         $this->niveaux[] = DB::transactionLevel();
+        $this->recus[] = $message;
 
         return ($this->comportement)($message, $this);
     }

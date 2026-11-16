@@ -5,6 +5,7 @@ namespace App\Envoi\Chauffe;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Depot\DepotSocle;
 use App\Socle\Alertes\Alerte;
+use App\Support\WorkspaceContext;
 
 /**
  * « Tout arrêter » : arme le drapeau en base (journalisé) et met le serveur en pause.
@@ -28,7 +29,7 @@ final class ToutArreter
     {
         $this->depot->armerToutArreter($workspaceId, $auteur);
         try {
-            $this->serveur?->pause(); // ceinture : le drapeau en base suffit déjà
+            $this->serveur !== null && WorkspaceContext::run($workspaceId, fn () => $this->serveur->pause()); // ceinture (dans le contexte de l'espace : sinon l'aiguilleur n'a pas de serveur) : le drapeau en base suffit déjà
         } finally {
             $this->alerte?->envoyer('Tout arrêter armé', "Auteur : {$auteur}. Plus aucune injection pour cet espace.", 'envoi', 'critique');
         }
@@ -40,8 +41,13 @@ final class ToutArreter
         if (! $this->depot->leverToutArreter($workspaceId, $auteur)) {
             return false;
         }
-        $this->serveur?->reprise();
-        $this->alerte?->envoyer('Tout arrêter levé', "Auteur : {$auteur}. L’envoi peut reprendre pour cet espace (les freins et le quota restent appliqués).", 'envoi', 'critique');
+        try {
+            $this->serveur !== null && WorkspaceContext::run($workspaceId, fn () => $this->serveur->reprise()); // jamais hors contexte : Kumo resterait en pause
+        } finally {
+            // Le drapeau est déjà levé et journalisé : l'alerte part même si le serveur est injoignable (il reste alors
+            // en pause, état sûr ; le rejoueur renverra la reprise). L'échec est relancé tel quel, sans détail ajouté.
+            $this->alerte?->envoyer('Tout arrêter levé', "Auteur : {$auteur}. L’envoi peut reprendre pour cet espace (les freins et le quota restent appliqués).", 'envoi', 'critique');
+        }
 
         return true;
     }

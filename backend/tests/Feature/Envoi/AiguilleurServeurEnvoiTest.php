@@ -519,7 +519,7 @@ function aigNettoyer(string $ws): void
 }
 
 /** `ToutArreter::armer` (comme envoi:tout-arreter) sur la connexion applicative SANS contexte, via la passerelle et l'aiguilleur. */
-function aigArmerSansContexte(string $ws, ?Closure $lecteur): AigDouble
+function aigArmerSansContexte(string $ws, ?Closure $lecteur, bool $viaToutArreter = true): AigDouble
 {
     $double = new AigDouble('kumo');
     aigSimuler();
@@ -529,7 +529,11 @@ function aigArmerSansContexte(string $ws, ?Closure $lecteur): AigDouble
     $passerelle = new PasserelleLocale($aig, new DepotSocleDb, true, 300, null, '', 300, fn () => WorkspaceContext::current());
     DB::setDefaultConnection('pgsql_app');
     WorkspaceContext::clear();
-    (new ToutArreter(new DepotSocleDb, $passerelle))->armer($ws, 'auteur-test');
+    if ($viaToutArreter) {
+        (new ToutArreter(new DepotSocleDb, $passerelle))->armer($ws, 'auteur-test'); // E2 : ToutArreter pose lui-même le contexte de l'espace
+    } else {
+        $passerelle->pause(); // appel brut, VRAIMENT sans contexte (témoin de la RLS)
+    }
 
     return $double;
 }
@@ -553,7 +557,7 @@ test('garde avec témoin : un SELECT direct sur envoi_domaines (RLS) à la place
     $defaut = DB::getDefaultConnection();
     try {
         $direct = fn (): array => array_map(fn ($l) => (string) $l->adaptateur, DB::select("SELECT DISTINCT adaptateur FROM envoi_domaines WHERE adaptateur <> 'faux'"));
-        $double = aigArmerSansContexte($ws, $direct);
+        $double = aigArmerSansContexte($ws, $direct, false);
         expect($double->appels)->toBe([]); // sans contexte la RLS cache tout : la lecture directe est fausse en production
     } finally {
         DB::setDefaultConnection($defaut);

@@ -54,6 +54,9 @@ final class JournalCommandes
 
     /**
      * Intentions SANS acquittement de l'espace (les plus anciennes d'abord), à rejouer avec le même commande_id.
+     * Pour un couple (espace, source), une pause ou une reprise n'est rejouée que s'il n'existe aucune pause ou
+     * reprise PLUS RÉCENTE (par id, acquittée ou non) : on ne rejoue jamais un état périmé. Un retrait est toujours
+     * rejoué. Filtre dans la requête : le journal reste en ajout seul.
      *
      * @return list<array{commande_id: string, commande: string, source: string}>
      */
@@ -65,6 +68,7 @@ final class JournalCommandes
                 'SELECT i.commande_id, i.commande, i.source FROM envoi_journal_commandes i
                  WHERE i.workspace_id = ? AND i.commande_id IS NOT NULL AND i.source IS NOT NULL
                    AND NOT EXISTS (SELECT 1 FROM envoi_journal_commandes a WHERE a.workspace_id = i.workspace_id AND a.commande = ? AND a.cle_idempotence = i.commande_id)
+                   AND NOT (i.commande IN (\'pause\', \'reprise\') AND EXISTS (SELECT 1 FROM envoi_journal_commandes n WHERE n.workspace_id = i.workspace_id AND n.source = i.source AND n.commande_id IS NOT NULL AND n.commande IN (\'pause\', \'reprise\') AND n.id > i.id))
                  ORDER BY i.id LIMIT ?',
                 [$workspaceId, self::ACQUITTEMENT, $limite],
             ),

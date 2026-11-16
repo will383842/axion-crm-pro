@@ -397,7 +397,8 @@ test('M4 : rejeu des intentions non acquittées, idempotent par commande_id', fu
     $perdue = envoiCmd();
     $livree = envoiCmd();
     $client = app(CommandeurServeur::class);
-    expect(fn () => $client->commander($this->ws, 'srv1', $perdue, 'pause'))->toThrow(ServeurEnvoiRefuse::class);
+    // E4 : une pause perdue suivie d'une reprise livrée n'est plus rejouée (état périmé, cf. tests E4) ; un RETRAIT, lui, l'est toujours.
+    expect(fn () => $client->commander($this->ws, 'srv1', $perdue, 'retrait'))->toThrow(ServeurEnvoiRefuse::class);
     $panne = false;
     $client->commander($this->ws, 'srv1', $livree, 'reprise');
     Http::assertSentCount(2);
@@ -405,7 +406,7 @@ test('M4 : rejeu des intentions non acquittées, idempotent par commande_id', fu
     $bilan = app(RejoueurCommandes::class)->rejouer();
     expect($bilan)->toBe(['rejouees' => 1, 'echecs' => 0]);
     Http::assertSentCount(3);
-    Http::assertSent(fn (Request $r) => str_contains($r->body(), $perdue) && str_ends_with($r->url(), '/v1/commandes/pause'));
+    Http::assertSent(fn (Request $r) => str_contains($r->body(), $perdue) && str_ends_with($r->url(), '/v1/commandes/retrait'));
 
     // Idempotent : plus rien à rejouer, aucun nouvel appel, aucun doublon d'acquittement.
     expect(app(RejoueurCommandes::class)->rejouer())->toBe(['rejouees' => 0, 'echecs' => 0]);
@@ -561,4 +562,61 @@ test('K7 : le drapeau « observation » de la passerelle est conservé par K1 (f
     ], 'curseur_suivant' => '3'])]);
     $lot = app(TireurEvenements::class)->tirer($this->ws, 'srv1', '0', 10, new DateTimeImmutable('-1 hour'));
     expect(array_map(fn ($e) => $e->observation, $lot->evenements))->toBe([true, false, false]);
+});
+
+/** E4 : ids rejouables (commande_id) pour l'espace de test, dans l'ordre de rejeu. */
+function envoiRejouables(string $ws): array
+{
+    return array_column(app(JournalCommandes::class)->nonAcquittees($ws, 50), 'commande_id');
+}
+
+test('E4 : pause non acquittée suivie d’une reprise acquittée => la pause n’est pas rejouée', function () {
+    $j = app(JournalCommandes::class);
+    [$p, $r] = [envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $p, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $r, 'reprise', 'srv1');
+    $j->acquitter($this->ws, $r);
+
+    expect(envoiRejouables($this->ws))->toBe([]);
+});
+
+test('E4 : pause acquittée, reprise non acquittée, pause non acquittée => seule la dernière pause est rejouée', function () {
+    $j = app(JournalCommandes::class);
+    [$p1, $r, $p2] = [envoiCmd(), envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $p1, 'pause', 'srv1');
+    $j->acquitter($this->ws, $p1);
+    $j->enregistrer($this->ws, $r, 'reprise', 'srv1');
+    $j->enregistrer($this->ws, $p2, 'pause', 'srv1');
+
+    expect(envoiRejouables($this->ws))->toBe([$p2]);
+});
+
+test('E4 : un retrait non acquitté est TOUJOURS rejoué, même suivi d’une pause ou d’une reprise', function () {
+    $j = app(JournalCommandes::class);
+    [$x, $p, $r] = [envoiCmd(), envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $x, 'retrait', 'srv1');
+    $j->enregistrer($this->ws, $p, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $r, 'reprise', 'srv1');
+
+    expect(envoiRejouables($this->ws))->toBe([$x, $r]);
+});
+
+test('E4 : le filtre est propre à la source et le journal reste en ajout seul', function () {
+    $j = app(JournalCommandes::class);
+    [$a, $b] = [envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $a, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $b, 'reprise', 'srv2');
+    $avant = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->count());
+
+    expect(envoiRejouables($this->ws))->toBe([$a, $b]);
+    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->count()))->toBe($avant);
+});
+
+test('E4 : pause non acquittée puis retrait seul => le journal à rejouer vaut [pause, retrait]', function () {
+    $j = app(JournalCommandes::class);
+    [$p, $x] = [envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $p, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $x, 'retrait', 'srv1');
+
+    expect(envoiRejouables($this->ws))->toBe([$p, $x]); // un retrait n'est pas une pause/reprise : il ne périme pas la pause
 });

@@ -29,6 +29,8 @@ test.describe('listes de refus (démo)', () => {
   test('H2 : confirmer ⇒ le total du registre augmente', async ({ page }) => {
     const fenetre = await ouvrirImport(page);
     const total = async () => Number((await page.getByText(/ oppositions, jamais effacées/).first().textContent())?.match(/(\d+) oppositions/)?.[1]);
+    // Le total n'est lisible qu'une fois le registre chargé : attendre un nombre, sinon `avant` vaut NaN.
+    await expect(page.getByText(/\d+ oppositions, jamais effacées/).first()).toBeVisible();
     const avant = await total();
     await choisir(page, CONTENU);
     await fenetre.getByRole('button', { name: 'Simuler l’import' }).click();

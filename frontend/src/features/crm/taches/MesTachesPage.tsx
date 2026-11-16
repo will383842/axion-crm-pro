@@ -14,8 +14,7 @@ import { NOM_DU_PRODUIT, useProduitCourant } from '@/features/socle/produit/useP
 import { useAjouterTache, useCocherTache, useRappelMatin, useTaches } from './api';
 import { dateCourte, grouper } from './groupes';
 import type { Tache } from './types';
-import { tachesEtAffairesDisponibles } from './disponible';
-import { PageEnAttente } from '@/features/socle/PageEnAttente';
+import { qualifierErreur } from '@/lib/api';
 
 function phrase(aujourdhui: number, enRetard: number): string {
   const jour = aujourdhui + enRetard;
@@ -78,6 +77,21 @@ function Groupe({ id, titre, mot, children }: { id: string; titre: string; mot?:
 function RappelDuMatin({ actif }: { actif: boolean }) {
   const rappel = useRappelMatin();
   const [local, setLocal] = useState<boolean | null>(null);
+  // Un 409 (rappel_indisponible) au premier essai : on masque l'interrupteur, sans réessayer.
+  const indisponible = rappel.isError && qualifierErreur(rappel.error).status === 409;
+  if (indisponible) {
+    return (
+      <Card padding="lg" className="flex items-start gap-3">
+        <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-slate-900">Rappel du matin</h2>
+          <p role="status" className="mt-1 text-sm text-slate-600">
+            Le rappel du matin par courriel n’est pas encore disponible.
+          </p>
+        </div>
+      </Card>
+    );
+  }
   return (
     <Card padding="lg" className="flex items-start gap-3">
       <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-produit" aria-hidden />
@@ -155,7 +169,7 @@ function FormulaireTache({ ouvert, onFermer }: { ouvert: boolean; onFermer: () =
   );
 }
 
-function MesTachesPageDemo() {
+function MesTachesPageContenu() {
   const produit = useProduitCourant();
   const { data, isLoading, error, refetch } = useTaches();
   const [formulaire, setFormulaire] = useState(false);
@@ -251,13 +265,6 @@ function MesTachesPageDemo() {
   );
 }
 
-/**
- * Hors démo (donc en production), la page reste « en attente », comme avant ce lot :
- * le serveur n'a pas encore ses routes (voir `disponible.ts`).
- */
 export function MesTachesPage() {
-  if (!tachesEtAffairesDisponibles()) {
-    return <PageEnAttente title="Mes tâches" lot="DM1-ACC" onglets={<OngletsTableauDeBord />} />;
-  }
-  return <MesTachesPageDemo />;
+  return <MesTachesPageContenu />;
 }

@@ -157,6 +157,7 @@ const SRC = path.resolve(racine, '../../src');
 /** L'écran de chaque entrée de menu. Une entrée nouvelle sans écran ici fait rougir. */
 const ECRAN_DE: Record<string, string> = {
   '/': 'features/dashboard/DashboardPage.tsx',
+  '/taches': 'features/crm/taches/MesTachesPage.tsx',
   '/doublons': 'features/doublons/DoublonsPage.tsx',
   '/rgpd/effacements': 'features/rgpd/EffacementsDemandesPage.tsx',
   '/origines': 'features/origines/OriginesPage.tsx',

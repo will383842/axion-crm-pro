@@ -122,20 +122,19 @@ describe('MesTachesPage', () => {
   });
 });
 
-describe('MesTachesPage hors démo (production : le serveur n’a pas encore ses routes)', () => {
-  it('reste « en attente », texte neutre, et n’appelle pas /crm/taches', async () => {
+describe('MesTachesPage hors démo (lot G2-B : le serveur a ses routes)', () => {
+  it('montre la liste du serveur, plus la page « en attente »', async () => {
     vi.stubEnv('VITE_DEMO', '');
     const appels: string[] = [];
-    const espion = http.get(apiUrl('/crm/taches'), () => {
+    const serveur = http.get(apiUrl('/crm/taches'), () => {
       appels.push('/crm/taches');
-      return HttpResponse.json({ data: [] });
+      return HttpResponse.json({ aujourdhui: '2027-01-12', rappel_matin: false, data: [] });
     });
     try {
-      await renderScreen(<MesTachesPage />, { path: PATH, handlers: [espion] });
-      const page = await screen.findByTestId('page-en-attente');
-      expect(page).toHaveAttribute('data-lot', 'DM1-ACC');
-      expect(screen.getByRole('heading', { level: 1, name: 'Mes tâches' })).toBeVisible();
-      expect(appels).toEqual([]);
+      await renderScreen(<MesTachesPage />, { path: PATH, handlers: [serveur] });
+      expect(await screen.findByRole('heading', { level: 1, name: 'Mes tâches' })).toBeVisible();
+      expect(screen.queryByTestId('page-en-attente')).not.toBeInTheDocument();
+      await waitFor(() => expect(appels).toEqual(['/crm/taches']));
     } finally {
       vi.unstubAllEnvs();
     }

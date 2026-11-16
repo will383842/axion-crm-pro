@@ -47,6 +47,18 @@ final class ResolveurDnsSysteme implements ResolveurDns
         return array_values(array_filter($sortie));
     }
 
+    public function mx(string $nom): array
+    {
+        $lignes = $this->interroger($nom, DNS_MX);
+        usort($lignes, static fn (array $x, array $y): int => (int) ($x['pri'] ?? 0) <=> (int) ($y['pri'] ?? 0));
+        $sortie = [];
+        foreach ($lignes as $e) {
+            $sortie[] = rtrim(strtolower((string) ($e['target'] ?? '')), '.');
+        }
+
+        return array_values(array_filter($sortie));
+    }
+
     public function ptr(string $ip): array
     {
         $inverse = self::nomInverse($ip);

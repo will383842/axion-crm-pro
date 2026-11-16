@@ -25,9 +25,9 @@ function statut(RapportControle $r, string $code): string
     return 'absent';
 }
 
-test('domaine conforme : 20 points, tous ok, prêt, pas de pause', function () {
+test('domaine conforme : 22 points, tous ok, prêt, pas de pause', function () {
     $r = (new ControleurDns(FauxResolveurDns::conforme()))->controler(cfg());
-    expect($r->resultats)->toHaveCount(20)
+    expect($r->resultats)->toHaveCount(22)
         ->and(array_map(fn ($p) => $p->code, $r->resultats))->toBe(PlanDns::codesPointsDeControle())
         ->and(array_filter($r->resultats, fn ($p) => $p->statut !== 'ok'))->toBe([])
         ->and($r->pret())->toBeTrue()
@@ -139,7 +139,7 @@ test('aucune requête hors DNS/MTA-STS : le contrôle ne fait que lire', functio
     (new ControleurDns($f))->controler(cfg());
     expect($f->requetes)->not->toBeEmpty();
     foreach ($f->requetes as $q) {
-        expect($q)->toMatch('/^(TXT|A|PTR|STS) /');
+        expect($q)->toMatch('/^(TXT|A|AAAA|MX|PTR|STS) /');
     }
 });
 
@@ -225,4 +225,42 @@ test('D1b : helo_a_vers_ip compare des adresses IPv6 NORMALISÉES (zéros, casse
 
     $f->aaaa['mx.envoi.example.test'] = ['2001:db8::11'];
     expect(statut((new ControleurDns($f))->controler($c), 'helo_a_vers_ip'))->toBe('ko');
+});
+
+test('C1-3 : MX de rebond absent : ko bloquant, domaine pas prêt', function () {
+    $f = FauxResolveurDns::conforme();
+    $f->mx = [];
+    $r = (new ControleurDns($f))->controler(cfg());
+    expect(statut($r, 'bounce_mx_present'))->toBe('ko')
+        ->and(statut($r, 'bounce_spf_autorise_ip'))->toBe('ok')
+        ->and($r->pret())->toBeFalse();
+});
+
+test('C1-3 : SPF de rebond qui n autorise pas l IP, absent ou en double : ko, pas prêt', function (array $txt) {
+    $f = FauxResolveurDns::conforme();
+    $f->txt['bounce.envoi.example.test'] = $txt;
+    $r = (new ControleurDns($f))->controler(cfg());
+    expect(statut($r, 'bounce_spf_autorise_ip'))->toBe('ko')
+        ->and(statut($r, 'bounce_mx_present'))->toBe('ok')
+        ->and($r->pret())->toBeFalse();
+})->with([
+    'autre IP' => [['v=spf1 ip4:192.0.2.99 -all']],
+    'absent' => [[]],
+    'deux SPF' => [['v=spf1 ip4:192.0.2.10 -all', 'v=spf1 ip4:192.0.2.10 -all']],
+]);
+
+test('C1-3 : le SPF du domaine d envoi ne tient pas lieu de SPF de rebond', function () {
+    $f = FauxResolveurDns::conforme();
+    unset($f->txt['bounce.envoi.example.test']);
+    $r = (new ControleurDns($f))->controler(cfg());
+    expect(statut($r, 'spf_autorise_ip'))->toBe('ok')->and(statut($r, 'bounce_spf_autorise_ip'))->toBe('ko');
+});
+
+test('C1-3 : SPF de rebond IPv6 et include: suivis', function () {
+    $c = new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '2001:db8::10');
+    $f = FauxResolveurDns::conforme(ip: '2001:db8::10');
+    $f->aaaa['mx.envoi.example.test'] = ['2001:db8::10'];
+    $f->txt['bounce.envoi.example.test'] = ['v=spf1 include:spf.rebonds.example.test -all'];
+    $f->txt['spf.rebonds.example.test'] = ['v=spf1 ip6:2001:db8::/64 -all'];
+    expect(statut((new ControleurDns($f))->controler($c), 'bounce_spf_autorise_ip'))->toBe('ok');
 });

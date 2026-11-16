@@ -15,4 +15,13 @@ class CompanyPolicy extends BasePolicy
     {
         return $user->hasPermissionTo('companies.update');
     }
+
+    /**
+     * « Mes tâches » : créer ou clore une tâche exige le droit d'ÉDITER les
+     * entreprises (lecture seule : voir, jamais écrire).
+     */
+    public function gererTaches(User $user): bool
+    {
+        return $user->hasPermissionTo('companies.update');
+    }
 }

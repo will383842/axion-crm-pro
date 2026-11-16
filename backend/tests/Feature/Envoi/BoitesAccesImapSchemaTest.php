@@ -130,6 +130,7 @@ test('D1-L1 S5 droits du rôle applicatif : INSERT oui, UPDATE non', function ()
     expect(DB::selectOne("SELECT has_table_privilege(?, 'envoi_boites_acces_imap', 'INSERT') AS p", [$role])->p)->toBeTrue();
     expect(DB::selectOne("SELECT has_table_privilege(?, 'envoi_boites_acces_imap', 'UPDATE') AS p", [$role])->p)->toBeFalse();
     expect(DB::selectOne("SELECT has_table_privilege(?, 'envoi_boites_acces_imap', 'DELETE') AS p", [$role])->p)->toBeFalse();
+    expect(DB::selectOne("SELECT has_table_privilege(?, 'envoi_boites_acces_imap', 'TRUNCATE') AS p", [$role])->p)->toBeFalse();
 });
 
 test('D1-L1 S6 up() rejouable deux fois sans erreur, down() inerte', function () {

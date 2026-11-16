@@ -37,7 +37,7 @@ const MSG = '/api/v1/envoi/messages';
 
 function msgSaisie(array $plus = []): array
 {
-    return $plus + ['nom' => 'Premier contact fictif', 'objet' => 'Bonjour {{prénom|vous}}', 'corps' => 'Texte simple pour {{entreprise|votre société}}.', 'bloc_information' => true];
+    return $plus + ['nom' => 'Premier contact fictif', 'objet' => 'Bonjour {{prenom|vous}}', 'corps' => 'Texte simple pour {{organisation|votre société}}.', 'bloc_information' => true];
 }
 
 test('POST crée un modèle brouillon version 1, conforme au contrat', function () {
@@ -51,7 +51,7 @@ test('PUT crée une nouvelle version, sans jamais modifier l’ancienne', functi
     [$owner, , $id] = $this->jeu();
     $this->actingAs($owner)->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet deux']))->assertOk()->assertJsonPath('version_courante', 2);
     $v = DB::table('envoi_modele_versions')->where('modele_id', $id)->orderBy('numero')->pluck('objet', 'numero')->all();
-    expect($v)->toBe([1 => 'Bonjour {{prénom|vous}}', 2 => 'Objet deux']);
+    expect($v)->toBe([1 => 'Bonjour {{prenom|vous}}', 2 => 'Objet deux']);
 });
 
 test('PUT avec If-Match : version de base périmée → 409 version_perimee, une seule version ajoutée', function () {
@@ -71,7 +71,7 @@ test('restaurer recopie l’ancienne version dans une nouvelle', function () {
     [$owner, , $id] = $this->jeu();
     $this->actingAs($owner)->putJson(MSG . "/{$id}", msgSaisie(['objet' => 'Objet deux']))->assertOk();
     $this->actingAs($owner)->postJson(MSG . "/{$id}/versions/1/restaurer")->assertOk()->assertJsonPath('version_courante', 3);
-    expect(DB::table('envoi_modele_versions')->where('modele_id', $id)->where('numero', 3)->value('objet'))->toBe('Bonjour {{prénom|vous}}');
+    expect(DB::table('envoi_modele_versions')->where('modele_id', $id)->where('numero', 3)->value('objet'))->toBe('Bonjour {{prenom|vous}}');
     $this->actingAs($owner)->postJson(MSG . "/{$id}/versions/9/restaurer")->assertNotFound();
 });
 
@@ -79,7 +79,7 @@ test('une version validée reste immuable : modifier le modèle crée une versio
     [$owner, , $id] = $this->jeu();
     $this->actingAs($owner)->postJson(MSG . "/{$id}/versions/1/valider")->assertOk()->assertJsonPath('statut', 'valide')->assertJsonPath('version_validee', 1);
     $this->actingAs($owner)->putJson(MSG . "/{$id}", msgSaisie(['corps' => 'Autre texte.']))->assertOk()->assertJsonPath('statut', 'brouillon')->assertJsonPath('version_validee', null);
-    expect(DB::table('envoi_modele_versions')->where('modele_id', $id)->where('numero', 1)->value('corps'))->toBe('Texte simple pour {{entreprise|votre société}}.');
+    expect(DB::table('envoi_modele_versions')->where('modele_id', $id)->where('numero', 1)->value('corps'))->toBe('Texte simple pour {{organisation|votre société}}.');
 });
 
 test('valider une version qui n’est pas la dernière : 422 ; HTML dangereux : 422 à la création et à la validation', function () {
@@ -129,7 +129,7 @@ test('étanchéité : un autre espace ne voit ni ne touche le modèle (404)', fu
 test('aperçu : rend le message sans rien écrire ni toucher ServeurEnvoi', function () {
     [, $admin] = $this->jeu();
     $avant = [DB::table('envoi_modeles')->count(), DB::table('envoi_modele_versions')->count()];
-    $r = $this->actingAs($admin)->postJson(MSG . '/apercu', ['objet' => 'Bonjour {{prénom|vous}}', 'corps' => 'Chez {{entreprise|votre société}}'])->assertOk()->json();
+    $r = $this->actingAs($admin)->postJson(MSG . '/apercu', ['objet' => 'Bonjour {{prenom|vous}}', 'corps' => 'Chez {{organisation|votre société}}'])->assertOk()->json();
     expect($r['objet'])->toBe('Bonjour vous')->and($r['corps'])->toContain('votre société')->and(ContratOpenApiEnvoi::ecarts('creation.yaml', 'SaisieMessage', msgSaisie()))->toBe([])
         ->and([DB::table('envoi_modeles')->count(), DB::table('envoi_modele_versions')->count()])->toBe($avant)
         ->and($this->resolutions)->toBe(0);
@@ -137,13 +137,13 @@ test('aperçu : rend le message sans rien écrire ni toucher ServeurEnvoi', func
 
 test('aperçu : variable sans repli ou HTML dangereux refusés (422)', function () {
     [, $admin] = $this->jeu();
-    $this->actingAs($admin)->postJson(MSG . '/apercu', ['objet' => 'a', 'corps' => 'Bonjour {{prénom}}'])->assertStatus(422);
+    $this->actingAs($admin)->postJson(MSG . '/apercu', ['objet' => 'a', 'corps' => 'Bonjour {{prenom}}'])->assertStatus(422);
     $this->actingAs($admin)->postJson(MSG . '/apercu', ['objet' => 'a', 'corps' => '<iframe src="x"></iframe>'])->assertStatus(422);
 });
 
 test('contrôler : liste les contrôles du contrat, bloque ce qui est interdit, sans écrire', function () {
     [, $admin] = $this->jeu();
-    $r = $this->actingAs($admin)->postJson(MSG . '/controler', msgSaisie(['corps' => 'Voir https://bit.ly/x et {{prénom}}']))->assertOk()->json();
+    $r = $this->actingAs($admin)->postJson(MSG . '/controler', msgSaisie(['corps' => 'Voir https://bit.ly/x et {{prenom}}']))->assertOk()->json();
     expect(collect($r['controles'])->pluck('code')->all())->toBe(['mots_interdits', 'liens', 'bloc_information', 'texte_simple', 'valeurs_repli'])
         ->and($r['bloquants'])->toBeGreaterThan(0);
     foreach ($r['controles'] as $c) {
@@ -180,8 +180,8 @@ test('contexte et champs de fusion', function () {
     $b = $this->actingAs($admin)->getJson('/api/v1/envoi/messages')->json('blocs');
     expect($b)->toBeArray();
     $r = $this->actingAs($admin)->postJson('/api/v1/envoi/creation/champs', ['cible' => ['type' => 'liste', 'reference' => 'x'],
-        'sequence' => [['etape' => 1, 'message_id' => $this->actingAs($admin)->getJson(MSG)->json('data.0.id'), 'delai_jours' => 0]], 'repli' => ['entreprise' => 'votre société']])->assertOk()->json();
-    expect(collect($r['champs'])->pluck('nom')->sort()->values()->all())->toBe(['entreprise', 'prénom']);
+        'sequence' => [['etape' => 1, 'message_id' => $this->actingAs($admin)->getJson(MSG)->json('data.0.id'), 'delai_jours' => 0]], 'repli' => ['organisation' => 'votre société']])->assertOk()->json();
+    expect(collect($r['champs'])->pluck('nom')->sort()->values()->all())->toBe(['organisation', 'prenom']);
     foreach ($r['champs'] as $ch) {
         expect(ContratOpenApiEnvoi::ecarts('creation.yaml', 'ChampUtilise', $ch))->toBe([]);
     }

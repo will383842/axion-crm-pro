@@ -37,7 +37,7 @@ final class ComposeurSequenceMessage implements ComposeurSequence
             destinataire: $d->destinataire,
             sujet: $d->sujet,
             texte: $d->corps,
-            html: '<p>' . nl2br(htmlspecialchars($d->corps, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>',
+            html: '<p>' . self::corpsHtml($d->corps) . '</p>',
             // C1 : ce jeton (dérivé du Message-ID) n'est plus émis ; il ne sert qu'au contrôle de forme de DemandeMessage.
             jetonEnvoi: substr(hash('sha256', $d->messageId), 0, 32),
             urlDesinscription: $url,
@@ -46,6 +46,7 @@ final class ComposeurSequenceMessage implements ComposeurSequence
             adressePostale: (string) $this->identite['adresse_postale'],
             texteArt14: (string) $this->identite['bloc_information'],
             inReplyTo: $d->inReplyTo,
+            variables: $d->variables,
             references: $d->references,
         ));
 
@@ -55,5 +56,20 @@ final class ComposeurSequenceMessage implements ComposeurSequence
         }
 
         return $remplace;
+    }
+
+    /**
+     * Corps en HTML : le texte HORS des `{{nom|repli}}` est échappé ; les `{{…}}` restent intacts, car le rendu
+     * (`ComposeurMessage::rendre`) échappe lui-même la valeur et le repli, UNE fois (sinon « l'équipe » deviendrait `&amp;#039;`).
+     */
+    private static function corpsHtml(string $corps): string
+    {
+        $parties = preg_split('/(\{\{.*?\}\})/s', $corps, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$corps];
+        $html = '';
+        foreach ($parties as $i => $partie) {
+            $html .= $i % 2 === 1 ? $partie : nl2br(htmlspecialchars($partie, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+        }
+
+        return $html;
     }
 }

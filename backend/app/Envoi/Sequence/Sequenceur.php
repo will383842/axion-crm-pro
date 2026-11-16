@@ -12,7 +12,11 @@ use App\Envoi\Exceptions\InjectionIncertaine;
 use App\Envoi\Exceptions\RefusDefinitifServeur;
 use App\Envoi\Gardes\DemandeEnvoi;
 use App\Envoi\Gardes\EnvoiAutorise;
+use App\Envoi\Message\LecteurVariables;
+use App\Envoi\Message\LecteurVariablesDb;
 use App\Envoi\Message\MessageRefuse;
+use App\Envoi\Message\ValeursVariables;
+use App\Envoi\Message\VariablesMessage;
 use App\Envoi\Serveur\ServeurEnvoiRefuse;
 use App\Envoi\Smtp\EnvoiSmtpRefuse;
 use App\Support\ListeSuppression;
@@ -85,6 +89,7 @@ final class Sequenceur
         private readonly ComposeurSequence $composeur,
         private readonly ParametresExpedition $expedition,
         private readonly RegistreInjectionsSequence $registre = new RegistreInjectionsSequence,
+        private ?LecteurVariables $variables = null,
     ) {}
 
     /** @var list<array{0: string, 1: array<string, mixed>}> alertes critiques en attente du COMMIT de la transaction en cours */
@@ -334,6 +339,7 @@ final class Sequenceur
             $messageId,
             $inReplyTo,
             $references,
+            $this->variablesDe($ws, $fiche->contactId, $sujet, (string) $etape['corps']),
         ));
 
         return [
@@ -341,6 +347,23 @@ final class Sequenceur
             'message' => new MessageAEnvoyer($ws, $fiche->email, $this->expedition->expediteur, $sujet, $brut, $cle, $inj['id'] ?? null, $inj['cheminRetour'] ?? null),
             'idRegistre' => $inj['id'] ?? null,
         ];
+    }
+
+    /**
+     * F2a : valeurs nettoyées des champs de fusion du destinataire. Gabarit sans variable : AUCUNE lecture. Un nom hors
+     * liste fermée n'est pas lu (il prendra son repli).
+     *
+     * @return array<string, string>
+     */
+    private function variablesDe(string $ws, int $contactId, string $sujet, string $corps): array
+    {
+        $noms = array_values(array_intersect(VariablesMessage::utilisees($sujet, $corps), VariablesMessage::NOMS));
+        if ($noms === []) {
+            return [];
+        }
+        $this->variables ??= new LecteurVariablesDb;
+
+        return ValeursVariables::nettoyer($this->variables->pourContacts($ws, [$contactId], $noms)[$contactId] ?? [])['valeurs'];
     }
 
     /**

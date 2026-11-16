@@ -558,6 +558,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/contacts-hub', [ContactsHubController::class, 'index']);
             Route::get('/contacts-hub/counts', [ContactsHubController::class, 'counts']);
             // G1-B : corbeille douce. `corbeille` AVANT `/contacts/{contactId}` (sinon pris pour un identifiant).
+            // G1-C : ajout rapide. Avant `/contacts/{contactId}` (sinon `doublons` serait pris pour un identifiant).
+            Route::get('/contacts/doublons', [ContactsGestesController::class, 'doublons'])->middleware(['throttle:scraper-list', 'permission:companies.view']);
+            Route::post('/contacts', [ContactsGestesController::class, 'ajouter'])->middleware('permission:companies.create');
             Route::get('/contacts/corbeille', [ContactsGestesController::class, 'corbeille'])->middleware('permission:companies.view');
             Route::post('/contacts/{contactId}/retirer', [ContactsGestesController::class, 'retirer'])->whereNumber('contactId')->middleware('permission:companies.delete');
             Route::post('/contacts/{contactId}/restaurer', [ContactsGestesController::class, 'restaurer'])->whereNumber('contactId')->middleware('permission:companies.delete');

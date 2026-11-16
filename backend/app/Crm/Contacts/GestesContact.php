@@ -137,7 +137,7 @@ final class GestesContact
     {
         return DB::transaction(function () use ($workspaceId, $contactId): array {
             $ligne = DB::table('contacts')->where('workspace_id', $workspaceId)->where('id', $contactId)
-                ->whereNotNull('deleted_at')->lockForUpdate()->first(['id', 'company_id', 'metadata']);
+                ->whereNotNull('deleted_at')->lockForUpdate()->first(['id', 'company_id', 'metadata', 'email']);
             if ($ligne === null) {
                 return ['etat' => 'introuvable'];
             }
@@ -149,7 +149,17 @@ final class GestesContact
             if (! array_key_exists('retire_console_le', $meta)) {
                 return ['etat' => 'introuvable'];
             }
-            $entrepriseRetiree = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $ligne->company_id)->whereNotNull('deleted_at')->exists();
+            // Une opposition ou un effacement posé APRÈS le retrait (liste de suppression, opt-out, demande RGPD,
+            // `personnes.opposition_at`…) interdit aussi la restauration. Échec FERMÉ : sans verdict, on refuse.
+            $entreprise = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $ligne->company_id)->first(['siren', 'deleted_at']);
+            $siren = $entreprise->siren ?? null;
+            $statut = (new StatutOpposition)->pourLignes($workspaceId, [
+                $contactId => ['email' => is_string($ligne->email) ? $ligne->email : null, 'siren' => is_string($siren) ? $siren : null],
+            ]);
+            if (($statut[$contactId]['opposee'] ?? true) === true) {
+                return ['etat' => 'mis_a_l_ecart'];
+            }
+            $entrepriseRetiree = $entreprise !== null && $entreprise->deleted_at !== null;
             if ($entrepriseRetiree) {
                 return ['etat' => 'entreprise_corbeille'];
             }

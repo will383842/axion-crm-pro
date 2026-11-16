@@ -13,6 +13,8 @@ use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Rgpd\MiseAEcart;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Rgpd\GdprErasureService;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -279,3 +281,43 @@ test('12. le service sous rôle applicatif ET propriétaire : retirer/restaurer/
     expect($liste)->toBe([]);
     expect($joue(fn (GestesContact $g) => $g->restaurer($ws, $this->contactB)['etat']))->toBe('introuvable');
 })->with(['app', 'proprio']);
+
+test('13. opposition posée APRÈS le retrait console : restaurer → 409, reste en corbeille', function () {
+    $g = new GestesContact;
+    WorkspaceContext::run($this->espaceA->id, fn () => $g->retirer($this->espaceA->id, $this->contactA, (string) Str::uuid()));
+    DB::table('email_suppressions')->insert(['scope' => 'business', 'email_hash' => ListeSuppression::empreinte('alice@example.test'), 'reason' => 'manual', 'source' => 'test']);
+
+    $r = WorkspaceContext::run($this->espaceA->id, fn () => $g->restaurer($this->espaceA->id, $this->contactA));
+
+    expect($r['etat'])->toBe('mis_a_l_ecart')->and(cbLigne($this->contactA)['deleted_at'])->not->toBeNull();
+});
+
+test('14. retirer puis effacement RGPD (GdprErasureService) puis restaurer → 409, sous rôle applicatif ET propriétaire', function (string $mode) {
+    $ws = $this->espaceA->id;
+    $g = new GestesContact;
+    WorkspaceContext::run($ws, fn () => $g->retirer($ws, $this->contactA, (string) Str::uuid()));
+    app(GdprErasureService::class)->erase('alice@example.test');
+    $avant = cbLigne($this->contactA);
+
+    DB::beginTransaction();
+    try {
+        if ($mode === 'app') {
+            WorkspaceContext::set($ws);
+            DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
+        }
+        $r = $g->restaurer($ws, $this->contactA);
+    } finally {
+        DB::rollBack();
+    }
+
+    expect($r['etat'])->toBe('mis_a_l_ecart')->and(cbLigne($this->contactA))->toBe($avant)->and($avant['deleted_at'])->not->toBeNull();
+})->with(['app', 'proprio']);
+
+test('15. sans opposition, restaurer fonctionne toujours (témoin du contrôle)', function () {
+    $g = new GestesContact;
+    WorkspaceContext::run($this->espaceA->id, fn () => $g->retirer($this->espaceA->id, $this->contactA, (string) Str::uuid()));
+
+    $r = WorkspaceContext::run($this->espaceA->id, fn () => $g->restaurer($this->espaceA->id, $this->contactA));
+
+    expect($r['etat'])->toBe('ok')->and(cbLigne($this->contactA)['deleted_at'])->toBeNull();
+});

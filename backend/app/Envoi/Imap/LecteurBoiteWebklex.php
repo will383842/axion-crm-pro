@@ -40,6 +40,9 @@ final class LecteurBoiteWebklex implements LecteurBoite
     public const MAX_OCTETS = 262_144;
 
     /** Chiffrement imposé : aucun paramètre ne permet de l'affaiblir. */
+    /** Délai réseau (secondes) : connexion ET lecture du flux (un seul réglage dans la bibliothèque). */
+    public const DELAI_RESEAU_SECONDES = 15;
+
     private const CHIFFREMENTS = ['ssl', 'tls', 'starttls'];
 
     private ?ImapProtocol $protocole = null;
@@ -322,6 +325,9 @@ final class LecteurBoiteWebklex implements LecteurBoite
             $p = $this->fabrique !== null
                 ? ($this->fabrique)()
                 : new ImapProtocol($this->config(), true, $this->parametres['encryption'] ?? 'ssl'); // validation du certificat : toujours
+            // Délai de la bibliothèque : UN seul réglage, appliqué à la connexion ET à la lecture du flux
+            // (`createStream` : stream_socket_client puis stream_set_timeout). Pas de délai de lecture distinct.
+            $p->setConnectionTimeout(self::DELAI_RESEAU_SECONDES);
             $p->connect($this->parametres['host'], $this->parametres['port'] ?? 993);
             $p->login($this->parametres['username'], $this->parametres['password']);
             $this->protocole = $p;

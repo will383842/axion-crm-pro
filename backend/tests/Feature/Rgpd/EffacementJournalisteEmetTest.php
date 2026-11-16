@@ -31,9 +31,8 @@ uses(TestCase::class, RefreshDatabase::class);
  *   2. temoin negatif — une simple LECTURE de fiche n'emet rien, donc
  *      l'instrument ne rapporte pas une emission la ou il n'y en a aucune ;
  *   3. le seul autre effacement de personne physique cable sur une route de la
- *      console (`DELETE /contacts/{id}`) rend encore 501 : il n'efface rien,
- *      donc il n'a rien a emettre AUJOURD'HUI. C'est le chiffre du jour qu'on
- *      fige, pour que le jour ou quelqu'un l'implemente, la garde rougisse.
+ *      console (`DELETE /contacts/{id}`) met le contact en corbeille douce (G1-B) : il
+ *      n'efface rien, donc il n'a rien a emettre. On fige cette absence d'emission.
  */
 function effacementJournalisteHash(string $email): string
 {
@@ -137,14 +136,11 @@ test('TEMOIN NEGATIF : une LECTURE de fiche n\'emet rien', function () {
 
 // ── SITE JUMEAU : RIEN A FERMER AUJOURD'HUI, DONC ON FIGE LE CHIFFRE ────────
 
-test('l\'effacement d\'un CONTACT ne peut pas emettre : il n\'efface pas encore', function () {
-    // `ContactsController::destroy()` est le seul autre effacement de personne
-    // physique cable sur une route de la console. Il rend 501 : il n'efface
-    // RIEN, donc il n'y a pas d'emission manquante a lui reprocher.
-    //
-    // Le jour ou quelqu'un l'implemente, ce test rougit et rappelle que
-    // l'effacement d'une personne doit partir au site comme celui d'un
-    // journaliste — sinon le patron A-011 se rejoue une fois de plus.
+test('retirer un CONTACT (corbeille douce) n\'emet rien : ce n\'est pas un effacement', function () {
+    // `ContactsController::destroy()` (G1-B, cahier #619) met le contact en corbeille DOUCE : un UPDATE
+    // qui pose `deleted_at` et une marque, restaurable, aucune ligne effacée. Ce n'est PAS l'effacement
+    // d'une personne (circuit RGPD `GdprErasureService` / `MiseAEcart`, inchangé) : rien ne part au site.
+    // Si un jour il EFFAÇAIT vraiment, ce test devrait de nouveau rougir sur l'absence d'émission.
     // (le role est desormais pose dans le `beforeEach`)
     $companyId = DB::table('companies')->insertGetId([
         'workspace_id' => $this->workspace->id,
@@ -163,8 +159,10 @@ test('l\'effacement d\'un CONTACT ne peut pas emettre : il n\'efface pas encore'
         'updated_at' => now(),
     ]);
 
-    $this->deleteJson("/api/v1/contacts/{$contactId}")->assertStatus(501);
+    $this->deleteJson("/api/v1/contacts/{$contactId}")->assertNoContent();
 
-    expect(DB::table('contacts')->where('id', $contactId)->value('deleted_at'))->toBeNull()
+    // La ligne existe toujours (aucune suppression physique), mise de côté, et rien n'est émis.
+    expect(DB::table('contacts')->where('id', $contactId)->count())->toBe(1)
+        ->and(DB::table('contacts')->where('id', $contactId)->value('deleted_at'))->not->toBeNull()
         ->and(DB::table('crm_outbound_events')->count())->toBe(0);
 });

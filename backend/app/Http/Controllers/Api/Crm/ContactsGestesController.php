@@ -11,7 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
-/** Gestes d'écriture « Contacts » de la console (lot G1-A : modifier). */
+/** Gestes « Contacts » de la console (G1-A : modifier ; G1-B : retirer, restaurer, corbeille douce). */
 class ContactsGestesController extends ConsoleController
 {
     use VerrouOptimiste;
@@ -52,6 +52,44 @@ class ContactsGestesController extends ConsoleController
             'champ_non_modifiable' => response()->json(['error' => 'champ_non_modifiable', 'message' => "L'étape se change sur l'entreprise."], 422),
             default => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
         };
+    }
+
+    /** Retirer = corbeille douce, restaurable. Idempotent. Rien n'est effacé. */
+    public function retirer(Request $request, int|string $contactId): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('retirer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $userId = (string) $this->currentUser($request)->getKey();
+
+        $r = WorkspaceContext::run($workspaceId, fn () => (new GestesContact)->retirer($workspaceId, (int) $contactId, $userId));
+
+        return $r['etat'] === 'ok'
+            ? response()->json(['retire' => true])
+            : response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404);
+    }
+
+    /** Restaurer un contact retiré par la console (jamais une mise à l'écart RGPD). */
+    public function restaurer(Request $request, int|string $contactId): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('retirer', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+
+        $r = WorkspaceContext::run($workspaceId, fn () => (new GestesContact)->restaurer($workspaceId, (int) $contactId));
+
+        return match ($r['etat']) {
+            'ok' => response()->json(['restaure' => true]),
+            'mis_a_l_ecart' => response()->json(['error' => 'mis_a_l_ecart', 'message' => 'Cette personne a été mise à l’écart : la fiche ne peut pas être restaurée ici.'], 409),
+            'entreprise_corbeille' => response()->json(['error' => 'entreprise_corbeille', 'message' => 'Restaurer d’abord l’entreprise.'], 409),
+            default => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
+        };
+    }
+
+    /** La corbeille de la console. */
+    public function corbeille(Request $request): JsonResponse
+    {
+        $workspaceId = $this->businessWorkspace($request);
+
+        return response()->json(['data' => WorkspaceContext::run($workspaceId, fn () => (new GestesContact)->corbeille($workspaceId))]);
     }
 
     /**

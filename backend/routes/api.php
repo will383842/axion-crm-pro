@@ -557,6 +557,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware('crm-console')->prefix('crm')->group(function () {
             Route::get('/contacts-hub', [ContactsHubController::class, 'index']);
             Route::get('/contacts-hub/counts', [ContactsHubController::class, 'counts']);
+            // G1-B : corbeille douce. `corbeille` AVANT `/contacts/{contactId}` (sinon pris pour un identifiant).
+            Route::get('/contacts/corbeille', [ContactsGestesController::class, 'corbeille'])->middleware('permission:companies.view');
+            Route::post('/contacts/{contactId}/retirer', [ContactsGestesController::class, 'retirer'])->whereNumber('contactId')->middleware('permission:companies.delete');
+            Route::post('/contacts/{contactId}/restaurer', [ContactsGestesController::class, 'restaurer'])->whereNumber('contactId')->middleware('permission:companies.delete');
             Route::patch('/contacts/{contactId}', [ContactsGestesController::class, 'modifier'])->whereNumber('contactId')->middleware('permission:companies.update');
             // N12 (03/10/2026) — provenance tiers d'une personne : rôle owner
             // SEULEMENT (contrôlé par le contrôleur, 403 pour tout autre rôle).

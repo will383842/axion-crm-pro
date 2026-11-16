@@ -67,14 +67,11 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // restent. La liste reste FERMÉE : tout autre appel sans route fait toujours rougir.
 const ECARTS_CONNUS: string[] = [
   'POST /api/v1/doublons/fusions/{p}/annuler',
-  'GET /api/v1/crm/contacts/corbeille',
   'GET /api/v1/crm/contacts/doublons',
   'POST /api/v1/crm/contacts',
   'POST /api/v1/crm/contacts/export',
   'POST /api/v1/crm/contacts/import',
   'POST /api/v1/crm/contacts/import/controle',
-  'POST /api/v1/crm/contacts/{p}/restaurer',
-  'POST /api/v1/crm/contacts/{p}/retirer',
   'POST /api/v1/crm/persons/{p}/appels',
   'POST /api/v1/crm/persons/{p}/rappel',
   // DM2-CAM — liste, calendrier et suivi des campagnes.

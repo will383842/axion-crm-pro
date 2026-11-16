@@ -11,4 +11,10 @@ class ContactPolicy extends BasePolicy
     {
         return $user->hasPermissionTo('companies.update');
     }
+
+    /** Retirer / restaurer un contact (corbeille douce) : même droit que la suppression d'une entreprise. */
+    public function retirer(User $user): bool
+    {
+        return $user->hasPermissionTo('companies.delete');
+    }
 }

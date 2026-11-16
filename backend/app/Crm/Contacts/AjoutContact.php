@@ -25,22 +25,21 @@ final class AjoutContact
 
     /**
      * @param  array<string, mixed>  $d  entrée déjà validée
-     * @return array{etat: 'organisation_introuvable'|'organisation_ambigue'|'opposition'|'doublon'|'introuvable'|'fusion_invalide'}
-     *                                                                                                                               |array{etat: 'doublons', doublons: list<array<string, mixed>>}
-     *                                                                                                                               |array{etat: 'cree'|'fusionne', fiche: array<string, mixed>}
+     * @return array<string, mixed> `etat` : cree, fusionne, doublons (+ `doublons`), doublon, opposition, introuvable,
+     *                              fusion_invalide, organisation_introuvable, organisation_ambigue ; `fiche` pour cree/fusionne
      */
     public function ajouter(string $workspaceId, array $d, string $userId): array
     {
         return DB::transaction(function () use ($workspaceId, $d, $userId): array {
             $entreprise = $this->entreprise($workspaceId, isset($d['company_id']) ? (int) $d['company_id'] : null, is_string($d['organisation'] ?? null) ? $d['organisation'] : null);
-            if (! is_object($entreprise)) {
-                return ['etat' => $entreprise];
+            if (is_string($entreprise)) {
+                return ['etat' => $entreprise === 'organisation_ambigue' ? 'organisation_ambigue' : 'organisation_introuvable'];
             }
             $prenom = $this->texte($d['first_name'] ?? null);
             $nom = trim((string) ($d['last_name'] ?? ''));
             $email = $this->texte($d['email'] ?? null);
             $provenance = (string) ($d['provenance'] ?? '');
-            $siren = is_string($entreprise->siren) ? $entreprise->siren : null;
+            $siren = $entreprise['siren'];
 
             // 1. Opposition / effacement : refus avant toute écriture, y compris pour « garder » et « fusionner ».
             $verdict = $this->opposition($workspaceId, $email, $siren, $prenom, $nom);
@@ -61,7 +60,7 @@ final class AjoutContact
 
             // 3. Doublons : sans choix explicite, on les montre au lieu de décider.
             if ($choix === null) {
-                $doublons = $this->doublons($workspaceId, $email, $prenom, $nom, (int) $entreprise->id);
+                $doublons = $this->doublons($workspaceId, $email, $prenom, $nom, $entreprise['id']);
                 if ($doublons !== []) {
                     return ['etat' => 'doublons', 'doublons' => $doublons];
                 }
@@ -77,7 +76,7 @@ final class AjoutContact
             try {
                 $id = (int) DB::transaction(fn () => DB::table('contacts')->insertGetId([
                     'workspace_id' => $workspaceId,
-                    'company_id' => (int) $entreprise->id,
+                    'company_id' => $entreprise['id'],
                     'first_name' => $prenom,
                     'last_name' => $nom,
                     'email' => $email,
@@ -162,14 +161,18 @@ final class AjoutContact
         return $rendu;
     }
 
-    /** Entreprise de l'espace (jamais créée) : l'objet, ou `organisation_introuvable` / `organisation_ambigue`. */
-    public function entreprise(string $workspaceId, ?int $companyId, ?string $organisation): object|string
+    /**
+     * Entreprise de l'espace (jamais créée) : ses champs, ou `organisation_introuvable` / `organisation_ambigue`.
+     *
+     * @return array{id: int, siren: ?string, denomination: ?string, relation_type: ?string, lifecycle_stage: ?string}|string
+     */
+    public function entreprise(string $workspaceId, ?int $companyId, ?string $organisation): array|string
     {
         $base = DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at');
         if ($companyId !== null) {
             $e = $base->where('id', $companyId)->first(['id', 'siren', 'denomination', 'relation_type', 'lifecycle_stage']);
 
-            return $e ?? 'organisation_introuvable';
+            return $e === null ? 'organisation_introuvable' : $this->versEntreprise($e);
         }
         $saisie = trim((string) $organisation);
         if ($saisie === '') {
@@ -185,9 +188,22 @@ final class AjoutContact
 
         return match ($trouvees->count()) {
             0 => 'organisation_introuvable',
-            1 => $trouvees->first(),
+            1 => $this->versEntreprise($trouvees->firstOrFail()),
             default => 'organisation_ambigue',
         };
+    }
+
+    /**
+     * @return array{id: int, siren: ?string, denomination: ?string, relation_type: ?string, lifecycle_stage: ?string}
+     */
+    private function versEntreprise(object $e): array
+    {
+        $texte = static fn (mixed $v): ?string => is_string($v) ? $v : null;
+
+        return [
+            'id' => (int) ($e->id ?? 0), 'siren' => $texte($e->siren ?? null), 'denomination' => $texte($e->denomination ?? null),
+            'relation_type' => $texte($e->relation_type ?? null), 'lifecycle_stage' => $texte($e->lifecycle_stage ?? null),
+        ];
     }
 
     /**
@@ -199,8 +215,8 @@ final class AjoutContact
     {
         $statut = (new StatutOpposition)->pourLignes($workspaceId, [0 => ['email' => $email, 'siren' => $siren]]);
         $verdict = $statut[0] ?? ['opposee' => true, 'motifs' => ['verdict_absent']];
-        if (($verdict['opposee'] ?? true) === true) {
-            return ['opposee' => true, 'motifs' => $verdict['motifs'] ?? []];
+        if ($verdict['opposee'] !== false) {
+            return ['opposee' => true, 'motifs' => $verdict['motifs']];
         }
         if ($siren !== null && $nom !== '') {
             $r = DB::selectOne('SELECT contacts_retires_contient(?::uuid, ?, ?, ?) AS e', [$workspaceId, $siren, $prenom ?? '', $nom]);
@@ -213,10 +229,11 @@ final class AjoutContact
     }
 
     /**
+     * @param  array{id: int, siren: ?string, denomination: ?string, relation_type: ?string, lifecycle_stage: ?string}  $entreprise
      * @param  array{opposee: bool, motifs: list<string>}  $verdict
-     * @return array{etat: 'introuvable'|'opposition'|'doublon'}|array{etat: 'fusionne', fiche: array<string, mixed>}
+     * @return array<string, mixed>
      */
-    private function fusionner(string $workspaceId, int $cibleId, object $entreprise, ?string $prenom, ?string $email, ?string $fonction, string $provenance, array $verdict): array
+    private function fusionner(string $workspaceId, int $cibleId, array $entreprise, ?string $prenom, ?string $email, ?string $fonction, string $provenance, array $verdict): array
     {
         $cible = DB::table('contacts')->where('workspace_id', $workspaceId)->where('id', $cibleId)->whereNull('deleted_at')->lockForUpdate()->first();
         if ($cible === null) {
@@ -268,7 +285,8 @@ final class AjoutContact
             'workspace_id' => $workspaceId, 'resource_type' => 'contact', 'resource_id' => $cibleId, 'provenance' => $provenance, 'fusion' => true,
         ]);
 
-        $entrepriseCible = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $cible->company_id)->first(['id', 'siren', 'denomination', 'relation_type', 'lifecycle_stage']) ?? $entreprise;
+        $ligneCible = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $cible->company_id)->first(['id', 'siren', 'denomination', 'relation_type', 'lifecycle_stage']);
+        $entrepriseCible = $ligneCible === null ? $entreprise : $this->versEntreprise($ligneCible);
 
         return ['etat' => 'fusionne', 'fiche' => $this->fiche($workspaceId, $cibleId, $entrepriseCible, $provenance, $v)];
     }
@@ -276,12 +294,13 @@ final class AjoutContact
     /**
      * Forme `FicheContact` (`ajout-rapide/types.ts`). Champs que le serveur ne porte pas : valeur neutre explicite.
      *
+     * @param  array{id: int, siren: ?string, denomination: ?string, relation_type: ?string, lifecycle_stage: ?string}  $entreprise
      * @param  array{opposee: bool, motifs: list<string>}  $verdict
      * @return array<string, mixed>
      */
-    private function fiche(string $workspaceId, int $id, object $entreprise, string $provenance, array $verdict): array
+    private function fiche(string $workspaceId, int $id, array $entreprise, string $provenance, array $verdict): array
     {
-        $c = DB::table('contacts')->where('workspace_id', $workspaceId)->where('id', $id)->first();
+        $c = DB::table('contacts')->where('workspace_id', $workspaceId)->where('id', $id)->first() ?? throw new \RuntimeException('Contact écrit introuvable.');
         $courriel = is_string($c->email ?? null) ? $c->email : null;
 
         return [
@@ -291,9 +310,9 @@ final class AjoutContact
             'last_name' => (string) $c->last_name,
             'email' => MasquageCoordonnees::requis() ? (string) MasquageCoordonnees::email($courriel) : (string) $courriel,
             'fonction' => (string) ($c->role ?? ''),
-            'organisation' => (string) ($entreprise->denomination ?? ''),
-            'relation_type' => $entreprise->relation_type ?? null,
-            'lifecycle_stage' => $entreprise->lifecycle_stage ?? null,
+            'organisation' => (string) ($entreprise['denomination'] ?? ''),
+            'relation_type' => $entreprise['relation_type'],
+            'lifecycle_stage' => $entreprise['lifecycle_stage'],
             'provenance' => $provenance,
             'person_key' => (string) ($c->person_key ?? ''),
             'retire_le' => null,

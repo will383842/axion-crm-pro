@@ -72,7 +72,7 @@ class ContactsGestesController extends ConsoleController
             $service = new AjoutContact;
             $e = $service->entreprise($workspaceId, isset($q['company_id']) ? (int) $q['company_id'] : null, $q['organisation'] ?? null);
 
-            return $service->doublons($workspaceId, $q['email'] ?? null, $q['prenom'] ?? null, $q['nom'] ?? null, is_object($e) ? (int) $e->id : null);
+            return $service->doublons($workspaceId, $q['email'] ?? null, $q['prenom'] ?? null, $q['nom'] ?? null, is_array($e) ? $e['id'] : null);
         });
 
         return response()->json(['data' => $data]);

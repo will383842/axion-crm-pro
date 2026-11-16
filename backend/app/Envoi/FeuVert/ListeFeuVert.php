@@ -2,6 +2,7 @@
 
 namespace App\Envoi\FeuVert;
 
+use App\Console\Commands\EnvoiTemoinsReleve;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
@@ -10,9 +11,15 @@ use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use App\Envoi\JourEnvoi;
 use App\Envoi\Sante\DepotSante;
+use App\Envoi\Temoins\DepotAccesTemoins;
+use App\Envoi\Temoins\HotesTemoins;
 use App\Envoi\Temoins\ReleveTemoins;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
+use Cron\CronExpression;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -50,9 +57,9 @@ class ListeFeuVert
             $auto('auto.signature_absente', $d !== null && $d->feu_vert_signature === null, 'Aucune signature posée.', $d === null ? 'Drapeaux absents.' : 'Une signature existe déjà.'),
             $this->temoins($ws),
             $this->troisJours($ws),
-            // R07 : points sans source (R16 pas posé) : FAUX par construction, jamais « vrai par défaut ».
-            $auto('auto.frein_temoins_branche', false, '', 'Relève des indésirables liée et planifiée : source pas encore posée (R16).'),
-            $auto('auto.frein_reponses_baisse', false, '', 'Évaluation planifiée de reponsesEnBaisse : source pas encore posée.'),
+            // X5 : signaux STRUCTURELS en lecture seule (aucune exécution réelle ne peut servir de preuve avant l'ouverture).
+            $this->freinTemoinsBranche($ws),
+            $this->freinReponsesBaisse($ws),
             $this->separation($ws),
             $auto('auto.arret_entreprise', ! self::estAbsent(app(ArretParEntreprise::class), ArretParEntrepriseAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
             $auto('auto.retrait_file', ! self::estAbsent(app(RetraitEnvoisEnFile::class), RetraitEnvoisEnFileAbsent::class), 'Implémentation réelle liée.', 'Implémentation « absente » liée.'),
@@ -158,6 +165,124 @@ class ListeFeuVert
         sort($lignes);
 
         return hash('sha256', implode("\n", $lignes) . "\ndecision=" . ($this->derniereDecision($ws)['id'] ?? 'aucune'));
+    }
+
+    /**
+     * X5 : le frein « réponses en baisse » est évalué pour de bon. Vrai SEULEMENT si (a) `envoi:evaluer-freins` est planifiée au plus
+     * toutes les 5 minutes, sans condition qui l'éteigne, ET (b) l'espace a un battement `evaluation_freins` d'aujourd'hui ou d'hier
+     * (Paris), journalisé par la commande après une évaluation sans exception. Lecture seule : le feu vert reste une décision humaine.
+     */
+    private function freinReponsesBaisse(string $ws): PointFeuVert
+    {
+        $code = 'auto.frein_reponses_baisse';
+        if (! $this->planifieeSansExtinction('envoi:evaluer-freins', 300)) {
+            return self::pointAuto($code, false, 'L’évaluation des freins n’est pas planifiée au moins toutes les 5 minutes, ou une condition l’éteint.');
+        }
+        $aujourdhui = JourEnvoi::de();
+        $jours = [$aujourdhui->format('Y-m-d'), $aujourdhui->modify('-1 day')->format('Y-m-d')];
+        $battement = WorkspaceContext::run($ws, fn (): bool => DB::table('envoi_journal_commandes')
+            ->where('workspace_id', $ws)->where('commande', 'evaluation_freins')->whereIn('jour', $jours)->exists());
+        if (! $battement) {
+            return self::pointAuto($code, false, 'Évaluation planifiée, mais aucun battement « evaluation_freins » d’aujourd’hui ou d’hier pour cet espace.');
+        }
+
+        return self::pointAuto($code, true, 'Évaluation des freins planifiée (5 minutes) et battement récent journalisé.');
+    }
+
+    /**
+     * X5 : le frein « témoins » est branché. Vrai SEULEMENT si (a) l'interrupteur `envoi.temoins_releve_actif` est vrai (lu, jamais écrit),
+     * (b) la relève `envoi:temoins-releve` est planifiée, ET (c) les accès des 6 fournisseurs de {@see HotesTemoins} sont tous déposés et lisibles.
+     * Signal structurel : aucune exécution réelle n'est possible avant l'ouverture.
+     */
+    private function freinTemoinsBranche(string $ws): PointFeuVert
+    {
+        $code = 'auto.frein_temoins_branche';
+        $suite = ' — exécution réelle prouvable seulement après ouverture : voir manuel.arrivee_boite.';
+        if (config('envoi.temoins_releve_actif') !== true) {
+            return self::pointAuto($code, false, 'Interrupteur de relève des témoins éteint.' . $suite);
+        }
+        if (! $this->evenementsPlanifies(EnvoiTemoinsReleve::SIGNATURE_PLANIFIEE)) {
+            return self::pointAuto($code, false, 'Relève des témoins non planifiée.' . $suite);
+        }
+        $r = app(DepotAccesTemoins::class)->listerAvecPannes($ws);
+        $couverts = array_values(array_unique(array_map(static fn ($a): string => $a->fournisseur, $r['acces'])));
+        $manquants = array_values(array_diff(array_keys(HotesTemoins::LISTE), $couverts));
+        if ($manquants !== [] || $r['illisibles'] > 0) {
+            return self::pointAuto($code, false, count($manquants) . ' fournisseur(s) sans accès lisible, ' . $r['illisibles'] . ' accès illisible(s).' . $suite);
+        }
+
+        return self::pointAuto($code, true, 'Relève liée, planifiée, accès des 6 fournisseurs déposés et lisibles.' . $suite);
+    }
+
+    /** @return list<Event> événements planifiés dont la commande est exactement `$commande` (planificateur chargé même hors console). */
+    private function evenementsPlanifies(string $commande): array
+    {
+        app(ConsoleKernel::class)->bootstrap(); // idempotent : charge routes/console.php si la requête n'est pas passée par la console
+        $trouves = [];
+        foreach (app(Schedule::class)->events() as $e) {
+            if (is_string($e->command) && preg_match('/(^|[\s\'"])' . preg_quote($commande, '/') . '([\s\'"]|$)/', $e->command) === 1) {
+                $trouves[] = $e;
+            }
+        }
+
+        return $trouves;
+    }
+
+    /**
+     * Planifiée au moins un événement, tous sans condition qui l'éteint (`when`, `skip`, environnements ; `withoutOverlapping` seul toléré),
+     * avec un écart maximal de `$ecartMaxSecondes` entre deux passages sur les 8 prochains jours.
+     */
+    private function planifieeSansExtinction(string $commande, int $ecartMaxSecondes): bool
+    {
+        foreach ($this->evenementsPlanifies($commande) as $e) {
+            $filtres = self::proprieteDe($e, 'filters');
+            $rejets = self::proprieteDe($e, 'rejects');
+            $environnements = self::proprieteDe($e, 'environments');
+            if (! is_array($filtres) || ! is_array($rejets) || ! is_array($environnements)) {
+                continue; // structure inattendue : prudence, rien ne libère
+            }
+            if ($filtres !== [] || $environnements !== [] || count($rejets) > ($e->withoutOverlapping === true ? 1 : 0)) {
+                continue;
+            }
+            if (self::ecartMax($e->expression, $ecartMaxSecondes)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function proprieteDe(Event $e, string $nom): mixed
+    {
+        try {
+            return (new \ReflectionProperty(Event::class, $nom))->getValue($e);
+        } catch (\ReflectionException) {
+            return null;
+        }
+    }
+
+    /** Aucun trou de plus de `$max` secondes entre deux passages sur 8 jours (au plus 2 400 passages examinés). */
+    private static function ecartMax(string $expression, int $max): bool
+    {
+        if (! CronExpression::isValidExpression($expression)) {
+            return false;
+        }
+        $cron = new CronExpression($expression);
+        $depart = new \DateTimeImmutable('now');
+        $limite = $depart->modify('+8 days');
+        $precedent = $depart;
+        for ($i = 0; $i < 2400; $i++) {
+            $prochain = \DateTimeImmutable::createFromInterface($cron->getNextRunDate($precedent));
+            if ($prochain > $limite) {
+                return $prochain->getTimestamp() - $precedent->getTimestamp() <= $max;
+            }
+            if ($prochain->getTimestamp() - $precedent->getTimestamp() > $max) {
+                return false;
+            }
+            $precedent = $prochain;
+        }
+
+        return true;
     }
 
     /** Essai à blanc (D10) réussi, terminé depuis moins de 7 jours : un essai par semaine, voulu. */

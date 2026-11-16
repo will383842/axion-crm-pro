@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\EnvoiTemoinsReleve;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\ArretParEntrepriseAbsent;
@@ -10,7 +11,10 @@ use App\Envoi\FeuVert\DepotPreuves;
 use App\Envoi\FeuVert\ListeFeuVert;
 use App\Envoi\FeuVert\PointFeuVert;
 use App\Envoi\JourEnvoi;
+use App\Envoi\Temoins\DepotAccesTemoins;
+use App\Envoi\Temoins\HotesTemoins;
 use App\Support\WorkspaceContext;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -19,8 +23,8 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class)->group('envoi');
 
-/** R07 : points automatiques dont la source n'existe pas encore (toujours faux). */
-const FV_AUTO_SANS_SOURCE = ['auto.frein_temoins_branche', 'auto.frein_reponses_baisse', 'auto.separation_lettre_prospection'];
+/** R07 : points automatiques dont la source n'existe pas encore (toujours faux). X5 : les deux freins ont une source structurelle (voir FeuVertFreinsSignauxTest). */
+const FV_AUTO_SANS_SOURCE = ['auto.separation_lettre_prospection'];
 function espaceFeuVert(): string
 {
     $id = (string) Str::uuid();
@@ -38,7 +42,18 @@ function toutVert(string $ws): void
         'envoi.desinscription_hotes' => ['app' => 'https://app.exemple.test', 'api' => 'https://api.exemple.test'],
         'envoi.releve_actif' => true,
         'envoi.sante.actif' => true,
+        // X5 : signaux structurels des deux freins (détail : FeuVertFreinsSignauxTest).
+        'envoi.temoins_releve_actif' => true,
+        'envoi.cle_empreinte' => 'cle-de-test-seulement',
     ]);
+    $planning = new Schedule;
+    $planning->command('envoi:evaluer-freins')->everyFiveMinutes()->withoutOverlapping(10)->onOneServer();
+    $planning->command(EnvoiTemoinsReleve::SIGNATURE_PLANIFIEE)->everyFifteenMinutes();
+    app()->instance(Schedule::class, $planning);
+    DB::table('envoi_journal_commandes')->insert(['workspace_id' => $ws, 'commande' => 'evaluation_freins', 'auteur' => 'freins', 'details' => '{}', 'jour' => JourEnvoi::de()->format('Y-m-d')]);
+    foreach (array_keys(HotesTemoins::LISTE) as $i => $f) {
+        app(DepotAccesTemoins::class)->poser($ws, $f, 'temoin' . $i . '@exemple.test', 'mot-de-passe-de-test-' . $i);
+    }
     app()->instance(RetraitEnvoisEnFile::class, Mockery::mock(RetraitEnvoisEnFile::class));
     DB::table('envoi_drapeaux')->updateOrInsert(['workspace_id' => $ws], ['mode_temoins' => true, 'feu_vert_signature' => null]);
     WorkspaceContext::run($ws, function () use ($ws) {
@@ -356,8 +371,8 @@ test('R07 : le nombre de bloquants et les drapeaux ne bougent que comme attendu'
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     $points = app(ListeFeuVert::class)->points($ws);
     $bloquants = count(array_filter($points, fn ($p) => $p->bloquant));
-    // 48 points : 16 auto verts (toutVert pose l'essai à blanc), 3 auto sans source, 29 manuels non faits.
-    expect($bloquants)->toBe(3 + 29);
+    // 48 points : 18 auto verts (toutVert pose l'essai à blanc et, X5, les signaux des deux freins), 1 auto sans source, 29 manuels non faits.
+    expect($bloquants)->toBe(1 + 29);
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
 });
 

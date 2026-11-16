@@ -56,6 +56,8 @@ export const EVENEMENTS: Record<string, string> = {
   'company.presse_provenance_levee': 'Marque de provenance presse retirée',
   'email.verified': 'Adresse e-mail vérifiée',
   'contact.modifie': 'Contact modifié',
+  'contact.retire': 'Contact retiré (corbeille)',
+  'contact.restaure': 'Contact restauré',
   'liste_manuelle.creee': 'Liste créée',
   'liste_manuelle.modifiee': 'Liste modifiée',
   'liste_manuelle.corbeille': 'Liste mise à la corbeille',

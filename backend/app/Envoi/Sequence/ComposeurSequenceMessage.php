@@ -38,6 +38,7 @@ final class ComposeurSequenceMessage implements ComposeurSequence
             sujet: $d->sujet,
             texte: $d->corps,
             html: '<p>' . nl2br(htmlspecialchars($d->corps, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')) . '</p>',
+            // C1 : ce jeton (dérivé du Message-ID) n'est plus émis ; il ne sert qu'au contrôle de forme de DemandeMessage.
             jetonEnvoi: substr(hash('sha256', $d->messageId), 0, 32),
             urlDesinscription: $url,
             mailtoDesinscription: 'mailto:' . $d->expediteur . '?subject=STOP',

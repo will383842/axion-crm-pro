@@ -59,6 +59,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000122_envoi_oppositions_canal_reponse.php',
     // Filet modifié : pourquoi — VERDICTS : colonne motif nullable + CHECK NOT VALID ; la retirer effacerait le pourquoi des verdicts ; down() inerte, up() rejouable.
     '2026_12_05_000500_envoi_verdicts_adresse_motif.php',
+    // Filet modifié : pourquoi — VERDICTS : REVOKE UPDATE/DELETE du rôle applicatif sur les verdicts (ajout seul) ; rendre ces droits rouvrirait la réécriture des verdicts ; down() inerte, up() rejouable.
+    '2026_12_05_000510_envoi_verdicts_adresse_revoke_ud.php',
     '2026_11_10_000063_envoi_echecs_releve.php',
     '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.

@@ -13,6 +13,9 @@ final class Passerelle
 
     public const TAILLE_MAX_CORPS = 65536;
 
+    /** Plafond AVANT authentification pour le seul chemin /v1/injections (message ≤ 1 Mio en base64 + JSON). */
+    public const TAILLE_MAX_INJECTION_BRUTE = 1_500_000;
+
     public const LIMITE_EVENEMENTS = 500;
 
     /** Commandes autorisées : les noms de K1 (ClientServeurEnvoiHmac::COMMANDES_AUTORISEES). Le reste est refusé. */
@@ -85,6 +88,7 @@ final class Passerelle
     public function traiter(Requete $r): Reponse
     {
         try {
+            $plafond = explode('?', $r->chemin, 2)[0] === '/v1/injections' ? self::TAILLE_MAX_INJECTION_BRUTE : self::TAILLE_MAX_CORPS * 2;
             $ws = $r->entete('x-envoi-workspace');
             $ts = $r->entete('x-envoi-timestamp');
             $nonce = $r->entete('x-envoi-nonce');
@@ -94,7 +98,7 @@ final class Passerelle
                 || ! Signature::estUuid($ws) || ! Signature::estUuid($nonce)
                 || preg_match('/^\d{1,12}$/', $ts) !== 1
                 || ! isset($this->cles[$ws])
-                || strlen($r->corps) > self::TAILLE_MAX_CORPS * 2
+                || strlen($r->corps) > $plafond
             ) {
                 return $this->nonAutorise();
             }
@@ -161,6 +165,13 @@ final class Passerelle
             }
 
             return $requete === '' ? $this->sante() : Reponse::erreur(400, 'requete');
+        }
+        if ($chemin === '/v1/injections') {
+            if ($r->methode !== 'POST') {
+                return Reponse::erreur(405, 'methode');
+            }
+
+            return $requete === '' ? $this->injecter($ws, $r->corps) : Reponse::erreur(400, 'requete');
         }
         if ($chemin === '/v1/evenements') {
             return $r->methode === 'GET' ? $this->evenements($ws, $requete) : Reponse::erreur(405, 'methode');
@@ -253,6 +264,52 @@ final class Passerelle
         }
         $rep = Reponse::json(200, ['workspace_id' => $ws, 'commande_id' => $id, 'statut' => 'ok', 'resultat' => $resultat]);
         $this->stockage()->terminerCommande($ws, $id, $operation, $rep->statut, $rep->corps);
+
+        return $rep;
+    }
+
+    /**
+     * POST /v1/injections (C2-2). L'espace vient de la SIGNATURE. Réservation AVANT l'appel au moteur : une seule exécution
+     * par (espace, id_injection). Le message n'est ni journalisé ni rendu ; seule l'empreinte du corps est gardée.
+     */
+    private function injecter(string $ws, string $corps): Reponse
+    {
+        try {
+            $d = Injection\Validateur::valider($corps);
+        } catch (\DomainException $e) {
+            return Reponse::erreur($e->getCode(), $e->getMessage());
+        }
+        $id = $d['id_injection'];
+        $empreinte = hash('sha256', $corps);
+
+        for ($essai = 0; ; $essai++) {
+            $res = $this->stockage()->reserverInjection($ws, $id, $empreinte);
+            if ($res['action'] === 'conflit') {
+                return Reponse::erreur(409, 'id_injection_deja_utilise');
+            }
+            if ($res['action'] === 'rejouer') {
+                return new Reponse($res['statut'] ?? 200, $res['reponse'] ?? '{}', ['Content-Type' => 'application/json']);
+            }
+            if ($res['action'] === 'executer') {
+                break;
+            }
+            if ($essai >= self::ATTENTES) {
+                return Reponse::erreur(503, 'injection_en_cours'); // réessayable avec le même id_injection
+            }
+            ($this->dormir)(self::PAUSE_MS);
+        }
+
+        try {
+            $this->kumo->executer($ws, 'injecter', ['mail_from' => $d['mail_from'], 'rcpt_to' => $d['rcpt_to'], 'message' => $d['message']]);
+        } catch (\RuntimeException) {
+            $this->stockage()->rendreInjection($ws, $id); // rien n'a été accepté : l'id reste rejouable
+            return Reponse::erreur(503, 'indisponible');
+        } catch (\Throwable $e) {
+            $this->stockage()->rendreInjection($ws, $id);
+            throw $e;
+        }
+        $rep = Reponse::json(202, ['id_injection' => $id, 'etat' => 'en_file']);
+        $this->stockage()->terminerInjection($ws, $id, 'en_file', $rep->statut, $rep->corps);
 
         return $rep;
     }

@@ -33,7 +33,11 @@ final class DepotAccesImap
         $this->ajouter($ws, $boiteId, ['hote' => null, 'port' => null, 'dossier' => null, 'identifiant_chiffre' => null, 'actif' => false]);
     }
 
-    /** Dernière ligne de la boîte, sans déchiffrer ; null si aucune ou inactive. @return array{hote: string, port: int, dossier: string}|null */
+    /**
+     * Dernière ligne de la boîte, sans déchiffrer ; null si aucune ou inactive.
+     *
+     * @return array{hote: string, port: int, dossier: string}|null
+     */
     public function decrire(string $ws, string $boiteId): ?array
     {
         $l = $this->derniere($ws, $boiteId);
@@ -41,7 +45,11 @@ final class DepotAccesImap
         return $l === null ? null : ['hote' => (string) $l->hote, 'port' => (int) $l->port, 'dossier' => (string) $l->dossier];
     }
 
-    /** @return array{host: string, port: int, encryption: string, username: string, password: string}|null */
+    /**
+     * Seul endroit qui déchiffre.
+     *
+     * @return array{host: string, port: int, encryption: string, username: string, password: string}|null
+     */
     public function parametres(string $ws, string $boiteId): ?array
     {
         $l = $this->derniere($ws, $boiteId);
@@ -57,7 +65,7 @@ final class DepotAccesImap
         }
     }
 
-    private function derniere(string $ws, string $boiteId): ?object
+    private function derniere(string $ws, string $boiteId): ?\stdClass
     {
         $l = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites_acces_imap')
             ->where('workspace_id', $ws)->where('boite_id', $boiteId)->orderByDesc('id')->first());

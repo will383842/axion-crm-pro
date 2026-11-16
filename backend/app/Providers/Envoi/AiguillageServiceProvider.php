@@ -19,7 +19,7 @@ class AiguillageServiceProvider extends ServiceProvider
     {
         $this->app->bind('envoi.serveur_interne', fn ($app) => new AiguilleurServeurEnvoi(
             $app->make(FauxServeurEnvoi::class),
-            [],
+            [], // array<string, Closure(string $workspaceId, string $domaine): ServeurEnvoi> : vide, aucune fabrique réelle liée
             fn (): bool => $app->make(PorteEnvoiReelle::class)->ouverte(),
             fn (): ListeFeuVert => $app->make(ListeFeuVert::class),
         ));

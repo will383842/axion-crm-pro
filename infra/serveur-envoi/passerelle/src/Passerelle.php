@@ -173,6 +173,13 @@ final class Passerelle
 
             return $requete === '' ? $this->injecter($ws, $r->corps) : Reponse::erreur(400, 'requete');
         }
+        if (preg_match('#^/v1/injections/([^/]{1,64})$#', $chemin, $m) === 1 && Signature::estUuid($m[1])) {
+            if ($r->methode !== 'GET') {
+                return Reponse::erreur(405, 'methode');
+            }
+
+            return $requete === '' ? Reponse::json(200, ['id_injection' => $m[1], 'etat' => $this->stockage()->etatInjection($ws, $m[1])]) : Reponse::erreur(400, 'requete');
+        }
         if ($chemin === '/v1/evenements') {
             return $r->methode === 'GET' ? $this->evenements($ws, $requete) : Reponse::erreur(405, 'methode');
         }
@@ -299,17 +306,45 @@ final class Passerelle
             ($this->dormir)(self::PAUSE_MS);
         }
 
+        $debut = ($this->horloge)();
         try {
             $this->kumo->executer($ws, 'injecter', ['mail_from' => $d['mail_from'], 'rcpt_to' => $d['rcpt_to'], 'message' => $d['message']]);
+        } catch (Injection\RefusKumo $e) {
+            if ($e->temporaire()) {
+                $this->stockage()->rendreInjection($ws, $id); // 4xx : rien n'est accepté, l'id reste rejouable
+                $rep = Reponse::json(429, ['code_smtp' => $e->codeSmtp]);
+
+                return new Reponse($rep->statut, $rep->corps, $rep->entetes + ['Retry-After' => '900']);
+            }
+            $rep = Reponse::json(422, ['erreur' => 'refus_definitif', 'code_smtp' => $e->codeSmtp]);
+            $this->stockage()->terminerInjection($ws, $id, 'refuse', $rep->statut, $rep->corps);
+
+            return $rep;
         } catch (\RuntimeException) {
+            if (($this->horloge)() - $debut > Kumo::DELAI_MAX_SECONDES) {
+                return $this->incertaine($ws, $id);
+            }
             $this->stockage()->rendreInjection($ws, $id); // rien n'a été accepté : l'id reste rejouable
+
             return Reponse::erreur(503, 'indisponible');
         } catch (\Throwable $e) {
             $this->stockage()->rendreInjection($ws, $id);
             throw $e;
         }
+        if (($this->horloge)() - $debut > Kumo::DELAI_MAX_SECONDES) {
+            return $this->incertaine($ws, $id); // trop lent : on ignore si le moteur a accepté ; jamais renvoyé
+        }
         $rep = Reponse::json(202, ['id_injection' => $id, 'etat' => 'en_file']);
         $this->stockage()->terminerInjection($ws, $id, 'en_file', $rep->statut, $rep->corps);
+
+        return $rep;
+    }
+
+    /** Issue inconnue (délai du moteur dépassé après l'envoi) : gardée telle quelle et rejouée, jamais ré-exécutée. */
+    private function incertaine(string $ws, string $id): Reponse
+    {
+        $rep = Reponse::erreur(504, 'issue_incertaine');
+        $this->stockage()->terminerInjection($ws, $id, 'incertain', $rep->statut, $rep->corps);
 
         return $rep;
     }

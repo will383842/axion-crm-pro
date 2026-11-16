@@ -18,9 +18,10 @@ final class RetraitEnvoisEnFileServeur implements RetraitEnvoisEnFile
     public function retirerPour(string $workspaceId, string $empreinteAdresse): int
     {
         // Garde de déploiement : le code est remplacé AVANT `migrate`. Table absente : rien n'est écrit (une requête en échec
-        // avorterait la transaction de l'opposition) ; l'opposition reste « à terminer » côté effets, jamais perdue.
+        // avorterait la transaction de l'opposition) ET on LÈVE : `TerminerEffetsOpposition` attrape, ne pose pas
+        // `effets_termines_le`, et la relance planifiée reprend après `migrate`. Échec fermé : jamais « terminé » sans retrait.
         if (! Schema::hasTable('envoi_retraits_demandes') || ! Schema::hasTable('envoi_injections_locales')) {
-            return 0;
+            throw new \RuntimeException('retrait indisponible : table absente (migration C3-0 non appliquée)');
         }
 
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $empreinteAdresse): int {

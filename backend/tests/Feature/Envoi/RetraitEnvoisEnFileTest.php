@@ -7,6 +7,7 @@ use App\Envoi\Desinscription\OppositionEnregistree;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use App\Envoi\Desinscription\RetraitEnvoisEnFileServeur;
+use App\Envoi\Desinscription\TerminerEffetsOpposition;
 use App\Envoi\Orchestration\PorteEnvoiReelle;
 use App\Envoi\Serveur\ClientServeurEnvoiHmac;
 use App\Envoi\Serveur\JournalCommandes;
@@ -403,4 +404,22 @@ test('C3-3 (10) la tâche planifiée : chaque minute, sans chevauchement, gardé
     Artisan::call('list', ['--format' => 'txt']);
     $evts = array_values(array_filter(app(Schedule::class)->events(), fn ($e) => str_contains((string) $e->command, 'envoi:retraits:envoyer')));
     expect($evts)->toHaveCount(1)->and($evts[0]->expression)->toBe('* * * * *')->and($evts[0]->withoutOverlapping)->toBeTrue();
+});
+
+test('C3-3 (11) table de retraits absente (code avant migrate) : échec FERMÉ — l\'opposition n\'est pas marquée terminée ; après remise de la table, la relance crée la demande', function () {
+    Http::fake();
+    retrInscription($this->ws, $this->empreinte, [['rang' => 1]]);
+    $lien = DB::table('envoi_liens_desinscription')->insertGetId(['workspace_id' => $this->ws, 'empreinte_adresse' => $this->empreinte, 'portee' => 'business']);
+    $opp = DB::table('envoi_oppositions')->insertGetId(['workspace_id' => $this->ws, 'lien_id' => $lien, 'empreinte_adresse' => $this->empreinte, 'canal' => 'one_click']);
+    $effets = new TerminerEffetsOpposition(static function (): void {});
+
+    DB::statement('ALTER TABLE envoi_retraits_demandes RENAME TO envoi_retraits_demandes_absente');
+    expect(fn () => app(RetraitEnvoisEnFile::class)->retirerPour($this->ws, $this->empreinte))->toThrow(RuntimeException::class);
+    expect($effets->pour($this->ws, $opp))->toBeFalse();
+    expect(DB::table('envoi_oppositions')->where('id', $opp)->value('effets_termines_le'))->toBeNull();
+
+    DB::statement('ALTER TABLE envoi_retraits_demandes_absente RENAME TO envoi_retraits_demandes');
+    expect($effets->pour($this->ws, $opp))->toBeTrue();
+    expect(DB::table('envoi_oppositions')->where('id', $opp)->value('effets_termines_le'))->not->toBeNull()
+        ->and(retrDemandes($this->ws))->toHaveCount(1);
 });

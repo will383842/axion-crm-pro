@@ -60,12 +60,11 @@ class EnvoiCampagnesMaterialiser extends Command
         $horloge = self::$horloge ?? static fn (): DateTimeImmutable => new DateTimeImmutable('now');
         $maintenant = $horloge();
         $debut = $maintenant->getTimestamp();
-        $enRetard = static fn (): bool => $horloge()->getTimestamp() - $debut >= self::BORNE_SECONDES;
         $b = ['espaces' => 0, 'campagnes' => 0, 'inscrits' => 0, 'bloquees' => 0, 'reglage_non_applique' => 0, 'a_reessayer' => 0, 'reetalees' => 0, 'erreurs' => 0, 'hors_borne' => 0];
 
         foreach (DB::table('workspaces')->whereNull('deleted_at')->orderBy('id')->pluck('id') as $espace) {
             $ws = (string) $espace;
-            if ($enRetard()) {
+            if (self::enRetard($horloge, $debut)) {
                 $b['hors_borne']++;
 
                 continue;
@@ -79,7 +78,7 @@ class EnvoiCampagnesMaterialiser extends Command
             }
             $travaillees = 0;
             foreach ($this->campagnes($ws) as $id) {
-                if ($travaillees >= self::CAMPAGNES_PAR_TOUR || $enRetard()) {
+                if ($travaillees >= self::CAMPAGNES_PAR_TOUR || self::enRetard($horloge, $debut)) {
                     $b['hors_borne']++;
 
                     continue;
@@ -117,12 +116,22 @@ class EnvoiCampagnesMaterialiser extends Command
      */
     private function campagnes(string $ws): array
     {
-        return WorkspaceContext::run($ws, fn (): array => array_map('strval', DB::table('envoi_campagnes as c')->where('c.workspace_id', $ws)->whereIn('c.statut', ['programmee', 'en_cours'])
+        return WorkspaceContext::run($ws, fn (): array => array_values(array_map('strval', DB::table('envoi_campagnes as c')->where('c.workspace_id', $ws)->whereIn('c.statut', ['programmee', 'en_cours'])
             ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('envoi_campagnes_materialisations as m')->whereColumn('m.campagne_id', 'c.id')->whereIn('m.etat', ['terminee', 'bloquee']))
-            ->orderBy('c.id')->pluck('c.id')->all()));
+            ->orderBy('c.id')->pluck('c.id')->all())));
     }
 
-    /** Refus réessayable : compté, pas une erreur. Sinon : erreur, journal SANS adresse (identifiants, classe et motif seulement). */
+    /** @param  Closure(): DateTimeImmutable  $horloge */
+    private static function enRetard(Closure $horloge, int $debut): bool
+    {
+        return $horloge()->getTimestamp() - $debut >= self::BORNE_SECONDES;
+    }
+
+    /**
+     * Refus réessayable : compté, pas une erreur. Sinon : erreur, journal SANS adresse (identifiants, classe et motif seulement).
+     *
+     * @param  array<string, int>  $b
+     */
     private function compter(array &$b, string $ws, string $campagne, Throwable $e, bool $reessayable): void
     {
         if ($reessayable) {

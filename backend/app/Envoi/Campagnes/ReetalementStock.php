@@ -63,7 +63,7 @@ final class ReetalementStock
         foreach ($lignes as $l) {
             $parSequence[(string) $l->sequence_id][] = $l;
         }
-        $deja = $this->dejaParJour($ws, $maintenant, array_map(static fn ($l): string => (string) $l->id, $lignes));
+        $deja = $this->dejaParJour($ws, $maintenant, array_values(array_map(static fn ($l): string => (string) $l->id, $lignes)));
         $apresHorizon = $this->premierJourApresHorizon($maintenant);
         $deplacees = 0;
         foreach ($parSequence as $sequence => $inscriptions) {

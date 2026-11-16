@@ -161,4 +161,54 @@ final class ConformiteTest extends TestCase
         $attendue = hash_hmac('sha256', "REPONSE\n".$nonce."\n".$this->ws."\n200\n".$corps, $this->cle);
         $this->assertSame('k='.$this->cleId.',sha256='.$attendue, $h['x-envoi-signature'] ?? '');
     }
+
+    private const MAIL_FROM = 'rb-0123456789abcdef0123456789abcdef0123456789@bounce.client.example.test';
+
+    private static function message(bool $desinscription = true): string
+    {
+        return "From: Contact <contact@client.example.test>\r\nTo: cible@client.example.test\r\nSubject: Essai\r\n"
+            .($desinscription ? "List-Unsubscribe: <https://client.example.test/u/abc>, <mailto:u@client.example.test>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n" : '')
+            ."\r\nBonjour\r\n";
+    }
+
+    /** @return array{0:int,1:string,2:array<string,string>} */
+    private function injecter(string $id, bool $desinscription = true): array
+    {
+        $corps = json_encode(['id_injection' => $id, 'mail_from' => self::MAIL_FROM, 'rcpt_to' => 'cible@client.example.test',
+            'message' => base64_encode(self::message($desinscription))], JSON_THROW_ON_ERROR);
+        [$chemin, $h] = $this->signer('POST', '/v1/injections', '', $corps);
+
+        return $this->appeler('POST', $chemin, $h, $corps);
+    }
+
+    public function test_injection_acceptee_rejouee_puis_refusee_422(): void
+    {
+        $id = self::uuid();
+        [$statut, $corps] = $this->injecter($id);
+        $this->assertSame(202, $statut);
+        $this->assertSame('en_file', json_decode($corps, true)['etat']);
+
+        [$statut2, $corps2] = $this->injecter($id);
+        $this->assertSame(202, $statut2, 'rejeu identique : même réponse');
+        $this->assertSame(json_decode($corps, true), json_decode($corps2, true));
+
+        [$statut3, $corps3] = $this->injecter(self::uuid(), false);
+        $this->assertSame(422, $statut3, 'sans List-Unsubscribe : refus de conformité');
+        $this->assertSame('conformite', json_decode($corps3, true)['erreur']);
+    }
+
+    public function test_etat_dune_injection_connue_et_inconnue(): void
+    {
+        $id = self::uuid();
+        $this->injecter($id);
+        [$chemin, $h] = $this->signer('GET', '/v1/injections/'.$id, '', '');
+        [$statut, $corps] = $this->appeler('GET', $chemin, $h);
+        $this->assertSame(200, $statut);
+        $this->assertSame('en_file', json_decode($corps, true)['etat']);
+
+        [$chemin, $h] = $this->signer('GET', '/v1/injections/'.self::uuid(), '', '');
+        [$statut, $corps] = $this->appeler('GET', $chemin, $h);
+        $this->assertSame(200, $statut, 'jamais 404 : aucune fuite entre espaces');
+        $this->assertSame('inconnu', json_decode($corps, true)['etat']);
+    }
 }

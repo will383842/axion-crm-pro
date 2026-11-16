@@ -9,6 +9,7 @@ use App\Envoi\Message\ControleurContenu;
 use App\Envoi\Message\HtmlListeBlanche;
 use App\Envoi\Message\MessageRefuse;
 use App\Envoi\Message\SignatureDkim;
+use App\Envoi\Message\VariablesMessage;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,9 @@ final class ServiceMessagesTypes
     {
         $html = array_values(array_filter($textes, static fn (string $t): bool => str_contains($t, '<')));
 
-        return $this->controleur->analyser(array_values($textes), [], $html);
+        // F2a : liste fermée des champs, exigée à l'écriture et à la validation (pas dans ControleurContenu : une version
+        // déjà figée avec un nom inconnu ne doit pas faire échouer une séquence en cours).
+        return array_values(array_unique([...VariablesMessage::inconnues(...$textes), ...$this->controleur->analyser(array_values($textes), [], $html)]));
     }
 
     /** @return array{controles: list<array<string,mixed>>, bloquants: int} */

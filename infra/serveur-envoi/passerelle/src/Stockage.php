@@ -297,6 +297,16 @@ SQL);
             ->execute([$ws, $id]);
     }
 
+    /** État public d'une injection de CET espace ; ligne absente ou simple réservation : `inconnu` (jamais d'indice sur un autre espace). */
+    public function etatInjection(string $ws, string $id): string
+    {
+        $st = $this->pdo->prepare('SELECT etat FROM injections WHERE workspace_id=? AND id_injection=?');
+        $st->execute([$ws, $id]);
+        $etat = $st->fetchColumn();
+
+        return is_string($etat) && in_array($etat, ['en_file', 'refuse', 'incertain', 'retire'], true) ? $etat : 'inconnu';
+    }
+
     public function nombreCommandes(): int
     {
         return (int) $this->pdo->query('SELECT COUNT(*) FROM journal_commandes')->fetchColumn();

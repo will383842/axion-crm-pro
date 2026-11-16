@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
  * - Le bilan, le rapport et le journal ne portent que des numéros de ligne, des codes et des compteurs, jamais une valeur.
  * - Une personne opposée ou retirée du registre ne revient JAMAIS (échec fermé : verdict absent = refus).
  * - Aucune suppression, aucun envoi. Le filtre `workspace_id` est explicite (le propriétaire ignore la RLS).
+ *
+ * @phpstan-type Bilan array{total: int, a_creer: int, refusees: list<array{ligne: int, raison: string}>, doublons: list<array{ligne: int, existant: string}>, sans_provenance: list<int>}
  */
 final class ImportContacts
 {
@@ -125,7 +127,7 @@ final class ImportContacts
      * `$creer` s'il est donné (import) ; sinon n'écrit rien (contrôle).
      *
      * @param  list<array<string, mixed>>  $lignes
-     * @param  array<string, mixed>  $bilan
+     * @param  Bilan  $bilan
      * @param  array<string, true>  $vus  clés de personnes déjà acceptées dans ce fichier (nom + entreprise, adresse)
      */
     private function evaluer(string $workspaceId, array $lignes, array &$bilan, ?callable $creer, array &$vus = []): void

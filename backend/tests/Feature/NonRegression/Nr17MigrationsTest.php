@@ -137,6 +137,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_04_000030_envoi_campagnes_lien_sequence.php',
     // Filet modifié : pourquoi — envoi X1-L1 : index partiel des inscriptions actives (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_04_000040_envoi_inscriptions_contact_actif_index.php',
+    // Filet modifié : pourquoi — envoi P2-A : colonnes `population` et `personne_id`, deux CHECK, contact/entreprise nullables et déclencheur de garde des inscriptions typées (ajout seul, inerte : aucune ligne « personnes » possible) ; les retirer rouvrirait des inscriptions incohérentes ; down() inerte, up() rejouable.
+    '2026_12_05_000100_envoi_inscriptions_population.php',
+    // Filet modifié : pourquoi — envoi P2-A : index unique partiel par personne (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_05_000110_envoi_inscriptions_personne_index.php',
+    // Filet modifié : pourquoi — envoi P2-A : garde de la clé `envoi.population_personnes` (propriétaire seul, true/false) ; la retirer laisserait l'application allumer l'interrupteur ; down() inerte, up() rejouable.
+    '2026_12_05_000120_envoi_reglages_interrupteur_population.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

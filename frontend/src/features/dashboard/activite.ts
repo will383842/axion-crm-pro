@@ -55,6 +55,7 @@ export const EVENEMENTS: Record<string, string> = {
   'company.presse_media_incertain_reparee': 'Fiche presse incertaine corrigée',
   'company.presse_provenance_levee': 'Marque de provenance presse retirée',
   'email.verified': 'Adresse e-mail vérifiée',
+  'contact.ajoute': 'Contact ajouté',
   'contact.modifie': 'Contact modifié',
   'contact.retire': 'Contact retiré (corbeille)',
   'contact.restaure': 'Contact restauré',

@@ -159,6 +159,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_05_000310_envoi_registre_kumo.php',
     // Filet modifié : pourquoi — envoi C3-0 : fonction de lecture des couples (espace, domaine, adaptateur) non « faux » pour la pause globale (CREATE OR REPLACE) ; down() inerte (un appelant futur en dépendra), up() rejouable.
     '2026_12_05_000320_envoi_couples_reels_portes.php',
+    // Filet modifié : pourquoi — envoi L6-0 : index partiel d'expression d'`envoi_evenements` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_09_000100_envoi_evenements_index_injection.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

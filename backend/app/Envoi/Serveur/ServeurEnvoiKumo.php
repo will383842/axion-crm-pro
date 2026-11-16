@@ -159,7 +159,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
             return $this->reporter($cle, $id, $jeton, $code);
         }
         if ($code >= 500 && $code < 600) {
-            $this->noter($cle, $id, 'echec', $jeton);
+            $this->noter($cle, $id, 'echec', $jeton, null, $code); // le code reste lisible au rejeu
             $this->registre->noter5xx($this->workspaceId, ($this->horloge)()->getTimestamp());
             $this->pauseSiTrop5xx();
             throw new RefusDefinitifServeur('Refus définitif du serveur d’envoi (' . $code . ').', $code);
@@ -225,7 +225,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         return $n;
     }
 
-    /** @param array{id: string, etat: string, reporte_au: ?int, instant: int, jeton?: string} $ligne */
+    /** @param array{id: string, etat: string, reporte_au: ?int, instant: int, jeton?: string, code?: int} $ligne */
     private function decisionSurExistant(string $cle, array $ligne): ?ResultatInjection
     {
         $demain = ($this->horloge)()->modify('tomorrow');
@@ -233,7 +233,7 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
             case 'accepte':
                 return ResultatInjection::accepte($ligne['id']);
             case 'echec':
-                throw new RefusDefinitifServeur('Refus définitif déjà enregistré pour cette clé.');
+                throw new RefusDefinitifServeur('Refus définitif déjà enregistré pour cette clé.', $ligne['code'] ?? null);
             case 'injection_en_cours':
                 return ResultatInjection::incertain($demain);
             case 'a_verifier':
@@ -260,12 +260,13 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         return ResultatInjection::accepte($ligne['id']);
     }
 
-    /** @param array{id: string, jeton?: string} $ligne */
+    /** @param array{id: string, jeton?: string, code?: int} $ligne */
     private function refuser(string $cle, array $ligne): never
     {
         // Sort Refuse LU par interrogation : ce n'est pas un 5xx reçu à l'injection, il ne compte pas pour la pause.
-        $this->noter($cle, $ligne['id'], 'echec', $ligne['jeton'] ?? '');
-        throw new RefusDefinitifServeur('Refus définitif constaté par le serveur d’envoi.');
+        $code = $ligne['code'] ?? null; // jamais inventé : nul si aucun code n'a été lu
+        $this->noter($cle, $ligne['id'], 'echec', $ligne['jeton'] ?? '', null, $code);
+        throw new RefusDefinitifServeur('Refus définitif constaté par le serveur d’envoi.', $code);
     }
 
     /** @param ?int $codeSmtp code 4xx reçu ; nul quand aucun code n'a été lu (coupure avant DATA) */
@@ -312,9 +313,12 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         return ResultatInjection::reporteEchec($demain);
     }
 
-    private function noter(string $cle, string $id, string $etat, string $jeton, ?int $reporteAu = null): void
+    private function noter(string $cle, string $id, string $etat, string $jeton, ?int $reporteAu = null, ?int $code = null): void
     {
         $ligne = ['id' => $id, 'etat' => $etat, 'reporte_au' => $reporteAu, 'instant' => ($this->horloge)()->getTimestamp(), 'jeton' => $jeton];
+        if ($code !== null) {
+            $ligne['code'] = $code; // clé facultative : code SMTP du refus définitif
+        }
         if ($etat === 'accepte') {
             // Séquence STABLE assignée une fois, à l'acceptation : un événement ne se déplace jamais.
             $ligne['seq'] = $this->registre->lire($this->workspaceId, $cle)['seq'] ?? $this->registre->prochaineSequence($this->workspaceId);

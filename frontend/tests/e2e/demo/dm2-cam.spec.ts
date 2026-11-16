@@ -51,7 +51,7 @@ test.describe('démo — campagnes (DM2-CAM)', () => {
     await page.getByRole('tab', { name: /^Destinataires/ }).click();
     await page.getByRole('button', { name: /^Refusés/ }).click();
     const yves = page.getByRole('row', { name: /Yves Roche/ });
-    await expect(yves).toContainText('Refusé');
+    await expect(yves).toContainText('Adresse invalide');
     await expect(yves).toContainText('Adresse inexistante');
 
     expect(Date.now() - debut).toBeLessThan(4 * 60_000);
@@ -63,9 +63,10 @@ test.describe('démo — campagnes (DM2-CAM)', () => {
     const dialogue = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Dupliquer la campagne' }) });
     await expect(dialogue.getByRole('textbox', { name: 'Nom de la copie' })).toHaveValue('Clubs d’entreprises Savoie (copie)');
     await dialogue.getByRole('button', { name: 'Créer la copie (brouillon)' }).click();
-    const copie = page.getByRole('row', { name: /Clubs d’entreprises Savoie \(copie\)/ });
-    await expect(copie).toBeVisible();
-    await expect(copie.getByText('Brouillon')).toBeVisible();
+    // La copie s'ouvre aussitôt, en brouillon, avec « Reprendre la création ».
+    await expect(page.getByRole('heading', { level: 1, name: 'Clubs d’entreprises Savoie (copie)' })).toBeVisible();
+    await expect(page.getByText('Brouillon').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Reprendre la création' })).toBeVisible();
   });
 
   test('P7 · le suivi d’une campagne : réponses en tête, aucune ouverture, aucun clic', async ({ page }) => {

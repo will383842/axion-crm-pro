@@ -10,8 +10,11 @@ use Illuminate\Support\Facades\DB;
  * - BEFORE INSERT : la campagne (lue FOR SHARE) doit être « programmee » et sans lien ; BEFORE UPDATE : campagne_id figé (il ne se pose
  *   qu'à l'insertion), fenêtres figées pour une séquence née d'une campagne ;
  * - AFTER INSERT : la séquence NAÎT EN PAUSE (geste « pause », auteur « campagne:naissance », horloge réelle clock_timestamp()) ;
- * - étapes figées dès que la séquence est reliée (une campagne y pointe par sequence_id).
- * Les gardes sont des déclencheurs : valables pour TOUS les rôles, propriétaire compris. Droits : aucun changement.
+ * - étapes figées dès que la séquence est reliée (une campagne y pointe par sequence_id ; verrou FOR NO KEY UPDATE sur la séquence).
+ * Les gardes sont des déclencheurs : elles s'appliquent à tous les rôles qui écrivent, propriétaire et superutilisateur compris, tant qu'elles sont
+ * actives. Le propriétaire de la table (ou un superutilisateur) PEUT les désactiver (ALTER TABLE ... DISABLE TRIGGER) : ce n'est pas une barrière
+ * contre lui, seulement contre le rôle applicatif et les écritures ordinaires. Les fonctions fixent `search_path = pg_catalog, public, pg_temp`
+ * (pg_temp EN DERNIER : sans lui, une table temporaire homonyme serait cherchée en premier). Droits : aucun changement.
  * ADDITIF SEULEMENT (aucun DROP de colonne ou de table, aucune ligne touchée). `down()` inerte ; `up()` rejouable.
  */
 return new class extends Migration
@@ -43,7 +46,7 @@ return new class extends Migration
                     RAISE EXCEPTION 'envoi_sequences : une séquence ne naît que d''une campagne programmée, de cet espace, sans séquence';
                 END IF;
                 RETURN NEW;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_sequences_garde_campagne_insert ON envoi_sequences;
             CREATE TRIGGER envoi_sequences_garde_campagne_insert BEFORE INSERT ON envoi_sequences
                 FOR EACH ROW EXECUTE FUNCTION envoi_sequences_garde_campagne_insert();
@@ -57,7 +60,7 @@ return new class extends Migration
                     RAISE EXCEPTION 'envoi_sequences : les fenêtres d''une séquence née d''une campagne sont figées';
                 END IF;
                 RETURN NEW;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_sequences_garde_campagne ON envoi_sequences;
             CREATE TRIGGER envoi_sequences_garde_campagne BEFORE UPDATE ON envoi_sequences
                 FOR EACH ROW EXECUTE FUNCTION envoi_sequences_garde_campagne();
@@ -71,7 +74,7 @@ return new class extends Migration
                     VALUES (NEW.workspace_id, NEW.id, 'pause', 'campagne:naissance', clock_timestamp());
                 END IF;
                 RETURN NULL;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_sequences_nee_en_pause ON envoi_sequences;
             CREATE TRIGGER envoi_sequences_nee_en_pause AFTER INSERT ON envoi_sequences
                 FOR EACH ROW EXECUTE FUNCTION envoi_sequences_nee_en_pause();
@@ -85,9 +88,10 @@ return new class extends Migration
                     FROM (SELECT OLD.workspace_id, OLD.sequence_id WHERE TG_OP IN ('UPDATE', 'DELETE')
                           UNION ALL SELECT NEW.workspace_id, NEW.sequence_id WHERE TG_OP IN ('INSERT', 'UPDATE')) AS t (workspace_id, sequence_id)
                 LOOP
-                    -- Verrou de ligne sur la séquence : une liaison concurrente (FOR KEY SHARE) et une écriture d'étape se sérialisent ;
+                    -- Verrou de ligne sur la séquence : une liaison concurrente (FOR SHARE) et une écriture d'étape se sérialisent (FOR NO KEY UPDATE
+                    -- ne gêne pas les contrôles de clé étrangère, au contraire de FOR UPDATE) ;
                     -- celui qui passe en second voit l'état validé du premier.
-                    PERFORM 1 FROM envoi_sequences WHERE id = ligne.seq AND workspace_id = ligne.ws FOR UPDATE;
+                    PERFORM 1 FROM envoi_sequences WHERE id = ligne.seq AND workspace_id = ligne.ws FOR NO KEY UPDATE;
                     IF EXISTS (SELECT 1 FROM envoi_campagnes c WHERE c.sequence_id = ligne.seq AND c.workspace_id = ligne.ws) THEN
                         RAISE EXCEPTION 'envoi_sequence_etapes : les étapes d''une séquence reliée à une campagne sont figées';
                     END IF;
@@ -96,7 +100,7 @@ return new class extends Migration
                     RETURN OLD;
                 END IF;
                 RETURN NEW;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_sequence_etapes_figees ON envoi_sequence_etapes;
             CREATE TRIGGER envoi_sequence_etapes_figees BEFORE INSERT OR UPDATE OR DELETE ON envoi_sequence_etapes
                 FOR EACH ROW EXECUTE FUNCTION envoi_sequence_etapes_figees();

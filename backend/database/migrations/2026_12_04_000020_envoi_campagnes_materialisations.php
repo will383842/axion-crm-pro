@@ -6,8 +6,10 @@ use Illuminate\Support\Facades\DB;
 /**
  * Envoi X1-L1 — matérialisation d'une campagne : une ligne par campagne, qui dit où en est la création de ses inscriptions
  * (curseur, compteurs bornés, état, motif de blocage). RLS FORCE par espace, clés étrangères composites (NO ACTION).
- * Déclencheur BEFORE UPDATE : campagne_id, workspace_id, cree_le figés ; sequence_id ne passe que de NULL à une valeur ; le curseur ne
- * décroît jamais ; en_cours -> terminee | bloquee seulement (terminee et bloquee sont terminales). DELETE et TRUNCATE refusés.
+ * Déclencheur BEFORE INSERT : une matérialisation naît « en_cours », curseur 0, terminee_le NULL, cree_le = now(), sequence_id NULL ou égal à celui de
+ * la campagne. Déclencheur BEFORE UPDATE : campagne_id, workspace_id, cree_le figés ; sequence_id ne passe que de NULL à une valeur ; le curseur ne
+ * décroît jamais ; en_cours -> terminee | bloquee seulement ; « terminee » exige la séquence de la campagne (non nulle) et terminee_le ; une fois
+ * terminee ou bloquee, compteurs, motif, terminee_le et curseur sont gelés. DELETE et TRUNCATE refusés.
  * Droits du rôle applicatif : SELECT, INSERT, UPDATE sur sept colonnes seulement. ADDITIF SEULEMENT. `down()` inerte ; `up()` rejouable.
  */
 return new class extends Migration
@@ -41,7 +43,30 @@ return new class extends Migration
                 USING (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''))
                 WITH CHECK (workspace_id::TEXT = NULLIF(current_setting('app.current_workspace_id', true), ''));
 
+            CREATE OR REPLACE FUNCTION envoi_campagnes_materialisations_naissance() RETURNS trigger AS $f$
+            DECLARE
+                seq_campagne UUID;
+                trouvee BOOLEAN;
+            BEGIN
+                IF NEW.etat <> 'en_cours' OR NEW.curseur <> 0 OR NEW.terminee_le IS NOT NULL THEN
+                    RAISE EXCEPTION 'envoi_campagnes_materialisations : une matérialisation naît en_cours, curseur 0, sans date de fin';
+                END IF;
+                NEW.cree_le := now();
+                IF NEW.sequence_id IS NOT NULL THEN
+                    SELECT c.sequence_id, true INTO seq_campagne, trouvee FROM envoi_campagnes c WHERE c.id = NEW.campagne_id AND c.workspace_id = NEW.workspace_id;
+                    IF trouvee IS TRUE AND NEW.sequence_id IS DISTINCT FROM seq_campagne THEN
+                        RAISE EXCEPTION 'envoi_campagnes_materialisations : sequence_id doit être NULL ou celui de la campagne';
+                    END IF;
+                END IF;
+                RETURN NEW;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
+            DROP TRIGGER IF EXISTS envoi_campagnes_materialisations_naissance ON envoi_campagnes_materialisations;
+            CREATE TRIGGER envoi_campagnes_materialisations_naissance BEFORE INSERT ON envoi_campagnes_materialisations
+                FOR EACH ROW EXECUTE FUNCTION envoi_campagnes_materialisations_naissance();
+
             CREATE OR REPLACE FUNCTION envoi_campagnes_materialisations_garde() RETURNS trigger AS $f$
+            DECLARE
+                seq_campagne UUID;
             BEGIN
                 IF NEW.campagne_id <> OLD.campagne_id OR NEW.workspace_id <> OLD.workspace_id OR NEW.cree_le <> OLD.cree_le THEN
                     RAISE EXCEPTION 'envoi_campagnes_materialisations : campagne, espace et date de création sont figés';
@@ -55,8 +80,18 @@ return new class extends Migration
                 IF NEW.etat <> OLD.etat AND NOT (OLD.etat = 'en_cours' AND NEW.etat IN ('terminee', 'bloquee')) THEN
                     RAISE EXCEPTION 'envoi_campagnes_materialisations : transition % -> % interdite', OLD.etat, NEW.etat;
                 END IF;
+                IF OLD.etat <> 'en_cours' AND (NEW.compteurs IS DISTINCT FROM OLD.compteurs OR NEW.motif IS DISTINCT FROM OLD.motif
+                   OR NEW.terminee_le IS DISTINCT FROM OLD.terminee_le OR NEW.curseur <> OLD.curseur) THEN
+                    RAISE EXCEPTION 'envoi_campagnes_materialisations : une matérialisation % est gelée (compteurs, motif, fin, curseur)', OLD.etat;
+                END IF;
+                IF NEW.etat = 'terminee' AND OLD.etat = 'en_cours' THEN
+                    SELECT c.sequence_id INTO seq_campagne FROM envoi_campagnes c WHERE c.id = NEW.campagne_id AND c.workspace_id = NEW.workspace_id;
+                    IF NEW.sequence_id IS NULL OR NEW.sequence_id IS DISTINCT FROM seq_campagne OR NEW.terminee_le IS NULL THEN
+                        RAISE EXCEPTION 'envoi_campagnes_materialisations : « terminee » exige la séquence de la campagne et une date de fin';
+                    END IF;
+                END IF;
                 RETURN NEW;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_campagnes_materialisations_garde ON envoi_campagnes_materialisations;
             CREATE TRIGGER envoi_campagnes_materialisations_garde BEFORE UPDATE ON envoi_campagnes_materialisations
                 FOR EACH ROW EXECUTE FUNCTION envoi_campagnes_materialisations_garde();
@@ -64,7 +99,7 @@ return new class extends Migration
             CREATE OR REPLACE FUNCTION envoi_campagnes_materialisations_sans_suppression() RETURNS trigger AS $f$
             BEGIN
                 RAISE EXCEPTION 'envoi_campagnes_materialisations : aucune suppression (DELETE/TRUNCATE refusés)';
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_campagnes_materialisations_pas_de_delete ON envoi_campagnes_materialisations;
             CREATE TRIGGER envoi_campagnes_materialisations_pas_de_delete BEFORE DELETE ON envoi_campagnes_materialisations
                 FOR EACH ROW EXECUTE FUNCTION envoi_campagnes_materialisations_sans_suppression();

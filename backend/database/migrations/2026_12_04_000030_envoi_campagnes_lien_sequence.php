@@ -6,13 +6,17 @@ use Illuminate\Support\Facades\DB;
 /**
  * Envoi X1-L1 — le lien campagne -> séquence devient réel.
  * 1. Les `sequence_id` ORPHELINS (sans séquence du même espace) font ÉCHOUER la migration avec leur nombre : elle ne remet JAMAIS la colonne à NULL.
+ *    Même arrêt (avec leur nombre, rien n'est réécrit) pour les campagnes dont `sequence_id` pointe vers une séquence SANS campagne ou d'une AUTRE campagne.
  * 2. Clé étrangère (workspace_id, sequence_id) -> envoi_sequences (workspace_id, id), sans action de suppression (NO ACTION), NOT VALID puis VALIDATE.
  * 3. `envoi_campagnes_garde()` (tous les rôles, propriétaire compris) GARDE toutes les règles de R08 et AJOUTE :
  *    a. sequence_id ne change qu'ainsi : NULL -> valeur, campagne « programmee » avant ET après, séquence de CETTE campagne et de cet espace
- *       (lue FOR KEY SHARE), dont le nombre d'étapes égale nb_etapes ; ni retrait, ni second lien ;
+ *       (lue FOR SHARE : elle se sérialise avec le FOR NO KEY UPDATE du déclencheur des étapes), dont le nombre d'étapes égale nb_etapes ; ni retrait, ni second lien ;
  *    b. campagne reliée : cible, boîtes, nb_etapes et saisie figés ; « programmee -> a_valider » refusé (corriger = arrêter puis dupliquer).
  * 4. Pause, fin ou arrêt d'une campagne reliée : geste « pause » sur sa séquence (auteur « campagne:<statut> », horloge réelle).
- * 5. Un geste « reprise » sur une séquence née d'une campagne n'est accepté que si la campagne est « en_cours » ET sa matérialisation « terminee ».
+ * 5. Un geste « reprise » sur une séquence née d'une campagne (retrouvée par `envoi_sequences.campagne_id` OU par `envoi_campagnes.sequence_id`) n'est
+ *    accepté que si la campagne est « en_cours » ET sa matérialisation « terminee » ; séquence introuvable : refus. Un déclencheur BEFORE INSERT impose
+ *    `cree_le = clock_timestamp()` à TOUS les gestes de ces séquences (une date fournie, ex. 2999, ferait d'une reprise le « dernier » geste).
+ *    Index (workspace_id, sequence_id) sur envoi_campagnes pour le déclencheur des étapes.
  * 6. Droit : UPDATE (sequence_id) pour le rôle applicatif ; jamais INSERT (sequence_id).
  * `down()` inerte (il ne remet pas l'ancienne garde). `up()` rejouable.
  */
@@ -28,7 +32,18 @@ return new class extends Migration
             throw new RuntimeException("envoi_campagnes : {$orphelins} campagne(s) portent un sequence_id orphelin (aucune séquence du même espace) ; la migration s'arrête, rien n'est modifié. À traiter à la main avant de relancer.");
         }
 
+        $incoherentes = (int) DB::selectOne(
+            'SELECT count(*) AS n FROM envoi_campagnes c WHERE c.sequence_id IS NOT NULL
+             AND EXISTS (SELECT 1 FROM envoi_sequences s WHERE s.workspace_id = c.workspace_id AND s.id = c.sequence_id
+                         AND s.campagne_id IS DISTINCT FROM c.id)',
+        )->n;
+        if ($incoherentes > 0) {
+            throw new RuntimeException("envoi_campagnes : {$incoherentes} campagne(s) pointent vers une séquence incohérente (sans campagne, ou née d'une autre campagne) ; la migration s'arrête, rien n'est modifié. À traiter à la main avant de relancer.");
+        }
+
         DB::unprepared(<<<'SQL'
+            CREATE INDEX IF NOT EXISTS envoi_campagnes_sequence_idx ON envoi_campagnes (workspace_id, sequence_id) WHERE sequence_id IS NOT NULL;
+
             DO $d$
             BEGIN
                 IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'envoi_campagnes_sequence_fk' AND conrelid = 'public.envoi_campagnes'::regclass) THEN
@@ -60,7 +75,7 @@ return new class extends Migration
                         RAISE EXCEPTION 'envoi_campagnes : le lien vers la séquence ne se pose que sur une campagne programmée';
                     END IF;
                     SELECT s.id INTO trouvee FROM envoi_sequences s
-                        WHERE s.id = NEW.sequence_id AND s.workspace_id = NEW.workspace_id AND s.campagne_id = NEW.id FOR KEY SHARE;
+                        WHERE s.id = NEW.sequence_id AND s.workspace_id = NEW.workspace_id AND s.campagne_id = NEW.id FOR SHARE;
                     IF NOT FOUND THEN
                         RAISE EXCEPTION 'envoi_campagnes : la séquence n''existe pas, ou n''est pas celle de cette campagne dans cet espace';
                     END IF;
@@ -79,7 +94,7 @@ return new class extends Migration
                     END IF;
                 END IF;
                 RETURN NEW;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
 
             CREATE OR REPLACE FUNCTION envoi_campagnes_pause_sequence() RETURNS trigger AS $f$
             BEGIN
@@ -88,31 +103,55 @@ return new class extends Migration
                     VALUES (NEW.workspace_id, NEW.sequence_id, 'pause', 'campagne:' || NEW.statut, clock_timestamp());
                 END IF;
                 RETURN NULL;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_campagnes_pause_sequence ON envoi_campagnes;
             CREATE TRIGGER envoi_campagnes_pause_sequence AFTER UPDATE ON envoi_campagnes
                 FOR EACH ROW EXECUTE FUNCTION envoi_campagnes_pause_sequence();
 
+            CREATE OR REPLACE FUNCTION envoi_sequences_gestes_horloge_campagne() RETURNS trigger AS $f$
+            BEGIN
+                -- Une séquence née d'une campagne (ou pointée par une campagne) : l'état est son DERNIER geste (cree_le DESC) ; une date fournie
+                -- (ex. 2999) ferait d'une reprise le dernier geste pour toujours. L'horloge réelle est donc imposée à TOUS ses gestes.
+                IF EXISTS (SELECT 1 FROM envoi_sequences s WHERE s.id = NEW.sequence_id AND s.workspace_id = NEW.workspace_id AND s.campagne_id IS NOT NULL)
+                   OR EXISTS (SELECT 1 FROM envoi_campagnes c WHERE c.sequence_id = NEW.sequence_id AND c.workspace_id = NEW.workspace_id) THEN
+                    NEW.cree_le := clock_timestamp();
+                END IF;
+                RETURN NEW;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
+            DROP TRIGGER IF EXISTS envoi_sequences_gestes_horloge_campagne ON envoi_sequences_gestes;
+            CREATE TRIGGER envoi_sequences_gestes_horloge_campagne BEFORE INSERT ON envoi_sequences_gestes
+                FOR EACH ROW EXECUTE FUNCTION envoi_sequences_gestes_horloge_campagne();
+
             CREATE OR REPLACE FUNCTION envoi_sequences_gestes_reprise_campagne() RETURNS trigger AS $f$
             DECLARE
-                campagne UUID;
-                statut_campagne TEXT;
+                seq_campagne UUID;
+                c RECORD;
                 etat_mat TEXT;
+                trouvee BOOLEAN;
+                reliee BOOLEAN := false;
             BEGIN
                 IF NEW.geste <> 'reprise' THEN
                     RETURN NEW;
                 END IF;
-                SELECT s.campagne_id INTO campagne FROM envoi_sequences s WHERE s.id = NEW.sequence_id AND s.workspace_id = NEW.workspace_id;
-                IF campagne IS NULL THEN
-                    RETURN NEW;
+                SELECT s.campagne_id, true INTO seq_campagne, trouvee FROM envoi_sequences s WHERE s.id = NEW.sequence_id AND s.workspace_id = NEW.workspace_id;
+                IF trouvee IS NOT TRUE THEN
+                    RAISE EXCEPTION 'envoi_sequences_gestes : reprise refusée (séquence introuvable)';
                 END IF;
-                SELECT c.statut INTO statut_campagne FROM envoi_campagnes c WHERE c.id = campagne AND c.workspace_id = NEW.workspace_id FOR SHARE;
-                SELECT m.etat INTO etat_mat FROM envoi_campagnes_materialisations m WHERE m.campagne_id = campagne AND m.workspace_id = NEW.workspace_id;
-                IF statut_campagne IS DISTINCT FROM 'en_cours' OR etat_mat IS DISTINCT FROM 'terminee' THEN
-                    RAISE EXCEPTION 'envoi_sequences_gestes : reprise refusée (campagne en_cours et matérialisation terminée exigées)';
+                -- la campagne se retrouve par la séquence (campagne_id) ET par la campagne (sequence_id) : toutes doivent être en_cours + terminee
+                FOR c IN SELECT k.id, k.statut FROM envoi_campagnes k
+                         WHERE k.workspace_id = NEW.workspace_id AND (k.id = seq_campagne OR k.sequence_id = NEW.sequence_id) ORDER BY k.id FOR SHARE
+                LOOP
+                    reliee := true;
+                    SELECT m.etat INTO etat_mat FROM envoi_campagnes_materialisations m WHERE m.campagne_id = c.id AND m.workspace_id = NEW.workspace_id;
+                    IF c.statut IS DISTINCT FROM 'en_cours' OR etat_mat IS DISTINCT FROM 'terminee' THEN
+                        RAISE EXCEPTION 'envoi_sequences_gestes : reprise refusée (campagne en_cours et matérialisation terminée exigées)';
+                    END IF;
+                END LOOP;
+                IF seq_campagne IS NOT NULL AND NOT reliee THEN
+                    RAISE EXCEPTION 'envoi_sequences_gestes : reprise refusée (campagne de la séquence introuvable)';
                 END IF;
                 RETURN NEW;
-            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public;
+            END $f$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
             DROP TRIGGER IF EXISTS envoi_sequences_gestes_reprise_campagne ON envoi_sequences_gestes;
             CREATE TRIGGER envoi_sequences_gestes_reprise_campagne BEFORE INSERT ON envoi_sequences_gestes
                 FOR EACH ROW EXECUTE FUNCTION envoi_sequences_gestes_reprise_campagne();

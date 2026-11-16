@@ -137,6 +137,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_04_000030_envoi_campagnes_lien_sequence.php',
     // Filet modifié : pourquoi — envoi X1-L1 : index partiel des inscriptions actives (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_04_000040_envoi_inscriptions_contact_actif_index.php',
+    // Filet modifié : pourquoi — envoi C1-0 : colonne `id_injection_serveur` (ADD COLUMN IF NOT EXISTS, NULL) + CHECK ; la retirer effacerait les identifiants serveur ; down() inerte, up() rejouable.
+    '2026_12_05_000200_envoi_messages_id_injection_serveur.php',
+    // Filet modifié : pourquoi — envoi C1-0 : deux index partiels d'`envoi_messages` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_05_000210_envoi_messages_index_injection.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

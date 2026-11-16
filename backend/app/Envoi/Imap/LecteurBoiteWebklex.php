@@ -326,7 +326,7 @@ final class LecteurBoiteWebklex implements LecteurBoite
                 ? ($this->fabrique)()
                 : new ImapProtocol($this->config(), true, $this->parametres['encryption'] ?? 'ssl'); // validation du certificat : toujours
             // Délai de la bibliothèque : UN seul réglage, appliqué à la connexion ET à la lecture du flux
-            // `createStream` de la bibliothèque). Pas de délai de lecture distinct.
+            // (`createStream` de la bibliothèque). Pas de délai de lecture distinct.
             $p->setConnectionTimeout(self::DELAI_RESEAU_SECONDES);
             $p->connect($this->parametres['host'], $this->parametres['port'] ?? 993);
             $p->login($this->parametres['username'], $this->parametres['password']);

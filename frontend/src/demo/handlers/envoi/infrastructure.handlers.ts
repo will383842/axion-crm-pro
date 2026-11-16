@@ -199,6 +199,8 @@ function lignesDns(domaine: Domaine): EnregistrementDns[] {
     mta_sts: { type: 'TXT', nom: `_mta-sts.${domaine.nom}`, valeur: 'v=STSv1; id=20270112T093000' },
     helo: { type: 'A', nom: `mail.${domaine.nom}`, valeur: ip },
     tls_rpt: { type: 'TXT', nom: `_smtp._tls.${domaine.nom}`, valeur: `v=TLSRPTv1; rua=mailto:rapports@${domaine.nom}` },
+    bounce_mx: { type: 'MX', nom: `bounce.${domaine.nom}`, valeur: '10 reception.rebonds.example.test.' },
+    bounce_spf: { type: 'TXT', nom: `bounce.${domaine.nom}`, valeur: `v=spf1 ip4:${ip} -all` },
   };
   return dnsDb()
     .filtrer((l) => l.domaine_id === domaine.id)

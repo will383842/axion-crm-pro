@@ -620,7 +620,7 @@ components:
         role:
           description: Ce que l'enregistrement sert à faire.
           type: string
-          enum: [spf, dkim, dmarc, ptr, mta_sts, helo, tls_rpt]
+          enum: [spf, dkim, dmarc, ptr, mta_sts, helo, tls_rpt, bounce_mx, bounce_spf]
         type: { type: string, enum: [A, AAAA, TXT, CNAME, MX, PTR] }
         nom: { type: string }
         valeur: { type: string }

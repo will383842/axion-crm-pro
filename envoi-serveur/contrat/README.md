@@ -43,8 +43,8 @@ de requête » signée est vide), réponse signée liée au nonce, `workspace_id
 | Champ | Type et unité | Plage acceptée par le CRM | Qui le calcule |
 | --- | --- | --- | --- |
 | `file_age_s` | entier, secondes | 0 à 31 536 000 | la passerelle : `maintenant − date du plus ancien message en file` (0 si la file est vide) |
-| `disque_libre_pct` | nombre, % | 0 à 100 | la passerelle : octets libres du volume des files / octets totaux × 100 |
-| `memoire_libre_pct` | nombre, % | 0 à 100 | la passerelle : mémoire disponible / `memory_limit`. **`memory_limit` peut valoir 0 ou −1 (illimitée) : la division est interdite, la clé est alors OMISE (ou `null`), jamais 0, NaN ni INF.** |
+| `disque_libre_pct` | nombre, % | 0 à 100 | la passerelle : octets libres du volume du dossier de la base / octets totaux × 100 |
+| `memoire_libre_pct` | nombre, % | 0 à 100 | la passerelle : `MemAvailable` / `MemTotal` de `/proc/meminfo`, × 100. **Si `MemTotal` est nul ou illisible : la division est interdite, la clé est alors OMISE (ou `null`), jamais 0, NaN ni INF.** |
 | `certificat_jours` | entier, jours entiers restants avant l'échéance du plus proche certificat (TLS du serveur ou client) | −36 500 à 36 500 (négatif = expiré) | la passerelle |
 | `tunnel_ok` | booléen | — | la passerelle : le lien d'administration répond |
 | `ntp_synchro` | booléen | — | la passerelle : l'horloge est synchronisée (NTP) |
@@ -62,6 +62,4 @@ Règles de lecture côté CRM :
   `{"erreur":"horloge_hors_fenetre","workspace_id":"<uuid de l'en-tête>"}` (comme toute réponse signée, `workspace_id` est EXIGÉ : le CRM refuse une réponse
   sans lui, ce 401 compris, et la traite alors comme un refus ordinaire) ; le CRM classe ce refus « horloge » critique (pas « serveur muet »). Un `401` non signé reste un refus ordinaire.
 
-**Dette K2-suite (nommée) : la route `/v1/sante` n'existe pas encore côté passerelle**, pas plus que le `401` signé `horloge_hors_fenetre`
-(`infra/serveur-envoi/passerelle/src/Passerelle.php`, `FENETRE_HORODATAGE`). Tant qu'elle manque, `ENVOI_SANTE_ACTIF` doit rester faux
-et l'envoi réel éteint (voir `docs/envoi/supervision-k15.md`, couplage avec l'homme mort).
+Livré (C2-1) : la passerelle répond à `GET /v1/sante` et rend le `401` signé `horloge_hors_fenetre`. `file_age_s` et `tunnel_ok` sont omis tant que l'API d'administration KumoMTA n'est pas liée (le CRM les classe « mesure absente », jamais vert).

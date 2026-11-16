@@ -5,8 +5,10 @@ namespace App\Envoi\Imap;
 use App\Envoi\Sequence\Evenement;
 use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
+use App\Envoi\Sequence\RegistreInjectionsSequence;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -36,11 +38,37 @@ final class RecepteurRetoursSequence implements RecepteurRetours
         }
         $maintenant = DateTimeImmutable::createFromInterface(now());
         WorkspaceContext::run($workspaceId, function () use ($workspaceId, $retour, $maintenant): void {
-            $ids = DB::table('envoi_messages')->where('workspace_id', $workspaceId)
-                ->where('id_injection', $retour->idInjection)->orderBy('inscription_id')->distinct()->pluck('inscription_id');
+            $ids = $this->inscriptionsRattachees($workspaceId, $retour->idInjection);
             foreach ($ids as $id) {
                 $this->inscriptions->evenement($workspaceId, (string) $id, Evenement::REPONSE, $maintenant);
             }
         });
+    }
+
+    /**
+     * C1-2 — lecture des DEUX formes d'identifiant pendant la transition (cahier C1, §1.5). Un identifiant rattache les
+     * messages où : (1) `id_injection` le porte (nouvelle forme, ou VERP Kumo ancien) ; (2) `id_injection_serveur` le porte ;
+     * (3) s'il s'agit d'un UUID du registre local dont la clé est `seq-<inscription>-<étape>` : le message de cette
+     * inscription et de cette étape (ancienne forme : le serveur seul était écrit dans `envoi_messages`).
+     * Branches 2 et 3 à retirer dans un lot ultérieur, pas ici. Filtre d'espace explicite (la RLS est contournée en propriétaire).
+     *
+     * @return Collection<int, mixed>
+     */
+    private function inscriptionsRattachees(string $workspaceId, string $id)
+    {
+        $cle = null;
+        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id) === 1) {
+            $nomCle = DB::table('envoi_injections_locales')->where('workspace_id', $workspaceId)->where('id_injection', strtolower($id))->value('cle_idempotence');
+            $cle = is_string($nomCle) ? RegistreInjectionsSequence::inscriptionDeCle($nomCle) : null;
+        }
+
+        return DB::table('envoi_messages')->where('workspace_id', $workspaceId)
+            ->where(function ($q) use ($id, $cle): void {
+                $q->where('id_injection', $id)->orWhere('id_injection_serveur', $id);
+                if ($cle !== null) {
+                    $q->orWhere(fn ($r) => $r->where('inscription_id', $cle[0])->where('etape', $cle[1]));
+                }
+            })
+            ->orderBy('inscription_id')->distinct()->pluck('inscription_id');
     }
 }

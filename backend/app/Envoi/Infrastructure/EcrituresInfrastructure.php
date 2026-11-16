@@ -32,7 +32,7 @@ final class EcrituresInfrastructure
     private const IP_MODELE = '192.0.2.1';
 
     /** Rôle du contrat <- libellé du plan. */
-    private const ROLES = ['nom du HELO' => 'helo', 'PTR = HELO = A' => 'ptr', 'SPF' => 'spf', 'DKIM' => 'dkim', 'DMARC' => 'dmarc', 'MTA-STS' => 'mta_sts', 'TLS-RPT' => 'tls_rpt'];
+    private const ROLES = ['nom du HELO' => 'helo', 'PTR = HELO = A' => 'ptr', 'SPF' => 'spf', 'DKIM' => 'dkim', 'DMARC' => 'dmarc', 'MTA-STS' => 'mta_sts', 'TLS-RPT' => 'tls_rpt', 'MX rebonds' => 'bounce_mx', 'SPF rebonds' => 'bounce_spf'];
 
     /** Points de contrôle par rôle ; le premier dit « présent ». */
     private const POINTS = [
@@ -43,6 +43,8 @@ final class EcrituresInfrastructure
         'helo' => ['helo_a_vers_ip'],
         'mta_sts' => ['mta_sts_enregistrement', 'mta_sts_politique', 'mta_sts_mode_testing'],
         'tls_rpt' => ['tls_rpt'],
+        'bounce_mx' => ['bounce_mx_present'],
+        'bounce_spf' => ['bounce_spf_autorise_ip'],
     ];
 
     public function __construct(

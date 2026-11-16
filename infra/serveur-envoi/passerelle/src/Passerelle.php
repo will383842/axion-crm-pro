@@ -45,6 +45,7 @@ final class Passerelle
      * @param \Closure():int|null    $horloge
      * @param \Closure(int):mixed|null $dormir pause en millisecondes (injectable pour les tests)
      * @param \Closure(string,array<string,string>):mixed|null $alerte alerte de dérive (26 § 1.8) ; défaut : error_log
+     * @param Sante\Mesureur|null $mesureur mesures de GET /v1/sante ; défaut : `horloge_unix` seulement
      */
     public function __construct(
         private readonly Stockage|\Closure $base,
@@ -53,6 +54,7 @@ final class Passerelle
         ?\Closure $horloge = null,
         ?\Closure $dormir = null,
         ?\Closure $alerte = null,
+        private readonly ?Sante\Mesureur $mesureur = null,
     ) {
         if ($kumo->delaiMaximal() >= Stockage::DELAI_RESERVATION || $kumo->delaiMaximal() > Kumo::DELAI_MAX_SECONDES) {
             // K4c : un client plus lent que la réservation ferait exécuter une commande deux fois.
@@ -111,7 +113,8 @@ final class Passerelle
                 return $this->nonAutorise();
             }
             if (abs(($this->horloge)() - (int) $ts) > self::FENETRE_HORODATAGE) {
-                return $this->nonAutorise();
+                // Signature VALIDE : refus signé (le CRM le classe « horloge »). Ni base ouverte, ni nonce retenu.
+                return $this->signer(Reponse::json(401, ['erreur' => 'horloge_hors_fenetre']), $cle, $ws, $nonce, (string) $cleId);
             }
         } catch (\Throwable) {
             return Reponse::erreur(500, 'erreur_interne'); // jamais de trace dans la réponse
@@ -152,6 +155,13 @@ final class Passerelle
 
     private function router(Requete $r, string $chemin, string $requete, string $ws): Reponse
     {
+        if ($chemin === '/v1/sante') {
+            if ($r->methode !== 'GET') {
+                return Reponse::erreur(405, 'methode');
+            }
+
+            return $requete === '' ? $this->sante() : Reponse::erreur(400, 'requete');
+        }
         if ($chemin === '/v1/evenements') {
             return $r->methode === 'GET' ? $this->evenements($ws, $requete) : Reponse::erreur(405, 'methode');
         }
@@ -160,6 +170,26 @@ final class Passerelle
         }
 
         return Reponse::erreur(404, 'introuvable');
+    }
+
+    private const MESURES_CONTRAT = ['file_age_s', 'disque_libre_pct', 'memoire_libre_pct', 'certificat_jours', 'tunnel_ok', 'ntp_synchro'];
+
+    /** Lecture seule. Une clé inconnue, non finie ou d'un autre type est omise ; une panne du mesureur n'est jamais un 500. */
+    private function sante(): Reponse
+    {
+        $mesures = [];
+        try {
+            foreach ($this->mesureur?->mesurer() ?? [] as $cle => $v) {
+                if (in_array($cle, self::MESURES_CONTRAT, true) && (is_bool($v) || is_int($v) || (is_float($v) && is_finite($v)))) {
+                    $mesures[$cle] = $v;
+                }
+            }
+        } catch (\Throwable) {
+            $mesures = [];
+        }
+        $mesures['horloge_unix'] = ($this->horloge)();
+
+        return Reponse::json(200, ['mesures' => $mesures]);
     }
 
     private function commande(string $ws, string $operation, string $corps, string $requete): Reponse

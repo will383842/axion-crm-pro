@@ -179,7 +179,7 @@ class ContactsGestesController extends ConsoleController
      * G1-E — le contact actif d'une personne, pour un geste (appel, rappel). Échec FERMÉ : introuvable, mis à l'écart,
      * retiré, opposé ou verdict d'opposition impossible → `null` (l'appelant rend 404, jamais d'oracle).
      */
-    private function contactPourGeste(string $workspaceId, string $personKey): ?object
+    private function contactPourGeste(string $workspaceId, string $personKey): ?\stdClass
     {
         if (preg_match('/^[0-9a-f]{64}$/', $personKey) !== 1) {
             return null;
@@ -205,7 +205,12 @@ class ContactsGestesController extends ConsoleController
         return ($v[$c->id]['opposee'] ?? true) === true ? null : $c;
     }
 
-    /** Écrit une activité ; `insertOrIgnore` (anti double clic). Rend [id, créée ?]. @param array<string, mixed> $ligne @return array{int, bool} */
+    /**
+     * Écrit une activité ; `insertOrIgnore` (anti double clic). Rend [id, créée ?].
+     *
+     * @param  array<string, mixed>  $ligne
+     * @return array{int, bool}
+     */
     private function consigner(string $workspaceId, string $ref, array $ligne): array
     {
         $cree = DB::table('activities')->insertOrIgnore($ligne + [
@@ -247,7 +252,7 @@ class ContactsGestesController extends ConsoleController
         $userId = $this->currentUser($request)->getKey();
         $note = trim((string) ($d['note'] ?? ''));
         // 09 h à Paris le jour demandé (jamais minuit : le jour reste le bon après conversion en UTC).
-        $echeance = Carbon::createFromFormat('Y-m-d H:i', $d['le'] . ' 09:00', 'Europe/Paris')->utc();
+        $echeance = Carbon::parse($d['le'] . ' 09:00', 'Europe/Paris')->utc();
 
         return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $personKey, $d, $userId, $note, $echeance): JsonResponse {
             $c = $this->contactPourGeste($workspaceId, $personKey);

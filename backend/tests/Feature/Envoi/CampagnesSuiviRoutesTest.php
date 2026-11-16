@@ -224,7 +224,8 @@ test('les gestes ne touchent ni sequence_id, ni les séquences, ni les inscripti
     expect(DB::table('envoi_sequences')->count())->toBe($sequences)->and(DB::table('envoi_inscriptions')->count())->toBe(0);
     foreach (['DepotCampagnes', 'GestesCampagne', 'LectureCampagnes'] as $classe) {
         $src = (string) file_get_contents(app_path("Envoi/Campagnes/{$classe}.php"));
-        expect($src)->not->toContain('sequence_id\' =>')->and($src)->not->toContain('ServeurEnvoi');
+        // DepotCampagnes : une seule écriture, dans lierSequence (X1-L3), gardée précisément par CampagnesModeleDbTest
+        expect(substr_count($src, 'sequence_id\' =>'))->toBe($classe === 'DepotCampagnes' ? 1 : 0)->and($src)->not->toContain('ServeurEnvoi');
     }
     expect(DepotCampagnes::TRANSITIONS['terminee'])->toBe([]);
 });

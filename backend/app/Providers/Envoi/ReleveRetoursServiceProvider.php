@@ -2,6 +2,7 @@
 
 namespace App\Providers\Envoi;
 
+use App\Envoi\Imap\DepotAccesImap;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -12,7 +13,7 @@ class ReleveRetoursServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Aucune liaison pour l'instant.
+        $this->app->singleton(DepotAccesImap::class);
     }
 
     public function boot(): void

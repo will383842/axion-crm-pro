@@ -662,14 +662,114 @@ test('deux espaces sur kumo : chacun reçoit SON adaptateur (aucun cache entre e
     expect($recus)->toBe(array_map(fn ($ws, $d) => [$ws, $d], array_keys($domaines), array_values($domaines)));
 });
 
-test('etatEnvoi d\'une injection smtp interroge smtp même si kumo est actif ; id inconnu ou non UUID ⇒ Inconnu, aucun adaptateur', function () {
-    $m = aigMontage('kumo');
-    aigAdaptateur($m['ws'], $m['domaine'], 'smtp'); // le domaine porte smtp : smtp et kumo ne peuvent pas être tous deux actifs ici
-    $id = aigInjectionLocale($m['ws'], 'smtp');
-    $idKumo = aigInjectionLocale($m['ws'], 'kumo');
-    expect($m['aig']->etatEnvoi($id))->toBe(EtatMessage::Inconnu)
-        ->and($m['smtp']->appels)->toBe(['etatEnvoi' => 1])->and($m['kumo']->total())->toBe(0);
-    expect($m['aig']->etatEnvoi($idKumo))->toBe(EtatMessage::Inconnu)->and($m['kumo']->total())->toBe(0); // kumo n'est pas actif (aucun domaine kumo) : jamais deviné
-    expect($m['aig']->etatEnvoi((string) Str::uuid()))->toBe(EtatMessage::Inconnu)->and($m['aig']->etatEnvoi('pas-un-uuid'))->toBe(EtatMessage::Inconnu)
-        ->and($m['smtp']->total())->toBe(1);
+/**
+ * Adaptateur simulé qui imite le contrat de l'identifiant : `injecter` rend l'identifiant que la production rendrait, `etatEnvoi(id rendu)`
+ * le reconnaît. smtp : UUID d'une ligne `envoi_injections_smtp` (comme AdaptateurSmtp, jamais écrit dans `envoi_injections_locales`) ;
+ * kumo : id Kumo + ligne `envoi_injections_locales(adaptateur = 'kumo')` posée comme le fera le registre durable (PAS encore écrite
+ * par la production). Aucun réseau.
+ */
+final class AigAller implements ServeurEnvoi
+{
+    /** @var array<string, true> */
+    private array $connus = [];
+
+    public function __construct(private readonly string $nom, private readonly string $ws, private readonly ?string $boite = null) {}
+
+    public function injecter(MessageAEnvoyer $message): ResultatInjection
+    {
+        $id = (string) Str::uuid();
+        WorkspaceContext::run($this->ws, function () use ($id, $message): void {
+            if ($this->nom === 'smtp') {
+                DB::table('envoi_injections_smtp')->insert(['workspace_id' => $this->ws, 'boite_id' => $this->boite, 'cle_idempotence' => $message->cleIdempotence, 'etat' => 'accepte', 'id_injection' => $id]);
+            } else {
+                DB::table('envoi_injections_locales')->insert(['workspace_id' => $this->ws, 'id_injection' => $id, 'cle_idempotence' => 'kumo-' . $id, 'adaptateur' => 'kumo']);
+            }
+        });
+        $this->connus[$id] = true;
+
+        return ResultatInjection::accepte($id);
+    }
+
+    public function etatEnvoi(string $idInjection): EtatMessage
+    {
+        return isset($this->connus[$idInjection]) ? EtatMessage::Envoye : EtatMessage::Inconnu;
+    }
+
+    public function pause(): void {}
+
+    public function reprise(): void {}
+
+    public function modeTemoins(): bool
+    {
+        return true;
+    }
+
+    public function etat(): EtatServeur
+    {
+        return new EtatServeur(false, count($this->connus));
+    }
+
+    public function sante(): SanteServeur
+    {
+        return new SanteServeur(true, 'ok');
+    }
+
+    public function lireEvenements(?string $curseur, int $limite = 100): LotEvenements
+    {
+        return new LotEvenements([], 'c');
+    }
+}
+
+test('aller-retour : injecter puis etatEnvoi(identifiant rendu) répond Envoye pour faux, kumo et smtp (contrat du kit de conformité)', function (string $a) {
+    $m = aigMontage($a === 'faux' ? 'faux' : $a, $a !== 'faux');
+    $ws = $m['ws'];
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $ws, 'adresse' => 'contact@' . $m['domaine'], 'hote' => 'imap.example.test', 'port' => 587, 'identifiants_chiffres' => 'x']);
+    $aller = new AigAller($a, $ws, $boite);
+    $aig = new AiguilleurServeurEnvoi($m['faux'], ['kumo' => fn () => $aller, 'smtp' => fn () => $aller], fn (): bool => $a !== 'faux', fn (): ListeFeuVert => app(ListeFeuVert::class));
+    $r = $aig->injecter(aigMessage($ws, $m['domaine']));
+    expect($r->accepte)->toBeTrue()->and($aig->etatEnvoi($r->idInjection))->toBe(EtatMessage::Envoye);
+    if ($a === 'smtp') {
+        // l'identifiant smtp n'est PAS dans envoi_injections_locales : seule envoi_injections_smtp le porte
+        expect(DB::table('envoi_injections_locales')->where('id_injection', $r->idInjection)->exists())->toBeFalse();
+    }
+})->with(['faux', 'kumo', 'smtp']);
+
+test('etatEnvoi : sans ligne ou non UUID ⇒ faux serveur s\'il est le seul actif, sinon Inconnu sans appeler d\'adaptateur', function () {
+    $m = aigMontage('faux', false); // seul le faux serveur est actif
+    $r = $m['faux']->injecter(aigMessage($m['ws'], $m['domaine']));
+    expect($r->idInjection)->toStartWith('sim-')->and($m['aig']->etatEnvoi($r->idInjection))->toBe(EtatMessage::Envoye);
+    $k = aigMontage('kumo'); // un adaptateur réel est actif : un identifiant sans ligne ne se devine pas
+    expect($k['aig']->etatEnvoi('sim-1'))->toBe(EtatMessage::Inconnu)->and($k['aig']->etatEnvoi((string) Str::uuid()))->toBe(EtatMessage::Inconnu)
+        ->and($k['kumo']->total())->toBe(0);
 });
+
+test('etatEnvoi : un identifiant kumo présent dans envoi_injections_locales (adaptateur kumo, posé comme le fera le registre) interroge kumo ; kumo inactif ⇒ Inconnu', function () {
+    $m = aigMontage('kumo');
+    $id = aigInjectionLocale($m['ws'], 'kumo');
+    $m['aig']->etatEnvoi($id);
+    expect($m['kumo']->appels)->toBe(['etatEnvoi' => 1]);
+    $m['porte'][0] = false;
+    $m['kumo']->appels = [];
+    expect($m['aig']->etatEnvoi($id))->toBe(EtatMessage::Inconnu)->and($m['kumo']->total())->toBe(0);
+});
+
+test('etatEnvoi smtp : le domaine de la boîte de l\'injection est passé à la fabrique', function () {
+    $m = aigMontage('smtp');
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $m['ws'], 'adresse' => 'contact@' . $m['domaine'], 'hote' => 'imap.example.test', 'port' => 587, 'identifiants_chiffres' => 'x']);
+    $id = (string) Str::uuid();
+    WorkspaceContext::run($m['ws'], fn () => DB::table('envoi_injections_smtp')->insert(['workspace_id' => $m['ws'], 'boite_id' => $boite, 'cle_idempotence' => 'c-smtp', 'etat' => 'accepte', 'id_injection' => $id]));
+    $recus = [];
+    $aig = new AiguilleurServeurEnvoi($m['faux'], ['smtp' => function (string $ws, string $d) use (&$recus, $m): ServeurEnvoi {
+        $recus[] = $d;
+
+        return $m['smtp'];
+    }], fn (): bool => true, fn (): ListeFeuVert => app(ListeFeuVert::class));
+    $aig->etatEnvoi($id);
+    expect($recus)->toBe([$m['domaine']]);
+});
+
+test('M1 : pause globale tous espaces avant de lier une fabrique', function () {
+    expect(true)->toBeTrue();
+})->skip('M1 : pause globale tous espaces avant de lier une fabrique');

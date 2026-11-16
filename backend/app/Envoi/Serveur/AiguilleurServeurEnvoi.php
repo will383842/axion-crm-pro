@@ -78,26 +78,52 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
         return $this->adaptateur($adaptateur, $ws, $domaine)->injecter($message);
     }
 
+    /**
+     * L'adaptateur qui a pris l'injection est résolu à partir de l'identifiant RENDU par `injecter` (contrat du kit de conformité),
+     * dans le contexte d'espace (RLS), jamais deviné par `actifs()[0]` : `envoi_injections_locales` d'abord (faux, kumo, et smtp si
+     * une ligne y existe), PUIS `envoi_injections_smtp` (l'identifiant rendu par l'adaptateur smtp est l'UUID de cette table).
+     * Kumo : le registre durable écrira (plus tard, PAS encore en production) `envoi_injections_locales(id_injection = id Kumo,
+     * adaptateur = 'kumo')` avant le réseau ; ce chemin est déjà accepté ici. Sans ligne (faux serveur : « sim-N », non UUID) : le faux
+     * serveur répond s'il est le seul actif (aucun adaptateur réel autorisé), sinon `Inconnu`. Un adaptateur réel n'est interrogé que si
+     * les trois conditions valent encore. Le domaine passé à la fabrique est celui de la boîte pour smtp quand il est connu ; sinon le
+     * premier domaine vert de l'adaptateur (limite : `envoi_injections_locales` ne porte pas le domaine).
+     */
     public function etatEnvoi(string $idInjection): EtatMessage
     {
         $ws = WorkspaceContext::current();
         if ($ws === null) {
             return $this->faux->etatEnvoi($idInjection);
         }
-        // L'adaptateur qui a pris l'injection est lu dans le registre (envoi_injections_locales.adaptateur), jamais deviné par `actifs()[0]`.
-        $nom = Str::isUuid($idInjection)
-            ? WorkspaceContext::run($ws, fn () => DB::selectOne('SELECT adaptateur FROM envoi_injections_locales WHERE workspace_id = ? AND id_injection = ?', [$ws, $idInjection]))
-            : null;
-        if ($nom === null) {
-            return EtatMessage::Inconnu;
+        $trouve = Str::isUuid($idInjection) ? $this->adaptateurDeLInjection($ws, $idInjection) : null;
+        $actifs = $this->actifs();
+        if ($trouve === null) {
+            return $actifs === [] ? $this->faux->etatEnvoi($idInjection) : EtatMessage::Inconnu;
         }
-        $adaptateur = (string) $nom->adaptateur;
+        [$adaptateur, $domaineConnu] = $trouve;
         if ($adaptateur === 'faux') {
             return $this->faux->etatEnvoi($idInjection);
         }
-        $domaine = $this->actifs()[$adaptateur] ?? null;
+        $domaine = $domaineConnu ?? ($actifs[$adaptateur] ?? null);
 
-        return $domaine === null ? EtatMessage::Inconnu : $this->adaptateur($adaptateur, $ws, $domaine)->etatEnvoi($idInjection);
+        return isset($actifs[$adaptateur]) && $domaine !== null ? $this->adaptateur($adaptateur, $ws, $domaine)->etatEnvoi($idInjection) : EtatMessage::Inconnu;
+    }
+
+    /** @return array{0: string, 1: ?string}|null [adaptateur, domaine connu de l'injection] ; lectures sous le contexte et la RLS de l'espace */
+    private function adaptateurDeLInjection(string $ws, string $id): ?array
+    {
+        return WorkspaceContext::run($ws, function () use ($ws, $id): ?array {
+            $l = DB::selectOne('SELECT adaptateur FROM envoi_injections_locales WHERE workspace_id = ? AND id_injection = ?', [$ws, $id]);
+            if ($l !== null) {
+                return [(string) $l->adaptateur, null];
+            }
+            $s = DB::selectOne('SELECT b.adresse FROM envoi_injections_smtp i JOIN envoi_boites b ON b.id = i.boite_id WHERE i.workspace_id = ? AND i.id_injection = ?', [$ws, $id]);
+            if ($s === null) {
+                return null;
+            }
+            $domaine = strtolower(substr((string) strrchr((string) $s->adresse, '@'), 1));
+
+            return ['smtp', $domaine === '' ? null : $domaine];
+        });
     }
 
     /**
@@ -107,6 +133,8 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
      */
     public function pause(): void
     {
+        // TODO M1 (ESCALADE, non implémenté ici) : pause globale tous espaces avant de lier une fabrique réelle. Aujourd'hui les
+        // fabriques sont appelées avec l'espace courant ou '' et le domaine '' : à trancher avant toute liaison réelle.
         $this->faux->pause();
         $premiere = null;
         foreach ($this->portes() as $nom) {

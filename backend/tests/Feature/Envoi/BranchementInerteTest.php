@@ -93,13 +93,24 @@ test('(1) reel_actif est faux sans variable d\'environnement ; la porte reste fe
     expect(config('envoi.reel_actif'))->toBeFalse();
     $defaut = (static function (): array {
         $ancien = getenv('ENVOI_REEL_ACTIF');
+        $dansEnv = array_key_exists('ENVOI_REEL_ACTIF', $_ENV);
+        $dansServer = array_key_exists('ENVOI_REEL_ACTIF', $_SERVER);
+        $env = $_ENV['ENVOI_REEL_ACTIF'] ?? null;
+        $server = $_SERVER['ENVOI_REEL_ACTIF'] ?? null;
         putenv('ENVOI_REEL_ACTIF');
         unset($_ENV['ENVOI_REEL_ACTIF'], $_SERVER['ENVOI_REEL_ACTIF']);
         try {
             return require base_path('config/envoi.php');
         } finally {
+            // Restauration à l'identique des trois sources (putenv, $_ENV, $_SERVER) : le test ne laisse aucune trace.
             if ($ancien !== false) {
                 putenv('ENVOI_REEL_ACTIF=' . $ancien);
+            }
+            if ($dansEnv) {
+                $_ENV['ENVOI_REEL_ACTIF'] = $env;
+            }
+            if ($dansServer) {
+                $_SERVER['ENVOI_REEL_ACTIF'] = $server;
             }
         }
     })();
@@ -133,8 +144,25 @@ test('(2) kumo + feu vert + DNS vert, porte fermée : injecter refusé (envoi_re
     $interne->etat();
     $interne->etatEnvoi((string) Str::uuid());
     $interne->lireEvenements(null);
-    expect($m['compteur']->count())->toBe(0);
+    expect($m['compteur']->count())->toBe(0); // le compteur reste à 0 via la passerelle (pause incluse : porte fermée, rien transmis)
     Http::assertNothingSent();
+});
+
+test('(2 bis) l\'aiguilleur lui-même : pause() construit les adaptateurs portés par un domaine MÊME porte fermée (stop = sens sûr), sans requête HTTP', function () {
+    $m = biMontage();
+    $passerelle = app(ServeurEnvoi::class);
+    $passerelle->pause();
+    expect($m['compteur']->count())->toBe(0); // via la passerelle : porte fermée, rien n'est construit
+    app('envoi.serveur_interne')->pause();
+    expect($m['compteur']->count())->toBe(1); // en direct : le stop construit la fabrique kumo même porte fermée (documenté)
+    Http::assertNothingSent();
+});
+
+test('(2 ter) envoi.serveur_interne : l\'aiguilleur de AiguillageServiceProvider gagne sur le faux serveur de EnvoiServiceProvider', function () {
+    $reflexion = fn (object $o, string $p) => (new ReflectionProperty($o, $p))->getValue($o);
+    $interne = $reflexion(app(ServeurEnvoi::class), 'serveur');
+    expect($interne)->toBeInstanceOf(AiguilleurServeurEnvoi::class)->and(app('envoi.serveur_interne'))->toBeInstanceOf(AiguilleurServeurEnvoi::class)
+        ->and($reflexion($interne, 'fabriques'))->toBe([]);
 });
 
 test('(3) dans app/, seul le fournisseur qui construit PasserelleLocale résout envoi.serveur_interne', function () {

@@ -188,15 +188,19 @@ class ContactsGestesController extends ConsoleController
         if ($ecart !== null) {
             return null;
         }
-        $c = DB::table('contacts')->where('workspace_id', $workspaceId)->where('person_key', $personKey)->whereNull('deleted_at')
-            ->orderByDesc('id')->first(['id', 'person_key', 'email', 'company_id']);
+        // Le SIREN vient de l'entreprise même en corbeille : l'opposition par organisation doit rester vue.
+        $c = DB::selectOne(
+            'SELECT c.id, c.person_key, c.email::text AS email, c.company_id, e.siren
+             FROM contacts c LEFT JOIN companies e ON e.id = c.company_id AND e.workspace_id = c.workspace_id
+             WHERE c.workspace_id = ? AND c.person_key = ? AND c.deleted_at IS NULL ORDER BY c.id DESC LIMIT 1',
+            [$workspaceId, $personKey],
+        );
         if ($c === null) {
             return null;
         }
         try {
-            $siren = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $c->company_id)->value('siren');
             $v = (new StatutOpposition)->pourLignes($workspaceId, [
-                $c->id => ['email' => is_string($c->email) ? $c->email : null, 'siren' => is_string($siren) ? $siren : null],
+                $c->id => ['email' => is_string($c->email) ? $c->email : null, 'siren' => is_string($c->siren) ? $c->siren : null],
             ]);
         } catch (\Throwable) {
             return null;

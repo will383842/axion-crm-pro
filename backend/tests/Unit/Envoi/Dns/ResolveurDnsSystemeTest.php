@@ -44,3 +44,13 @@ test('MTA-STS : adresse publique, requête épinglée sur cette adresse', functi
 test('adressePublique : IPv6 publique acceptée', function () {
     expect(ResolveurDnsSysteme::adressePublique('2606:4700::1111'))->toBeTrue();
 });
+
+test('C1-3 : mx() rend les hôtes triés par priorité, sans point final, en minuscules ; échec de résolution : liste vide', function () {
+    $r = new ResolveurDnsSysteme(fn (string $n, int $t) => $t === DNS_MX ? [
+        ['target' => 'B.rebonds.example.test.', 'pri' => 20],
+        ['target' => 'a.rebonds.example.test', 'pri' => 10],
+        ['target' => '', 'pri' => 30],
+    ] : []);
+    expect($r->mx('bounce.envoi.example.test'))->toBe(['a.rebonds.example.test', 'b.rebonds.example.test']);
+    expect((new ResolveurDnsSysteme(fn () => false))->mx('bounce.envoi.example.test'))->toBe([]);
+});

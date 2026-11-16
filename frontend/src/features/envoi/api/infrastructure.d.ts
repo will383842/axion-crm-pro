@@ -468,7 +468,7 @@ export interface components {
              * @description Ce que l'enregistrement sert à faire.
              * @enum {string}
              */
-            role: "spf" | "dkim" | "dmarc" | "ptr" | "mta_sts" | "helo" | "tls_rpt";
+            role: "spf" | "dkim" | "dmarc" | "ptr" | "mta_sts" | "helo" | "tls_rpt" | "bounce_mx" | "bounce_spf";
             /** @enum {string} */
             type: "A" | "AAAA" | "TXT" | "CNAME" | "MX" | "PTR";
             valeur: string;

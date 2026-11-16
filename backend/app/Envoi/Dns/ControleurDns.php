@@ -2,7 +2,7 @@
 
 namespace App\Envoi\Dns;
 
-/** Exécute les 20 points de contrôle d'un domaine d'envoi. Lecture seule : aucun envoi. */
+/** Exécute les 22 points de contrôle d'un domaine d'envoi. Lecture seule : aucun envoi. */
 final class ControleurDns
 {
     private const LIMITE_SPF = 10;
@@ -73,6 +73,17 @@ final class ControleurDns
         $r['mta_sts_politique'] = $ok($pol !== null && str_contains($pol, 'version: STSv1'), 'avert');
         $r['mta_sts_mode_testing'] = $ok($pol !== null && preg_match('/^mode:\s*testing\s*$/mi', $pol) === 1, 'avert');
         $r['tls_rpt'] = $ok($this->enregistrements('_smtp._tls.' . $c->domaine, 'v=TLSRPTv1') !== [], 'avert');
+
+        // Domaine de rebond : bloquants (sans MX ni A, un MAIL FROM peut être refusé et les rebonds sont perdus).
+        $nomRebond = 'bounce.' . $c->domaine;
+        $spfRebond = $this->enregistrements($nomRebond, 'v=spf1');
+        $motsRebond = [];
+        if (count($spfRebond) === 1) {
+            $lookupsRebond = 0;
+            $motsRebond = $this->mecanismesSpf($spfRebond[0], $lookupsRebond, 0, [$nomRebond => true]);
+        }
+        $r['bounce_mx_present'] = $ok($this->dns->mx($nomRebond) !== []);
+        $r['bounce_spf_autorise_ip'] = $ok($this->spfAutorise($motsRebond, $c->ip));
 
         $points = [];
         foreach (PlanDns::codesPointsDeControle() as $code) {

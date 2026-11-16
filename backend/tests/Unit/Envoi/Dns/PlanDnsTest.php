@@ -30,9 +30,21 @@ test('MTA-STS est publié en mode testing, jamais enforce', function () {
     expect($plan)->toContain('mode: testing')->not->toContain('enforce');
 });
 
-test('exactement 20 points de contrôle, codes uniques', function () {
+test('exactement 22 points de contrôle, codes uniques (dont les 2 du domaine de rebond)', function () {
     $codes = PlanDns::codesPointsDeControle();
-    expect($codes)->toHaveCount(20)->and(array_unique($codes))->toHaveCount(20);
+    expect($codes)->toHaveCount(22)->and(array_unique($codes))->toHaveCount(22)
+        ->and($codes)->toContain('bounce_mx_present')->toContain('bounce_spf_autorise_ip');
+});
+
+test('C1-3 : le plan publie MX et SPF de bounce.<domaine>, en jetons (IPv4 puis IPv6)', function () {
+    $lignes = array_map(fn ($e) => $e->type . ' ' . $e->nom . ' ' . $e->valeurModele . ' | ' . $e->role, PlanDns::enregistrements(configPlan()));
+    expect($lignes)->toContain('MX bounce.envoi.example.test 10 {HOTE_RECEPTION_REBONDS}. | MX rebonds')
+        ->toContain('TXT bounce.envoi.example.test v=spf1 ip4:{IP_ENVOI} -all | SPF rebonds');
+
+    $v6 = new ConfigurationDomaine('envoi.example.test', 'sel1', 'mx.envoi.example.test', '2001:db8::10');
+    $lignes6 = array_map(fn ($e) => $e->type . ' ' . $e->nom . ' ' . $e->valeurModele, PlanDns::enregistrements($v6));
+    expect($lignes6)->toContain('TXT bounce.envoi.example.test v=spf1 ip6:{IP_ENVOI} -all');
+    expect(json_encode(PlanDns::enregistrements(configPlan()), JSON_THROW_ON_ERROR))->not->toMatch('/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/');
 });
 
 test('la configuration refuse un domaine ou un nom d hôte invalide', function () {

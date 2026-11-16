@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Contacts\GestesContact;
-use App\Http\Controllers\Api\ContactsController;
 use App\Models\Contact;
 use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
@@ -36,7 +35,7 @@ class ContactsGestesController extends ConsoleController
         $r = WorkspaceContext::run($workspaceId, fn () => (new GestesContact)->modifier($workspaceId, (int) $contactId, $champs));
 
         if ($r['etat'] === 'ok') {
-            return response()->json(['data' => app(ContactsController::class)->present($r['contact'], MasquageCoordonnees::requis(), $r['opposition'])] + ['opposition' => $r['opposition']]);
+            return response()->json(['data' => $this->projeter($r['contact'], $r['opposition'])] + ['opposition' => $r['opposition']]);
         }
 
         return match ($r['etat']) {
@@ -44,5 +43,33 @@ class ContactsGestesController extends ConsoleController
             'champ_non_modifiable' => response()->json(['error' => 'champ_non_modifiable', 'message' => "L'étape se change sur l'entreprise."], 422),
             default => response()->json(['error' => 'introuvable', 'message' => 'Contact introuvable.'], 404),
         };
+    }
+
+    /**
+     * Même projection explicite que `ContactsController::present()` (adresse et téléphone masqués si requis).
+     *
+     * @param  array{opposee: bool, motifs: list<string>}  $opposition
+     * @return array<string, mixed>
+     */
+    private function projeter(Contact $c, array $opposition): array
+    {
+        $masquer = MasquageCoordonnees::requis();
+
+        return [
+            'opposition' => $opposition,
+            'id' => $c->id,
+            'first_name' => $c->first_name,
+            'last_name' => $c->last_name,
+            'role' => $c->role,
+            'email' => $masquer ? MasquageCoordonnees::email($c->email) : $c->email,
+            'email_status' => $c->email_status,
+            'joignabilite' => $c->getAttribute('joignabilite'),
+            'email_score' => $c->email_score,
+            'phone' => $masquer ? MasquageCoordonnees::telephone($c->phone) : $c->phone,
+            'linkedin_url' => $c->linkedin_url,
+            'discovery_source' => $c->discovery_source,
+            'company_id' => $c->company_id,
+            'company' => $c->company === null ? null : ['id' => $c->company->id, 'denomination' => $c->company->denomination],
+        ];
     }
 }

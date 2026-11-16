@@ -111,7 +111,7 @@ class ContactsController extends ApiController
      * @param  array{opposee: bool, motifs: list<string>}|null  $opposition
      * @return array<string, mixed>
      */
-    public function present(Contact $c, bool $masquer, ?array $opposition = null): array
+    private function present(Contact $c, bool $masquer, ?array $opposition = null): array
     {
         return [
             'opposition' => $opposition ?? ['opposee' => false, 'motifs' => []],

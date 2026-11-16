@@ -5,16 +5,22 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Crm\Contacts\AjoutContact;
 use App\Crm\Contacts\GestesContact;
 use App\Crm\Contacts\ImportContacts;
+use App\Crm\Opposition\StatutOpposition;
 use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\Contact;
+use App\Support\AuditLogger;
+use App\Support\CelluleCsv;
 use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\Response;
 
-/** Gestes « Contacts » de la console (G1-A : modifier ; G1-B : retirer, restaurer, corbeille douce ; G1-C : ajout rapide ; G1-D : import). */
+/** Gestes « Contacts » de la console (G1-A : modifier ; G1-B : retirer, restaurer, corbeille douce ; G1-C : ajout rapide ; G1-D : import ; G1-E : appel, rappel, export). */
 class ContactsGestesController extends ConsoleController
 {
     use VerrouOptimiste;
@@ -167,6 +173,163 @@ class ContactsGestesController extends ConsoleController
         ]);
 
         return array_values($d['lignes']);
+    }
+
+    /**
+     * G1-E — le contact actif d'une personne, pour un geste (appel, rappel). Échec FERMÉ : introuvable, mis à l'écart,
+     * retiré, opposé ou verdict d'opposition impossible → `null` (l'appelant rend 404, jamais d'oracle).
+     */
+    private function contactPourGeste(string $workspaceId, string $personKey): ?object
+    {
+        if (preg_match('/^[0-9a-f]{64}$/', $personKey) !== 1) {
+            return null;
+        }
+        $ecart = DB::selectOne("SELECT 1 AS x FROM contacts WHERE workspace_id = ? AND person_key = ? AND metadata ?? 'mis_a_l_ecart_le' LIMIT 1", [$workspaceId, $personKey]);
+        if ($ecart !== null) {
+            return null;
+        }
+        $c = DB::table('contacts')->where('workspace_id', $workspaceId)->where('person_key', $personKey)->whereNull('deleted_at')
+            ->orderByDesc('id')->first(['id', 'person_key', 'email', 'company_id']);
+        if ($c === null) {
+            return null;
+        }
+        try {
+            $siren = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $c->company_id)->value('siren');
+            $v = (new StatutOpposition)->pourLignes($workspaceId, [
+                $c->id => ['email' => is_string($c->email) ? $c->email : null, 'siren' => is_string($siren) ? $siren : null],
+            ]);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return ($v[$c->id]['opposee'] ?? true) === true ? null : $c;
+    }
+
+    /** Écrit une activité ; `insertOrIgnore` (anti double clic). Rend [id, créée ?]. @param array<string, mixed> $ligne @return array{int, bool} */
+    private function consigner(string $workspaceId, string $ref, array $ligne): array
+    {
+        $cree = DB::table('activities')->insertOrIgnore($ligne + [
+            'workspace_id' => $workspaceId, 'external_ref' => $ref, 'occurred_at' => now(), 'created_at' => now(),
+        ]);
+
+        return [(int) DB::table('activities')->where('workspace_id', $workspaceId)->where('external_ref', $ref)->value('id'), $cree > 0];
+    }
+
+    /** Consigner un appel (compte rendu) sur la fiche d'une personne. */
+    public function appel(Request $request, string $personKey): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('modifier', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $d = $request->validate(['compte_rendu' => ['required', 'string', 'min:1', 'max:5000']]);
+        $userId = $this->currentUser($request)->getKey();
+
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $personKey, $d, $userId): JsonResponse {
+            $c = $this->contactPourGeste($workspaceId, $personKey);
+            if ($c === null) {
+                return response()->json(['error' => 'introuvable', 'message' => 'Personne introuvable.'], 404);
+            }
+            [$id, $cree] = $this->consigner($workspaceId, 'console:contact:' . $c->id . ':call:' . now()->format('Y-m-d\TH:i') . ':' . substr(sha1((string) $d['compte_rendu']), 0, 12), [
+                'user_id' => $userId, 'contact_id' => $c->id, 'person_key' => $c->person_key, 'type' => 'call', 'kind' => 'call',
+                'subject_type' => 'contact', 'subject_id' => $c->id, 'title' => 'Appel', 'content' => (string) $d['compte_rendu'],
+                'payload' => json_encode(['surface' => 'fiche:appel'], JSON_THROW_ON_ERROR),
+            ]);
+
+            return response()->json(['activity_id' => $id, 'deja_consignee' => ! $cree], $cree ? 201 : 200);
+        });
+    }
+
+    /** Planifier un rappel : une tâche (`kind='task'`) rattachée au contact, visible dans « Mes tâches ». */
+    public function rappel(Request $request, string $personKey): JsonResponse
+    {
+        Gate::forUser($this->currentUser($request))->authorize('modifier', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $d = $request->validate(['le' => ['required', 'date_format:Y-m-d'], 'note' => ['nullable', 'string', 'max:200']]);
+        $userId = $this->currentUser($request)->getKey();
+        $note = trim((string) ($d['note'] ?? ''));
+        // 09 h à Paris le jour demandé (jamais minuit : le jour reste le bon après conversion en UTC).
+        $echeance = Carbon::createFromFormat('Y-m-d H:i', $d['le'] . ' 09:00', 'Europe/Paris')->utc();
+
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $personKey, $d, $userId, $note, $echeance): JsonResponse {
+            $c = $this->contactPourGeste($workspaceId, $personKey);
+            if ($c === null) {
+                return response()->json(['error' => 'introuvable', 'message' => 'Personne introuvable.'], 404);
+            }
+            [$id, $cree] = $this->consigner($workspaceId, 'console:contact:' . $c->id . ':rappel:' . now()->format('Y-m-d\TH:i') . ':' . substr(sha1($d['le'] . '|' . $note), 0, 12), [
+                'user_id' => $userId, 'contact_id' => $c->id, 'person_key' => $c->person_key, 'type' => 'task', 'kind' => 'task',
+                'subject_type' => 'contact', 'subject_id' => $c->id, 'title' => $note !== '' ? $note : 'Rappel', 'due_at' => $echeance,
+                'payload' => json_encode(['surface' => 'fiche:rappel', 'origine' => 'manuelle', 'genre' => 'relance', 'avec_heure' => false], JSON_THROW_ON_ERROR),
+            ]);
+
+            return response()->json(['activity_id' => $id, 'deja_consignee' => ! $cree], $cree ? 201 : 200);
+        });
+    }
+
+    /**
+     * Export CSV de contacts choisis. Tout identifiant hors espace, retiré ou inconnu → 422 (jamais d'export partiel
+     * silencieux). Les personnes opposées ne sortent pas (échec fermé) : leur nombre est rendu en `X-Lignes-Exclues`.
+     */
+    public function exporter(Request $request): Response
+    {
+        Gate::forUser($this->currentUser($request))->authorize('exporter', Contact::class);
+        $workspaceId = $this->businessWorkspace($request);
+        $d = $request->validate([
+            'company_ids' => ['sometimes', 'array', 'max:500'], 'company_ids.*' => ['integer', 'min:1'],
+            'contact_ids' => ['sometimes', 'array', 'max:500'], 'contact_ids.*' => ['integer', 'min:1'],
+        ]);
+        $entreprises = array_values(array_unique(array_map('intval', $d['company_ids'] ?? [])));
+        $contacts = array_values(array_unique(array_map('intval', $d['contact_ids'] ?? [])));
+        if ($entreprises === [] && $contacts === []) {
+            return response()->json(['error' => 'aucun_identifiant', 'message' => 'Aucune fiche choisie.'], 422);
+        }
+        if (count($entreprises) + count($contacts) > 500) {
+            return response()->json(['error' => 'trop_d_identifiants', 'message' => '500 fiches au plus.'], 422);
+        }
+
+        $rendu = WorkspaceContext::run($workspaceId, function () use ($workspaceId, $entreprises, $contacts): array|JsonResponse {
+            $valides = $entreprises === [] ? 0 : DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')->whereIn('id', $entreprises)->count();
+            $valides2 = $contacts === [] ? 0 : DB::table('contacts')->where('workspace_id', $workspaceId)->whereNull('deleted_at')->whereIn('id', $contacts)->count();
+            if ($valides !== count($entreprises) || $valides2 !== count($contacts)) {
+                return response()->json(['error' => 'identifiant_invalide', 'message' => 'Une fiche choisie est introuvable : rien n’est exporté.'], 422);
+            }
+            $lignes = DB::table('contacts as c')
+                ->join('companies as e', fn ($j) => $j->on('e.id', '=', 'c.company_id')->on('e.workspace_id', '=', 'c.workspace_id'))
+                ->where('c.workspace_id', $workspaceId)->whereNull('c.deleted_at')->whereNull('e.deleted_at')
+                ->where(fn ($q) => $q->whereIn('c.id', $contacts ?: [0])->orWhereIn('c.company_id', $entreprises ?: [0]))
+                ->orderBy('c.id')->limit(10001)
+                ->get(['c.id', 'c.first_name', 'c.last_name', 'c.email', 'c.role', 'e.denomination', 'e.siren']);
+            if ($lignes->count() > 10000) {
+                return response()->json(['error' => 'trop_de_lignes', 'message' => 'Choisissez moins de fiches.'], 422);
+            }
+            $verdicts = (new StatutOpposition)->pourLignes($workspaceId, $lignes->mapWithKeys(fn ($l) => [
+                $l->id => ['email' => is_string($l->email) ? $l->email : null, 'siren' => is_string($l->siren) ? $l->siren : null],
+            ])->all());
+            $sortie = [];
+            foreach ($lignes as $l) {
+                if (($verdicts[$l->id]['opposee'] ?? true) === true) {
+                    continue;
+                }
+                $sortie[] = [$l->first_name, $l->last_name, $l->email, $l->role, $l->denomination];
+            }
+            AuditLogger::log('contacts.export', ['workspace_id' => $workspaceId, 'resource_type' => 'contact', 'lignes' => count($sortie)]);
+
+            return ['lignes' => $sortie, 'exclues' => $lignes->count() - count($sortie)];
+        });
+        if ($rendu instanceof JsonResponse) {
+            return $rendu;
+        }
+
+        return response()->streamDownload(function () use ($rendu): void {
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                throw new \RuntimeException('Export CSV : impossible d’ouvrir php://output.');
+            }
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['prenom', 'nom', 'email', 'fonction', 'organisation'], ';');
+            foreach ($rendu['lignes'] as $ligne) {
+                fputcsv($out, CelluleCsv::ligne($ligne), ';');
+            }
+            fclose($out);
+        }, 'contacts.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'X-Lignes-Exclues' => (string) $rendu['exclues']]);
     }
 
     /** Retirer = corbeille douce, restaurable. Idempotent. Rien n'est effacé. */

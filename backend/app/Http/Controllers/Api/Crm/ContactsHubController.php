@@ -124,6 +124,8 @@ class ContactsHubController extends ConsoleController
 
         return $this->ok(CompteursHub::pour($workspaceId) + [
             'fresh_for_seconds' => CompteursHub::FRAIS_SECONDES,
+            // G1-E : les gestes « Contacts » (fiche, appel, rappel, export) existent côté serveur.
+            'gestes_fiches' => true,
         ]);
     }
 

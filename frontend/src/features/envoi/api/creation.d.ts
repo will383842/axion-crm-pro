@@ -47,7 +47,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Aperçu d'un message pour un destinataire exemple */
+        /**
+         * Aperçu d'une étape rendu pour 3 vrais destinataires de la cible
+         * @description Lecture seule (F2a-2) : les 3 premiers destinataires RETENUS de la cible du brouillon (ordre des clés, jamais un opposé), objet et corps rendus avec les mêmes valeurs que l'envoi. Aucune adresse n'est rendue. Étape hors séquence : 422.
+         */
         post: operations["apercuMessage"];
         delete?: never;
         options?: never;
@@ -249,7 +252,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Destinataires pour l'aperçu réel d'un message */
+        /**
+         * Destinataires pour l'aperçu réel d'un message
+         * @description Avec `brouillon_id`, les 3 premiers destinataires retenus de la cible (sans adresse) ; sans, les premiers contacts de l'espace (écran des messages types).
+         */
         get: operations["listerDestinatairesExemples"];
         put?: never;
         post?: never;
@@ -418,6 +424,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ApercuReel: {
+            destinataires: {
+                corps: string;
+                /** @description Identifiant du contact. */
+                id: number;
+                /** @description Ex. « Destinataire 1 » : jamais une adresse. */
+                libelle: string;
+                objet: string;
+                /** @description Champs pour lesquels le repli a servi. */
+                replis: string[];
+            }[];
+        };
         BlocReutilisable: {
             id: string;
             nom: string;
@@ -467,11 +485,11 @@ export interface components {
             bloquant: boolean;
             /** @description Personnes de la cible pour qui ce champ est vide. */
             manquants: number;
+            /** @description Faux sans `brouillon_id` (la cible n'est pas parcourue). */
+            manquants_connus?: boolean;
             /** @description Nom du champ sans accolades, ex. `prénom`. */
             nom: string;
             obligatoire: boolean;
-            /** @description Faux sans `brouillon_id` (la cible n'est pas parcourue). */
-            manquants_connus?: boolean;
             /** @description Vrai si le compte porte sur les 5 000 premiers destinataires seulement. */
             partiel?: boolean;
             /** @description Valeur de repli retenue (saisie ou écrite dans le message). */
@@ -724,28 +742,20 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    destinataire_id?: components["schemas"]["Identifiant"];
                     etape: number;
-                    /** @enum {string} */
-                    variante?: "a" | "b";
                 };
             };
         };
         responses: {
-            /** @description Message rendu. */
+            /** @description Messages rendus. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        corps: string;
-                        de: string;
-                        objet: string;
-                    };
+                    "application/json": components["schemas"]["ApercuReel"];
                 };
             };
-            501: components["responses"]["Erreur"];
         };
     };
     estimerCible: {
@@ -978,6 +988,11 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    /**
+                     * Format: uuid
+                     * @description Présent ⇒ vrais comptes sur la cible retenue ; absent ⇒ `manquants_connus` faux.
+                     */
+                    brouillon_id?: string;
                     cible: components["schemas"]["Cible"];
                     repli?: {
                         [key: string]: string;
@@ -1054,7 +1069,9 @@ export interface operations {
     };
     listerDestinatairesExemples: {
         parameters: {
-            query?: never;
+            query?: {
+                brouillon_id?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

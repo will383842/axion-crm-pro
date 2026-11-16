@@ -54,6 +54,9 @@ final class RefusSequenceur
         EligibiliteAdresse::DEJA_INFORMEE,
         EligibiliteAdresse::OPPOSITION,
         EnvoiAutorise::OPPOSITION_REGISTRE, // R13 : domaine ou organisation au registre manuel, levée = décision humaine
+        EnvoiAutorise::OPPOSITION_ART21, // X7/B10 : demande art. 21 en cours, levée = décision humaine
+        EnvoiAutorise::OPPOSITION_STOP,
+        EnvoiAutorise::OPPOSITION_LISTE_REFUS,
         EligibiliteAdresse::ADRESSE_PARTAGEE,
         EligibiliteAdresse::FICHE_CONSOLE,
     ];

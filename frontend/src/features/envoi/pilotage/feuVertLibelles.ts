@@ -35,4 +35,16 @@ export function libelleAccord(n: number): string {
 /** Rappel affiché à côté des deux gestes : le feu vert est nécessaire, pas suffisant. */
 export const RAPPEL_ENVOI_REEL = 'Accorder le feu vert n’active pas l’envoi réel : l’envoi réel reste une décision d’exploitation, prise hors de cet écran.';
 
+/** Ce qui se passe après le feu vert : une décision écrite, hors de cet écran. */
+export const ETAPE_SUIVANTE = 'Après le feu vert, l’ouverture de l’envoi réel est une décision écrite du fondateur, appliquée sur le serveur.';
+
+/** « 3 points validés sur 15 » et « 12 points restants » (jamais « Prêt » : le feu vert n'est pas l'envoi). */
+export function libelleAvancement(r: Pick<Recap, 'faits' | 'total'>): { valides: string; restants: string } {
+  const restants = Math.max(0, r.total - r.faits);
+  return {
+    valides: `${r.faits} ${r.faits > 1 ? 'points validés' : 'point validé'} sur ${r.total}`,
+    restants: restants === 0 ? 'Aucun point restant' : `${restants} ${restants > 1 ? 'points restants' : 'point restant'}`,
+  };
+}
+
 export const AIDE_MOTIF = 'Le motif compte de 10 à 500 caractères. N’écrivez JAMAIS d’adresse e-mail.';

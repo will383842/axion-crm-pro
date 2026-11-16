@@ -44,7 +44,7 @@ describe('CampagneSuiviPage', () => {
     await user.click(screen.getByRole('tab', { name: /^Destinataires/ }));
     await user.click(await screen.findByRole('button', { name: /^Refusés/ }));
     const yves = await screen.findByRole('row', { name: /Yves Roche/ });
-    expect(within(yves).getByText('Refusé')).toBeInTheDocument();
+    expect(within(yves).getByText('Adresse invalide')).toBeInTheDocument();
     expect(yves).toHaveTextContent('Adresse inexistante');
     // Le filtre écarte les autres états.
     expect(screen.queryByRole('row', { name: /Paul Morin/ })).not.toBeInTheDocument();

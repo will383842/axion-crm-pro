@@ -4,6 +4,7 @@ import { Plus, Send, X } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
 import { Bloc, CHAMP, Interrupteur } from './composants';
 import { useChamps, useMessagesTypes, envoyerTestCampagne, type MessageTypeEtat } from './api';
+import { messageErreur } from '../infrastructure/composants/format';
 import { cibleDeContrat, sequenceDeContrat, type Saisie } from './saisie';
 
 function versionUtilisee(m: MessageTypeEtat | undefined) {
@@ -34,6 +35,7 @@ export function EtapeMessage({
   const [retourTest, setRetourTest] = useState<string | null>(null);
   const [envoiTest, setEnvoiTest] = useState(false);
 
+  const messageRelance = liste.find((m) => m.statut === 'valide');
   const premier = liste.find((m) => m.id === saisie.sequence[0]?.message_id);
   const objetA = versionUtilisee(premier)?.objet ?? '';
 
@@ -64,8 +66,8 @@ export function EtapeMessage({
     }
     try {
       await suite();
-    } catch {
-      setErreur('Le brouillon n’a pas pu être enregistré. Réessayez dans un instant.');
+    } catch (e) {
+      setErreur(messageErreur(e, 'Le brouillon n’a pas pu être enregistré. Réessayez dans un instant.'));
     }
   };
 
@@ -74,8 +76,8 @@ export function EtapeMessage({
     try {
       const id = await assurerBrouillon();
       setRetourTest(await envoyerTestCampagne(id, 1));
-    } catch {
-      setRetourTest('Le test n’a pas pu partir. Réessayez dans un instant.');
+    } catch (e) {
+      setRetourTest(messageErreur(e, 'Le test n’a pas pu partir. Réessayez dans un instant.'));
     } finally {
       setEnvoiTest(false);
       setTestOuvert(false);
@@ -133,14 +135,19 @@ export function EtapeMessage({
         ))}
       </ol>
       {saisie.sequence.length < 3 ? (
-        <Button
-          className="mt-3"
-          variant="secondary"
-          iconLeft={<Plus className="h-4 w-4" aria-hidden />}
-          onClick={() => { modifier({ sequence: [...saisie.sequence, { message_id: liste.find((m) => m.statut === 'valide')?.id ?? 'msg-1', delai_jours: 4 }] }); }}
-        >
-          Ajouter une relance
-        </Button>
+        <>
+          <Button
+            className="mt-3"
+            variant="secondary"
+            iconLeft={<Plus className="h-4 w-4" aria-hidden />}
+            disabled={messageRelance === undefined}
+            aria-describedby={messageRelance === undefined ? 'aide-relance' : undefined}
+            onClick={() => { if (messageRelance !== undefined) modifier({ sequence: [...saisie.sequence, { message_id: messageRelance.id, delai_jours: 4 }] }); }}
+          >
+            Ajouter une relance
+          </Button>
+          {messageRelance === undefined ? <p id="aide-relance" className="mt-1 text-xs text-slate-600">Aucun message validé pour l’instant : validez un message type pour pouvoir l’utiliser en relance.</p> : null}
+        </>
       ) : null}
 
       <div className="mt-5 space-y-3">

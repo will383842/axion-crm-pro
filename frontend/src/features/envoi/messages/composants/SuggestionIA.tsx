@@ -2,22 +2,23 @@
 import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui';
+import { messageErreur } from '../../infrastructure/composants/format';
 import { suggererSequence, useGestesMessages } from '../../creation/api';
 
 type Suggestion = Awaited<ReturnType<typeof suggererSequence>>;
 
 export function SuggestionIA({ ouverte, onFermer }: { ouverte: boolean; onFermer: () => void }) {
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
-  const [erreur, setErreur] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
   const [cree, setCree] = useState(false);
   const { creer } = useGestesMessages();
 
   useEffect(() => {
-    if (!ouverte || suggestion !== null || erreur) return;
+    if (!ouverte || suggestion !== null || erreur !== null) return;
     let annule = false;
     suggererSequence()
       .then((s) => { if (!annule) setSuggestion(s); })
-      .catch(() => { if (!annule) setErreur(true); });
+      .catch((e: unknown) => { if (!annule) setErreur(messageErreur(e, 'La suggestion n’a pas pu être préparée. Réessayez dans un instant.')); });
     return () => { annule = true; };
   }, [ouverte, suggestion, erreur]);
 
@@ -38,8 +39,8 @@ export function SuggestionIA({ ouverte, onFermer }: { ouverte: boolean; onFermer
         <h2 className="text-lg font-bold tracking-tight text-slate-900">Brouillon de séquence</h2>
         <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-800">Suggestion</span>
       </div>
-      {erreur ? (
-        <p role="alert" className="text-sm text-rose-800">La suggestion n’a pas pu être préparée. Réessayez dans un instant.</p>
+      {erreur !== null ? (
+        <p role="alert" className="text-sm text-rose-800">{erreur}</p>
       ) : suggestion === null ? (
         <p role="status" className="text-sm text-slate-700">Préparation du brouillon…</p>
       ) : (
@@ -61,7 +62,7 @@ export function SuggestionIA({ ouverte, onFermer }: { ouverte: boolean; onFermer
         {suggestion !== null && !cree ? (
           <Button variant="secondary" loading={creer.isPending} onClick={() => { void creerBrouillons(); }}>Créer ces brouillons</Button>
         ) : null}
-        <Button variant="ghost" onClick={() => { setSuggestion(null); setErreur(false); setCree(false); onFermer(); }}>Fermer</Button>
+        <Button variant="ghost" onClick={() => { setSuggestion(null); setErreur(null); setCree(false); onFermer(); }}>Fermer</Button>
       </div>
     </section>
   );

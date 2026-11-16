@@ -4,6 +4,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import userEvent from '@testing-library/user-event';
 import { NouvelleCampagnePage } from '@/features/envoi/campagnes/NouvelleCampagnePage';
 import { handlers } from '@/demo/handlers/envoi/creation.handlers';
@@ -36,6 +37,19 @@ async function continuer(user: Utilisateur, nom: RegExp) {
 describe('NouvelleCampagnePage', () => {
   beforeEach(() => {
     demoDb.reinitialiser();
+  });
+
+  it('« Continuer » affiche le motif du serveur si l’enregistrement échoue, au lieu de ne rien faire', async () => {
+    const motif = 'Enregistrement refusé : brouillon verrouillé.';
+    const refus = [
+      http.post('*/envoi/brouillons', () => HttpResponse.json({ message: motif }, { status: 409 })),
+      http.put('*/envoi/brouillons/*/etapes/*', () => HttpResponse.json({ message: motif }, { status: 409 })),
+    ];
+    await renderScreen(<NouvelleCampagnePage />, { path: CHEMIN, url: `${CHEMIN}?etiquette=salon-artisans-2026`, handlers: [...refus, ...handlers], landingRoutes: ['/envoi/campagnes/$campagneId'] });
+    const user = userEvent.setup();
+    await continuer(user, /Continuer : message/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(motif);
+    expect(screen.getByRole('button', { name: /Continuer : message/ })).toBeInTheDocument();
   });
 
   it('?etiquette=salon-artisans-2026 pré-remplit la cible, avec ses joignables', async () => {

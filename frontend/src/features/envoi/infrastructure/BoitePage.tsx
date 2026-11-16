@@ -104,7 +104,7 @@ function Contenu({ fiche }: { fiche: FicheBoite }) {
         <KpiCard label="Envoyés (30 j)" value={nombre(t.envoyes)} tone="sky" />
         <KpiCard label="Refusés" value={pourcent(t.tauxRefus)} sublabel="limite 2 %" tone={t.tauxRefus > 2 ? 'amber' : 'emerald'} />
         <KpiCard label="Réponses" value={t.reponses} tone="emerald" />
-        <KpiCard label="Quota du jour" value={`${boite.envoyes_aujourdhui} / ${boite.quota_jour}`} sublabel="plafond 150 par jour" tone="amber" />
+        <KpiCard label="Quota du jour" value={`${boite.envoyes_aujourdhui} / ${boite.quota_jour}`} tone="amber" />
       </div>
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
         <section aria-labelledby="b30" className="rounded-xl bg-white p-4 ring-1 ring-slate-200">

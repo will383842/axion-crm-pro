@@ -27,7 +27,7 @@ export function SequencesPage() {
         </div>
       ) : lignes.length === 0 ? (
         <div className="mt-4">
-          <EmptyState title="Aucune séquence pour l’instant" description="Une séquence enchaîne jusqu’à trois messages pour une même cible." />
+          <EmptyState title="Aucune séquence pour l’instant" description="Une séquence enchaîne jusqu’à trois messages pour une même cible. Elle est créée automatiquement quand vous programmez une campagne : rien à faire ici." />
         </div>
       ) : (
         <TableScroll template={GRID} className="mt-4 rounded-xl bg-white shadow-sm ring-1 ring-slate-200">

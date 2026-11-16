@@ -10,7 +10,7 @@ import { messageErreur } from '../infrastructure/composants/format';
 import { OngletsSante } from './OngletsSante';
 import { DecisionFeuVert } from './composants/DecisionFeuVert';
 import { Chargement, Panne, Vide } from './composants/Etats';
-import { avertissementDemo, libelleBloquants } from './feuVertLibelles';
+import { avertissementDemo, ETAPE_SUIVANTE, libelleAvancement, libelleBloquants } from './feuVertLibelles';
 
 type Point = components['schemas']['PointFeuVert'];
 type Verrous = components['schemas']['VerrousFeuVert'];
@@ -154,8 +154,9 @@ export function FeuVertPage() {
               <BlocVerrous v={f.verrous} />
               <Card>
                 <h2 className="text-lg font-bold text-slate-900">Avant le premier envoi</h2>
-                <p className="mt-1 text-sm text-slate-700">{f.faits} / {f.total}</p>
-                <p className="mt-3 text-sm"><strong>{restants === 0 ? 'Prêt' : 'Presque prêt'}</strong><span className="block text-slate-600">{libelleBloquants(f)}</span></p>
+                <p className="mt-1 text-sm text-slate-700">{libelleAvancement(f).valides}</p>
+                <p className="mt-3 text-sm"><strong>{libelleAvancement(f).restants}</strong><span className="block text-slate-600">{libelleBloquants(f)}</span></p>
+                <p className="mt-3 text-sm text-slate-700">{ETAPE_SUIVANTE}</p>
                 {restants > 0 ? <Link to="/envoi/reglages" className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-4 text-sm font-medium md:min-h-9">Voir les réglages d’envoi</Link> : null}
               </Card>
             </div>

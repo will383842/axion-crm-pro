@@ -163,7 +163,7 @@ export function EtapeValidation({
             ) : (
               <>
                 <p role="status" className="mb-2 text-xs text-slate-600">
-                  Code envoyé à {codeEnvoye}. En démonstration, il est affiché dans le bandeau en haut de la page.
+                  Code envoyé à {codeEnvoye}.{import.meta.env.VITE_DEMO === '1' ? ' En démonstration, il est affiché dans le bandeau en haut de la page.' : ''}
                 </p>
                 <label htmlFor="code-validation" className="sr-only">Code reçu par e-mail</label>
                 <input

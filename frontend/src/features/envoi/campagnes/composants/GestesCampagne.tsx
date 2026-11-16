@@ -7,13 +7,15 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { isAxiosError } from 'axios';
+import { useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
 import { CalendarClock, Copy, Pause, Play, Square } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
 import { cn } from '@/components/ui/cn';
 import { useGestesCampagne, type Campagne } from '../api';
 import { ajouterJours, dateRelative, jourDe, parisVersIso, prochainLundi } from './libelles';
 
-type Dialogue = 'pause' | 'date' | 'dupliquer' | 'terminer' | null;
+type Dialogue = 'pause' | 'reprise' | 'date' | 'dupliquer' | 'terminer' | null;
 
 export interface GestesCampagneProps {
   campagne: Campagne;
@@ -48,23 +50,18 @@ const TACTILE = 'max-md:h-11 max-md:text-sm';
 
 export function GestesCampagne({ campagne, maintenant, variante, avant }: GestesCampagneProps) {
   const [dialogue, setDialogue] = useState<Dialogue>(null);
-  const gestes = useGestesCampagne();
   const permis = gestesPermis(campagne.statut);
-  const id = String(campagne.id);
   const entete = variante === 'entete';
   const nom = (court: string) => (entete ? undefined : `${court} : ${campagne.nom}`);
   const fermer = () => setDialogue(null);
   const conteneur = useRef<HTMLDivElement>(null);
   // Après « Reprendre », le bouton disparaît : le focus passe à « Pause » (ou au groupe de gestes), jamais au vide.
-  const reprendre = () =>
-    gestes.reprise.mutate(id, {
-      onSuccess: () => {
-        requestAnimationFrame(() => {
-          const cible = conteneur.current?.querySelector<HTMLElement>('[data-geste="pause"]') ?? conteneur.current;
-          cible?.focus();
-        });
-      },
+  const apresReprise = () => {
+    requestAnimationFrame(() => {
+      const cible = conteneur.current?.querySelector<HTMLElement>('[data-geste="pause"]') ?? conteneur.current;
+      cible?.focus();
     });
+  };
 
   return (
     <>
@@ -82,8 +79,7 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
             className={TACTILE}
             iconLeft={<Play className="h-4 w-4" aria-hidden />}
             aria-label={nom('Reprendre')}
-            loading={gestes.reprise.isPending}
-            onClick={reprendre}
+            onClick={() => setDialogue('reprise')}
           >
             Reprendre
           </Button>
@@ -102,16 +98,12 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
           </Button>
         ) : null}
       </div>
-      {gestes.reprise.isError ? (
-        <p role="alert" className="mt-2 text-xs text-rose-700">
-          {messageErreur(gestes.reprise.error)}
-        </p>
-      ) : null}
 
       {dialogue !== null
         ? createPortal(
             <>
               {dialogue === 'pause' ? <DialoguePause campagne={campagne} onClose={fermer} /> : null}
+              {dialogue === 'reprise' ? <DialogueReprise campagne={campagne} onClose={fermer} onFait={apresReprise} /> : null}
               {dialogue === 'date' ? <DialogueDate campagne={campagne} maintenant={maintenant} onClose={fermer} /> : null}
               {dialogue === 'dupliquer' ? <DialogueDupliquer campagne={campagne} onClose={fermer} /> : null}
               {dialogue === 'terminer' ? <DialogueTerminer campagne={campagne} onClose={fermer} /> : null}
@@ -153,7 +145,12 @@ function DialoguePause({ campagne, onClose }: { campagne: Campagne; onClose: () 
       title="Mettre en pause ?"
       footer={
         <PiedDialogue annuler={onClose}>
-          <Button className={TACTILE} loading={pause.isPending} onClick={() => pause.mutate(String(campagne.id), { onSuccess: onClose })}>
+          <Button className={TACTILE} loading={pause.isPending} onClick={() => pause.mutate(String(campagne.id), {
+                onSuccess: () => {
+                  toast.success(`« ${campagne.nom} » est en pause.`);
+                  onClose();
+                },
+              })}>
             Mettre en pause
           </Button>
         </PiedDialogue>
@@ -163,6 +160,42 @@ function DialoguePause({ campagne, onClose }: { campagne: Campagne; onClose: () 
         <strong className="font-semibold text-slate-900">{campagne.nom}</strong> s’arrête tout de suite. Rien n’est perdu : reprise quand vous voulez.
       </p>
       <Erreur erreur={pause.error} />
+    </Modal>
+  );
+}
+
+function DialogueReprise({ campagne, onClose, onFait }: { campagne: Campagne; onClose: () => void; onFait: () => void }) {
+  const { reprise } = useGestesCampagne();
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      title="Reprendre la campagne ?"
+      footer={
+        <PiedDialogue annuler={onClose}>
+          <Button
+            className={TACTILE}
+            loading={reprise.isPending}
+            onClick={() =>
+              reprise.mutate(String(campagne.id), {
+                onSuccess: () => {
+                  toast.success(`« ${campagne.nom} » a repris : les envois repartent.`);
+                  onClose();
+                  onFait();
+                },
+              })
+            }
+          >
+            Reprendre la campagne
+          </Button>
+        </PiedDialogue>
+      }
+    >
+      <p className="text-sm text-slate-700">
+        Les envois de <strong className="font-semibold text-slate-900">{campagne.nom}</strong> repartent dès que possible, dans les limites du jour.
+      </p>
+      <Erreur erreur={reprise.error} />
     </Modal>
   );
 }
@@ -177,7 +210,12 @@ function DialogueTerminer({ campagne, onClose }: { campagne: Campagne; onClose: 
       title="Terminer définitivement ?"
       footer={
         <PiedDialogue annuler={onClose}>
-          <Button variant="destructive" className={TACTILE} loading={terminer.isPending} onClick={() => terminer.mutate(String(campagne.id), { onSuccess: onClose })}>
+          <Button variant="destructive" className={TACTILE} loading={terminer.isPending} onClick={() => terminer.mutate(String(campagne.id), {
+                onSuccess: () => {
+                  toast.success(`« ${campagne.nom} » est terminée.`);
+                  onClose();
+                },
+              })}>
             Terminer la campagne
           </Button>
         </PiedDialogue>
@@ -236,7 +274,23 @@ function DialogueDate({ campagne, maintenant, onClose }: { campagne: Campagne; m
       description={`${campagne.nom} · liste et messages inchangés.`}
       footer={
         <PiedDialogue annuler={onClose}>
-          <Button className={TACTILE} disabled={!valide} loading={date.isPending} onClick={() => le !== null && date.mutate({ id: String(campagne.id), le }, { onSuccess: onClose })}>
+          <Button
+            className={TACTILE}
+            disabled={!valide}
+            loading={date.isPending}
+            onClick={() =>
+              le !== null &&
+              date.mutate(
+                { id: String(campagne.id), le },
+                {
+                  onSuccess: () => {
+                    toast.success(`Nouvelle date enregistrée : ${dateRelative(le, maintenant)}.`);
+                    onClose();
+                  },
+                },
+              )
+            }
+          >
             Reprogrammer
           </Button>
         </PiedDialogue>
@@ -277,6 +331,7 @@ function DialogueDate({ campagne, maintenant, onClose }: { campagne: Campagne; m
 
 function DialogueDupliquer({ campagne, onClose }: { campagne: Campagne; onClose: () => void }) {
   const { dupliquer } = useGestesCampagne();
+  const naviguer = useNavigate();
   const [nom, setNom] = useState(`${campagne.nom} (copie)`);
   const [garderCible, setGarderCible] = useState(true);
   const [garderMessages, setGarderMessages] = useState(true);
@@ -297,7 +352,13 @@ function DialogueDupliquer({ campagne, onClose }: { campagne: Campagne; onClose:
             onClick={() =>
               dupliquer.mutate(
                 { id: String(campagne.id), corps: { nom: nom.trim(), garder_cible: garderCible, garder_messages: garderMessages, exclure_deja_recus: exclure } },
-                { onSuccess: onClose },
+                {
+                  onSuccess: (copie) => {
+                    toast.success(`La copie « ${copie.nom} » est créée en brouillon.`);
+                    onClose();
+                    void naviguer({ to: '/envoi/campagnes/$campagneId', params: { campagneId: String(copie.id) } });
+                  },
+                },
               )
             }
           >

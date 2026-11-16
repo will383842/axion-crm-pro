@@ -4,9 +4,10 @@
  */
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Archive, ArchiveRestore, Mail, Sparkles } from 'lucide-react';
-import { Button, EmptyState, KpiCard, PageHeader, QueryErrorState, Skeleton } from '@/components/ui';
+import { Archive, Mail, Sparkles } from 'lucide-react';
+import { Button, EmptyState, KpiCard, Modal, PageHeader, QueryErrorState, Skeleton } from '@/components/ui';
 import { NOM_DU_PRODUIT, useProduitCourant } from '@/features/socle/produit/useProduitCourant';
+import { messageErreur } from '../infrastructure/composants/format';
 import { OngletsCampagnes } from '../campagnes/OngletsCampagnes';
 import { useGestesMessages, useMessagesTypes } from '../creation/api';
 import { StatutMessage } from './composants/StatutMessage';
@@ -18,6 +19,7 @@ export function MessagesTypesPage() {
   const [suggestion, setSuggestion] = useState(false);
   const messages = useMessagesTypes(archives);
   const { archiver } = useGestesMessages();
+  const [aArchiver, setAArchiver] = useState<{ id: string; nom: string } | null>(null);
   const liste = messages.data?.data ?? [];
   const actifs = liste.filter((m) => m.statut !== 'archive');
   const valides = actifs.filter((m) => m.statut === 'valide').length;
@@ -113,15 +115,19 @@ export function MessagesTypesPage() {
                     >
                       Ouvrir
                     </Link>
-                    <Button
-                      variant="ghost"
-                      aria-label={`${m.statut === 'archive' ? 'Désarchiver' : 'Archiver'} ${m.nom}`}
-                      iconLeft={m.statut === 'archive' ? <ArchiveRestore className="h-4 w-4" aria-hidden /> : <Archive className="h-4 w-4" aria-hidden />}
-                      loading={archiver.isPending && archiver.variables?.id === m.id}
-                      onClick={() => { archiver.mutate({ id: m.id, archive: m.statut !== 'archive' }); }}
-                    >
-                      {m.statut === 'archive' ? 'Désarchiver' : 'Archiver'}
-                    </Button>
+                    {m.statut === 'archive' ? (
+                      <span className="max-w-48 self-center text-xs text-slate-600">Archivé : ne peut pas être rétabli pour l’instant.</span>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        aria-label={`Archiver ${m.nom}`}
+                        iconLeft={<Archive className="h-4 w-4" aria-hidden />}
+                        loading={archiver.isPending && archiver.variables?.id === m.id}
+                        onClick={() => { archiver.reset(); setAArchiver({ id: m.id, nom: m.nom }); }}
+                      >
+                        Archiver
+                      </Button>
+                    )}
                   </span>
                 </li>
               ))}
@@ -129,6 +135,31 @@ export function MessagesTypesPage() {
           </>
         )}
       </div>
+      <Modal
+        open={aArchiver !== null}
+        onClose={() => { setAArchiver(null); }}
+        size="sm"
+        title="Archiver ce message ?"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setAArchiver(null); }}>Annuler</Button>
+            <Button
+              variant="destructive"
+              loading={archiver.isPending}
+              onClick={() => {
+                if (aArchiver !== null) archiver.mutate({ id: aArchiver.id, archive: true }, { onSuccess: () => { setAArchiver(null); } });
+              }}
+            >
+              Archiver le message
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-700">
+          <strong className="font-semibold text-slate-900">{aArchiver?.nom}</strong> ne servira plus dans les nouvelles campagnes. L’archivage ne peut pas être annulé pour l’instant.
+        </p>
+        {archiver.isError ? <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{messageErreur(archiver.error, 'L’archivage n’a pas abouti. Rien n’a changé : réessayez dans un instant.')}</p> : null}
+      </Modal>
     </div>
   );
 }

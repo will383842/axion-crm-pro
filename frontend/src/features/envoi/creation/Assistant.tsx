@@ -13,6 +13,7 @@ import { EtapeValidation } from './EtapeValidation';
 import { Recapitulatif } from './Recapitulatif';
 import { cibleDeContrat, contenuEtape, premierJourOuvre, saisieDepuis, SAISIE_INITIALE, type Saisie } from './saisie';
 import { creerBrouillon, enregistrerEtape, useContexte, useEstimation, useMessagesTypes, type Brouillon, type CibleProposee } from './api';
+import { messageErreur } from '../infrastructure/composants/format';
 import { heureDeParis, jourDeParis } from './outils';
 
 const DELAI_ENREGISTREMENT = 600;
@@ -42,6 +43,7 @@ export function Assistant({
   const [version, setVersion] = useState(0);
   const [enregistreA, setEnregistreA] = useState<string | null>(brouillonInitial ? heureDeParis(brouillonInitial.mis_a_jour_le) : null);
   const [brouillonId, setBrouillonId] = useState<string | null>(brouillonInitial?.id ?? null);
+  const [erreurSuite, setErreurSuite] = useState<string | null>(null);
   const [campagneId, setCampagneId] = useState<string | null>(brouillonInitial?.campagne_id ?? null);
 
   const saisieRef = useRef(saisie);
@@ -121,12 +123,20 @@ export function Assistant({
   }, [etape]);
 
   const aller = (n: number) => {
+    setErreurSuite(null);
     setEtape(n);
     setPlusLoin((p) => Math.max(p, n));
   };
   const avancer = async (de: number) => {
     await sauver(de);
     aller(de + 1);
+  };
+  /** « Continuer » des étapes 1 et 3 : si l'enregistrement échoue, on le dit au lieu de ne rien faire. */
+  const continuer = (de: number) => {
+    setErreurSuite(null);
+    void avancer(de).catch((e: unknown) => {
+      setErreurSuite(messageErreur(e, 'Le brouillon n’a pas pu être enregistré. Vous restez sur cette étape : réessayez dans un instant.'));
+    });
   };
 
   const accessible = bloquants !== null && bloquants === 0 ? 5 : Math.min(4, plusLoin);
@@ -145,8 +155,11 @@ export function Assistant({
       <Frise courante={etape} accessible={accessible} onAller={aller} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div ref={zoneEtape} tabIndex={-1} className="min-w-0 outline-none">
+          {erreurSuite !== null ? (
+            <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-800 ring-1 ring-rose-200">{erreurSuite}</p>
+          ) : null}
           {etape === 1 ? (
-            <EtapeCible saisie={saisie} modifier={modifier} cibles={cibles} brouillonId={brouillonId} suite={() => { void avancer(1).catch(() => undefined); }} />
+            <EtapeCible saisie={saisie} modifier={modifier} cibles={cibles} brouillonId={brouillonId} suite={() => { continuer(1); }} />
           ) : null}
           {etape === 2 ? (
             <EtapeMessage
@@ -161,7 +174,7 @@ export function Assistant({
             />
           ) : null}
           {etape === 3 ? (
-            <EtapeDepart saisie={saisie} modifier={modifier} restant={restant ?? 0} suite={() => { void avancer(3).catch(() => undefined); }} retour={() => { aller(2); }} />
+            <EtapeDepart saisie={saisie} modifier={modifier} restant={restant ?? 0} suite={() => { continuer(3); }} retour={() => { aller(2); }} />
           ) : null}
           {etape === 4 ? (
             <EtapeControles brouillonId={brouillonId} empreinte={String(version)} suite={() => { aller(5); }} retour={() => { aller(3); }} onBloquants={setBloquants} />

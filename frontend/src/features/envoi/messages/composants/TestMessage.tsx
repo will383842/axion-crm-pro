@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button, Modal } from '@/components/ui';
 import { CHAMP } from '../../creation/composants';
 import { envoyerTestMessage, useExemples } from '../../creation/api';
+import { messageErreur } from '../../infrastructure/composants/format';
 
 export function TestMessage({
   ouvert,
@@ -39,8 +40,8 @@ export function TestMessage({
         ...(exemple ? { destinataire_exemple_id: exemple } : {}),
       });
       onEnvoye(`Test envoyé à ${n} ${n > 1 ? 'adresses' : 'adresse'} de test. Personne d’autre n’a été contacté.`);
-    } catch {
-      onEnvoye('Le test n’a pas pu partir. Réessayez dans un instant.');
+    } catch (e) {
+      onEnvoye(messageErreur(e, 'Le test n’a pas pu partir. Réessayez dans un instant.'));
     } finally {
       setEnCours(false);
       onFermer();
@@ -65,7 +66,7 @@ export function TestMessage({
           <input type="checkbox" className="h-4 w-4 accent-[var(--color-produit)]" checked={aMoi} onChange={(e) => { setAMoi(e.target.checked); }} /> À moi
         </label>
         <label className="flex min-h-11 items-center gap-2 text-sm text-slate-900">
-          <input type="checkbox" className="h-4 w-4 accent-[var(--color-produit)]" checked={temoins} onChange={(e) => { setTemoins(e.target.checked); }} /> Aux boîtes témoins (4)
+          <input type="checkbox" className="h-4 w-4 accent-[var(--color-produit)]" checked={temoins} onChange={(e) => { setTemoins(e.target.checked); }} /> Aux boîtes témoins
         </label>
         {objetB !== null ? (
           <label className="flex min-h-11 items-center gap-2 text-sm text-slate-900">

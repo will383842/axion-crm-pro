@@ -123,7 +123,6 @@ export function EtapeCible({
         />
         <span>
           Revérifier les adresses vues il y a plus de 30 jours avant l’envoi
-          {e ? <span className="block text-xs text-slate-600">Environ {Math.round(e.restant * 0.12).toLocaleString('fr-FR')} adresses concernées.</span> : null}
         </span>
       </label>
 

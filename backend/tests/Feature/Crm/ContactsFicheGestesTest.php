@@ -22,7 +22,7 @@ uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
     Mail::fake();
-    config(['crm.console_v2' => true, 'crm.person_key.secret' => 'secret-de-test-g1e-0123456789abcdef']);
+    config(['crm.console_v2' => true, 'crm.person_key.secret' => str_repeat('g1e-', 10)]);
     $this->seed(PermissionsAndRolesSeeder::class);
     $this->espaceA = Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'ws-fg-a', 'name' => 'Espace A', 'settings' => []]);
     $this->espaceB = Workspace::create(['id' => (string) Str::uuid(), 'slug' => 'ws-fg-b', 'name' => 'Espace B', 'settings' => []]);

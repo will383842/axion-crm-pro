@@ -1270,12 +1270,28 @@ test('bloquant 1 : opposition inscrite entre la réservation et l\'injection => 
 test('bloquant 1 (variante) : STOP reçu sur UNE AUTRE inscription de la même adresse entre la réservation et l\'injection => zéro appel, refus opposition', function () {
     $email = 'stop2@zz-client.example.invalid';
     [$res, $espion, $i] = seqOppositionEntreReservationEtInjection($this, $email, function (string $i, int $c) {
+        // Même adresse, autre inscription : depuis P2-B la base refuse deux actives par adresse ; la seconde est donc TERMINÉE (cas réel).
         $sid2 = seqSequence($this);
-        $j = seqInscrire($this, $sid2, $c); // même adresse, autre inscription
+        $j = (string) Str::uuid();
+        DB::table('envoi_inscriptions')->insert(['id' => $j, 'sequence_id' => $sid2, 'statut' => 'terminee'] + (array) DB::table('envoi_inscriptions')->where('id', $i)->first());
         Inscriptions::tracer($this->ws, seqEtat($j), Evenement::STOP, $this->maintenant);
     });
     expect($res)->toBe(Sequenceur::REFUSE)->and($espion->appels)->toBe(0)
         ->and(seqMessages($i)[0]->statut)->toBe('refuse')->and(seqEtat($i)->statut)->toBe('arretee')
         ->and(seqEtat($i)->motif_arret)->toBe('garde:' . EligibiliteAdresse::OPPOSITION)
         ->and((new DepotSocleDb)->injectesLe($this->ws, JourEnvoi::de($this->maintenant)))->toBe(0);
+});
+
+test('P2-B : l\'ancienne forme (deux inscriptions ACTIVES de la même adresse dans l\'espace) est refusée par la base (23505)', function () {
+    $sid = seqSequence($this);
+    [, $contact] = seqFiche($this, 'dup@zz-client.example.invalid');
+    $i = seqInscrire($this, $sid, $contact);
+    $ligne = (array) DB::table('envoi_inscriptions')->where('id', $i)->first();
+    $code = null;
+    try {
+        DB::transaction(fn () => DB::table('envoi_inscriptions')->insert(['id' => (string) Str::uuid(), 'sequence_id' => seqSequence($this)] + $ligne));
+    } catch (QueryException $e) {
+        $code = (string) $e->getCode();
+    }
+    expect($code)->toBe('23505')->and(DB::table('envoi_inscriptions')->where('workspace_id', $this->ws)->where('statut', 'active')->count())->toBe(1);
 });

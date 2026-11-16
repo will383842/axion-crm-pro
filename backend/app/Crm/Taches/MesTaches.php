@@ -6,6 +6,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
+ * @phpstan-type Ligne array{id: int, title: string, due_at: string|null, done_at: string|null, payload: string, subject_type: string|null, subject_id: int|null}
+ *
  * « MES TÂCHES » (lot G2-A, cahier G1-G2 § 8) : lecture et écriture des tâches
  * de l'espace business pour l'utilisateur courant.
  *
@@ -48,7 +50,7 @@ final class MesTaches
             ['ws' => $workspaceId, 'moi' => $userId, 'seuil' => self::ts($seuil)],
         );
 
-        return self::projeter($workspaceId, $lignes, $maintenant);
+        return self::projeter($workspaceId, array_map(self::normaliser(...), array_values($lignes)), $maintenant);
     }
 
     /**
@@ -93,7 +95,7 @@ final class MesTaches
             ['ws' => $workspaceId, 'ref' => $ref],
         );
 
-        return ['tache' => $ligne === null ? null : self::projeter($workspaceId, [$ligne], $maintenant)[0], 'creee' => $cree > 0];
+        return ['tache' => $ligne === null ? null : self::projeter($workspaceId, [self::normaliser($ligne)], $maintenant)[0], 'creee' => $cree > 0];
     }
 
     /**
@@ -115,18 +117,39 @@ final class MesTaches
         if ($ligne === null) {
             return null;
         }
+        $ligne = self::normaliser($ligne);
 
-        if ($faite && $ligne->done_at === null) {
+        if ($faite && $ligne['done_at'] === null) {
             DB::table('activities')->where('workspace_id', $workspaceId)->where('id', $id)->where('kind', 'task')
                 ->update(['done_at' => self::ts($maintenant)]);
-            $ligne->done_at = self::ts($maintenant);
-        } elseif (! $faite && $ligne->done_at !== null) {
+            $ligne['done_at'] = self::ts($maintenant);
+        } elseif (! $faite && $ligne['done_at'] !== null) {
             DB::table('activities')->where('workspace_id', $workspaceId)->where('id', $id)->where('kind', 'task')
                 ->update(['done_at' => null]);
-            $ligne->done_at = null;
+            $ligne['done_at'] = null;
         }
 
         return self::projeter($workspaceId, [$ligne], $maintenant)[0];
+    }
+
+    /**
+     * Ligne SQL brute -> tableau typé (les colonnes lues sont celles du SELECT).
+     *
+     * @return Ligne
+     */
+    private static function normaliser(object $r): array
+    {
+        $texte = static fn (string $k): ?string => isset($r->{$k}) && is_scalar($r->{$k}) ? (string) $r->{$k} : null;
+
+        return [
+            'id' => (int) $texte('id'),
+            'title' => $texte('title') ?? '',
+            'due_at' => $texte('due_at'),
+            'done_at' => $texte('done_at'),
+            'payload' => $texte('payload') ?? '{}',
+            'subject_type' => $texte('subject_type'),
+            'subject_id' => $texte('subject_id') === null ? null : (int) $texte('subject_id'),
+        ];
     }
 
     /** Horodatage AVEC décalage : la session SQL est en Europe/Paris, un format nu serait lu comme heure de Paris. */
@@ -141,34 +164,34 @@ final class MesTaches
     }
 
     /**
-     * @param  list<object>  $lignes
+     * @param  list<Ligne>  $lignes
      * @return list<array<string,mixed>>
      */
     private static function projeter(string $workspaceId, array $lignes, CarbonImmutable $maintenant): array
     {
         $noms = self::nomsDesSujets($workspaceId, $lignes);
 
-        return array_map(function (object $l) use ($noms, $maintenant): array {
-            $payload = is_string($l->payload) ? (json_decode($l->payload, true) ?: []) : [];
+        return array_map(function (array $l) use ($noms, $maintenant): array {
+            $payload = json_decode($l['payload'], true);
             $payload = is_array($payload) ? $payload : [];
-            $due = $l->due_at === null ? null : CarbonImmutable::parse((string) $l->due_at)->setTimezone(self::FUSEAU);
+            $due = $l['due_at'] === null ? null : CarbonImmutable::parse($l['due_at'])->setTimezone(self::FUSEAU);
             $contexte = $payload['contexte'] ?? null;
             if (! is_string($contexte) || $contexte === '') {
-                $contexte = $l->subject_type === null ? null : ($noms[$l->subject_type . ':' . $l->subject_id] ?? null);
+                $contexte = $l['subject_type'] === null ? null : ($noms[$l['subject_type'] . ':' . $l['subject_id']] ?? null);
             }
             $origine = $payload['origine'] ?? 'manuelle';
             $genre = $payload['genre'] ?? 'tache';
 
             return [
-                'id' => (string) $l->id,
-                'titre' => (string) $l->title,
+                'id' => (string) $l['id'],
+                'titre' => $l['title'],
                 'contexte' => $contexte ?? '—',
                 'origine' => $origine === 'reponse' ? 'reponse' : 'manuelle',
                 'genre' => in_array($genre, ['rendez_vous', 'relance'], true) ? $genre : 'tache',
                 'echeance' => ($due ?? $maintenant->setTimezone(self::FUSEAU))->format('Y-m-d'),
                 'heure' => $due !== null && ($payload['avec_heure'] ?? false) === true ? $due->format('H:i') : null,
-                'faite' => $l->done_at !== null,
-                'faite_le' => $l->done_at === null ? null : CarbonImmutable::parse((string) $l->done_at)->utc()->format('Y-m-d\TH:i:s\Z'),
+                'faite' => $l['done_at'] !== null,
+                'faite_le' => $l['done_at'] === null ? null : CarbonImmutable::parse($l['done_at'])->utc()->format('Y-m-d\TH:i:s\Z'),
             ];
         }, $lignes);
     }
@@ -178,15 +201,15 @@ final class MesTaches
      * (jamais une par ligne). Chaque lecture porte `workspace_id` : une
      * entreprise ou un contact d'un autre espace n'est jamais joint.
      *
-     * @param  list<object>  $lignes
+     * @param  list<Ligne>  $lignes
      * @return array<string,string>
      */
     private static function nomsDesSujets(string $workspaceId, array $lignes): array
     {
         $ids = ['company' => [], 'personne' => [], 'contact' => []];
         foreach ($lignes as $l) {
-            if ($l->subject_id !== null && isset($ids[$l->subject_type])) {
-                $ids[$l->subject_type][] = (int) $l->subject_id;
+            if ($l['subject_id'] !== null && isset($ids[$l['subject_type']])) {
+                $ids[$l['subject_type']][] = $l['subject_id'];
             }
         }
 

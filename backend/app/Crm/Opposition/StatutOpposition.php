@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
  *  - `rgpd_requests` de l'espace, type `opposition`, ni refusée ni expirée (art. 21) ....... art21
  *  - `email_suppressions` (portée business) ................................................ liste_refus
  *  - `envoi_oppositions_registre` de l'espace : adresse, domaine (et parents), SIREN ....... liste_refus
+ *  - `personnes.opposition_at` non nul DE L'ESPACE (mise à l'écart, `MiseAEcart`, sans ligne `opt_out`) ... art21
+ *  - `opt_out` portée `lettre` (désabonnement de la lettre : bloque aussi tout courriel d'envoi) .......... stop
  *
  * Aucune écriture, aucun événement vers le site (anti-boucle : rien pour `site-sync:*`, `gdpr_erasure_bisystem`, ni
  * `metadata.origin=site-sync-gdpr`). Une opposition met à l'écart, elle n'efface rien.
@@ -84,6 +86,16 @@ final class StatutOpposition
             }
             foreach (DB::table('opt_out')->where('scope', 'business')->whereIn('email_hash', $hashs)->get(['email_hash', 'reason']) as $r) {
                 $parHash[(string) $r->email_hash][$r->reason === 'gdpr_art21' ? 'art21' : 'stop'] = true;
+            }
+            // P0 : désabonnement de la seule lettre. Même table que ci-dessus, autre portée ; MÊME absence de filtre d'espace
+            // (la table n'a pas de `workspace_id`). Index (scope, email_hash).
+            foreach (DB::table('opt_out')->where('scope', 'lettre')->whereIn('email_hash', $hashs)->pluck('email_hash') as $h) {
+                $parHash[(string) $h]['stop'] = true;
+            }
+            // P0 : personne mise à l'écart DE L'ESPACE (`MiseAEcart` ne pose aucune ligne `opt_out`). Index
+            // (workspace_id, email_hash). Aucune exception attrapée : une erreur de lecture fait échouer l'appelant.
+            foreach (DB::table('personnes')->where('workspace_id', $workspaceId)->whereNotNull('opposition_at')->whereIn('email_hash', $hashs)->pluck('email_hash') as $h) {
+                $parHash[trim((string) $h)]['art21'] = true;
             }
             foreach (DB::table('email_suppressions')->where('scope', 'business')->whereIn('email_hash', $hashs)->pluck('email_hash') as $h) {
                 $parHash[(string) $h]['liste_refus'] = true;

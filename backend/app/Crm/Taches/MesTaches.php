@@ -228,7 +228,7 @@ final class MesTaches
 
         $denominations = [];
         if ($ids['company'] !== []) {
-            foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereIn('id', array_unique($ids['company']))->get(['id', 'denomination']) as $r) {
+            foreach (DB::table('companies')->where('workspace_id', $workspaceId)->whereNull('deleted_at')->whereIn('id', array_unique($ids['company']))->get(['id', 'denomination']) as $r) {
                 $denominations[(int) $r->id] = (string) $r->denomination;
             }
         }

@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use App\Support\WorkspaceContext;
 use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -202,3 +203,18 @@ test('8. le service sous rôle applicatif ET propriétaire : même résultat pou
 
     expect($joue($this->contactA, ['last_name' => 'Durand'])['etat'])->toBe('ok');
 })->with(['app', 'proprio']);
+
+test('9. verrou optimiste : updated_at périmé → 409 sur PATCH et PUT, rien écrit ; updated_at courant ou absent → 200', function () {
+    $this->actingAs(cmActeur($this->espaceA->id, 'operator'));
+    $avant = cmLigne($this->contactA);
+    $perime = now()->subDays(3)->toIso8601String();
+
+    $this->patchJson("/api/v1/crm/contacts/{$this->contactA}", ['first_name' => 'Zed', 'updated_at' => $perime])
+        ->assertStatus(409)->assertJsonPath('error', 'version_conflict');
+    $this->putJson("/api/v1/contacts/{$this->contactA}", ['first_name' => 'Zed', 'updated_at' => $perime])
+        ->assertStatus(409)->assertJsonPath('error', 'version_conflict');
+    expect(cmLigne($this->contactA))->toBe($avant);
+
+    $this->patchJson("/api/v1/crm/contacts/{$this->contactA}", ['first_name' => 'Zed', 'updated_at' => Carbon::parse($avant['updated_at'])->toJSON()])->assertOk();
+    $this->patchJson("/api/v1/crm/contacts/{$this->contactA}", ['first_name' => 'Yan'])->assertOk();
+});

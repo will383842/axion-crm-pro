@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Contacts\GestesContact;
+use App\Http\Controllers\Concerns\VerrouOptimiste;
 use App\Models\Contact;
 use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\Gate;
 /** Gestes d'écriture « Contacts » de la console (lot G1-A : modifier). */
 class ContactsGestesController extends ConsoleController
 {
+    use VerrouOptimiste;
+
     public function modifier(Request $request, int|string $contactId): JsonResponse
     {
         // Défense en profondeur : la route porte déjà `permission:companies.update`.
@@ -30,6 +33,12 @@ class ContactsGestesController extends ConsoleController
         ]);
         if ($champs === []) {
             return response()->json(['error' => 'aucun_champ', 'message' => 'Aucun champ à modifier.'], 422);
+        }
+
+        // Verrou optimiste (G43-005) : `If-Match` ou `updated_at` périmé → 409 ; sans l'un ni l'autre, comme ailleurs, on passe.
+        $actuel = WorkspaceContext::run($workspaceId, fn () => Contact::query()->where('workspace_id', $workspaceId)->find((int) $contactId));
+        if ($actuel !== null) {
+            $this->refuserSiVersionPerimee($request, $actuel);
         }
 
         $r = WorkspaceContext::run($workspaceId, fn () => (new GestesContact)->modifier($workspaceId, (int) $contactId, $champs));

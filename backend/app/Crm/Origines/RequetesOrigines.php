@@ -249,7 +249,7 @@ final class RequetesOrigines
         $entreprises = array_values(array_unique(array_map('intval', $entreprises)));
         $contacts = array_values(array_unique(array_map('intval', $contacts)));
         // Un jeton hors forme ne correspond à rien (et ne peut pas casser le littéral de tableau).
-        $reseaux = array_values(array_filter($reseaux, static fn ($r): bool => is_string($r) && preg_match(self::JETON, $r) === 1 && ! str_contains($r, "\n")));
+        $reseaux = array_values(array_filter($reseaux, static fn (string $r): bool => preg_match(self::JETON, $r) === 1 && ! str_contains($r, "\n")));
         if ($reseaux === [] || ($entreprises === [] && $contacts === [])) {
             return $vide;
         }

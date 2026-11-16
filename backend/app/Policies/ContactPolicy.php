@@ -23,4 +23,10 @@ class ContactPolicy extends BasePolicy
     {
         return $user->hasPermissionTo('companies.create');
     }
+
+    /** Importer des contacts : même droit que l'ajout. */
+    public function importer(User $user): bool
+    {
+        return $user->hasPermissionTo('companies.create');
+    }
 }

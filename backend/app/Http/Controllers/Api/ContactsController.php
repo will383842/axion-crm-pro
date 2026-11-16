@@ -198,15 +198,18 @@ class ContactsController extends ApiController
      *
      *     @OA\Parameter(name="contact", in="path", required=true, @OA\Schema(type="integer")),
      *
-     *     @OA\Response(response=501, description="Not implemented"))
+     *     @OA\Response(response=204, description="Retiré (corbeille douce, restaurable)"))
      */
-    public function destroy(Contact $contact): JsonResponse
+    public function destroy(Request $r, Contact $contact): JsonResponse
     {
         // Constat B12-001 / F36-005 : la resolution de route rendait
         // l'enregistrement sans aucun filtre d'espace. 404, jamais 403 :
         // « interdit » confirmerait son existence.
         $this->refuserHorsEspace($contact);
 
-        return $this->notImplemented('5');
+        // G1-B : corbeille DOUCE (restaurable), jamais d'effacement. Droits et espace revérifiés par le geste.
+        $rep = app(ContactsGestesController::class)->retirer($r, $contact->id);
+
+        return $rep->isSuccessful() ? response()->json(null, 204) : $rep;
     }
 }

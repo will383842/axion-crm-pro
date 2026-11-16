@@ -287,3 +287,13 @@ test('12. un contact en corbeille n’est jamais proposé comme doublon (même a
     expect($this->getJson('/api/v1/crm/contacts/doublons?email=cora@example.test')->assertOk()->json('data'))->toBe([]);
     $this->postJson('/api/v1/crm/contacts', ajSaisie(['email' => 'cora@example.test']))->assertCreated();
 });
+
+test('13. fusionner vers une fiche dont l’entreprise est en corbeille → 404, fiche inchangée', function () {
+    $e2 = ajEntreprise($this->espaceA->id, '900000604', 'Gamma Test');
+    $vide = ajContact($this->espaceA->id, $e2, 'Vide', null, 'gamma@example.test');
+    DB::table('companies')->where('id', $e2)->update(['deleted_at' => now()]);
+    $avant = ajLigne($vide);
+    $this->actingAs(ajActeur($this->espaceA->id, 'operator'));
+    $this->postJson('/api/v1/crm/contacts', ajSaisie(['first_name' => 'Zed', 'email' => 'gamma@example.test', 'doublon' => 'fusionner', 'fusionner_avec' => $vide]))->assertNotFound();
+    expect(ajLigne($vide))->toBe($avant);
+});

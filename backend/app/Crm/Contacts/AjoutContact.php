@@ -240,7 +240,11 @@ final class AjoutContact
             return ['etat' => 'introuvable'];
         }
         // La fiche existante est aussi vérifiée (échec fermé) : on ne ravive pas une personne opposée.
-        $siren = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $cible->company_id)->value('siren');
+        $ligneCible = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $cible->company_id)->first(['id', 'siren', 'denomination', 'relation_type', 'lifecycle_stage', 'deleted_at']);
+        if ($ligneCible === null || $ligneCible->deleted_at !== null) {
+            return ['etat' => 'introuvable']; // entreprise absente ou en corbeille : rien n'est complété
+        }
+        $siren = $ligneCible->siren;
         $nomCible = (string) $cible->last_name;
         $v = $this->opposition($workspaceId, is_string($cible->email) ? $cible->email : null, is_string($siren) ? $siren : null, is_string($cible->first_name) ? $cible->first_name : null, $nomCible);
         if ($v['opposee']) {
@@ -285,8 +289,7 @@ final class AjoutContact
             'workspace_id' => $workspaceId, 'resource_type' => 'contact', 'resource_id' => $cibleId, 'provenance' => $provenance, 'fusion' => true,
         ]);
 
-        $ligneCible = DB::table('companies')->where('workspace_id', $workspaceId)->where('id', $cible->company_id)->first(['id', 'siren', 'denomination', 'relation_type', 'lifecycle_stage']);
-        $entrepriseCible = $ligneCible === null ? $entreprise : $this->versEntreprise($ligneCible);
+        $entrepriseCible = $this->versEntreprise($ligneCible);
 
         return ['etat' => 'fusionne', 'fiche' => $this->fiche($workspaceId, $cibleId, $entrepriseCible, $provenance, $v)];
     }

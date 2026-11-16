@@ -87,13 +87,13 @@ export function useEstimation(brouillonId: string | null, cible: Cible | null) {
   });
 }
 
-export function useChamps(cible: Cible | null, sequence: readonly EtapeSequence[], repli: Record<string, string>) {
+export function useChamps(cible: Cible | null, sequence: readonly EtapeSequence[], repli: Record<string, string>, brouillonId: string | null = null) {
   return useQuery({
-    queryKey: ['envoi', 'champs', cible, sequence, repli],
+    queryKey: ['envoi', 'champs', cible, sequence, repli, brouillonId],
     enabled: cible !== null && sequence.length > 0,
     placeholderData: (precedent) => precedent,
     queryFn: async () =>
-      (await api.post<{ champs: ChampUtilise[]; bloquants: number }>('/envoi/creation/champs', { cible, sequence, repli })).data,
+      (await api.post<{ champs: ChampUtilise[]; bloquants: number }>('/envoi/creation/champs', { cible, sequence, repli, ...(brouillonId === null ? {} : { brouillon_id: brouillonId }) })).data,
   });
 }
 

@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers\Envoi;
 
+use App\Envoi\Campagnes\SelectionRefusee;
+use App\Envoi\Creation\ApercuReel;
 use App\Envoi\Creation\AssistantCreation;
 use App\Envoi\Creation\ErreurCreation;
 use App\Envoi\Creation\ValidationCampagne;
 use App\Envoi\Exceptions\CampagneRefusee;
+use App\Envoi\Message\MessageRefuse;
 use App\Http\Controllers\Controller;
 use App\Support\AuditLogger;
 use Closure;
@@ -18,7 +21,7 @@ use Illuminate\Http\Request;
  */
 final class CreationController extends Controller
 {
-    public function __construct(private readonly AssistantCreation $assistant, private readonly ValidationCampagne $validation) {}
+    public function __construct(private readonly AssistantCreation $assistant, private readonly ValidationCampagne $validation, private readonly ApercuReel $apercuReel) {}
 
     public function creer(Request $r): JsonResponse
     {
@@ -65,12 +68,15 @@ final class CreationController extends Controller
         return $this->garde(fn () => response()->json($this->assistant->controles($this->ws($r), $this->assistant->lire($this->ws($r), $id))));
     }
 
-    /** L'aperçu réel dépend du moteur de rendu des messages (R10) : pas encore branché, réponse explicite. */
+    /** Aperçu RÉEL (F2a-2) : objet et corps de l'étape rendus pour 3 vrais destinataires de la cible. Lecture seule, aucune adresse rendue. */
     public function apercu(Request $r, string $id): JsonResponse
     {
-        return $this->garde(function () use ($r, $id): JsonResponse {
+        $etape = $r->validate(['etape' => ['required', 'integer', 'min:1', 'max:3']])['etape'];
+
+        return $this->garde(function () use ($r, $id, $etape): JsonResponse {
             $this->assistant->lire($this->ws($r), $id);
-            throw new ErreurCreation('apercu_non_branche', 'L\'aperçu réel n\'est pas encore disponible dans cette version.', 501);
+
+            return response()->json(['destinataires' => $this->apercuReel->rendre($this->ws($r), $id, (int) $etape)]);
         });
     }
 
@@ -127,7 +133,22 @@ final class CreationController extends Controller
 
     public function destinatairesExemples(Request $r): JsonResponse
     {
-        return response()->json(['data' => $this->assistant->destinatairesExemples($this->ws($r))]);
+        // F2a-2 : avec `brouillon_id`, les destinataires RETENUS de la cible (sans adresse, ni prénom ni organisation) ;
+        // sans, comportement historique inchangé (écran des messages types, qui n'a pas de brouillon).
+        $brouillon = $r->query('brouillon_id');
+        if (! is_string($brouillon) || $brouillon === '') {
+            return response()->json(['data' => $this->assistant->destinatairesExemples($this->ws($r))]);
+        }
+
+        return $this->garde(function () use ($r, $brouillon): JsonResponse {
+            $this->assistant->lire($this->ws($r), $brouillon);
+            $data = array_map(
+                static fn (array $e): array => ['id' => (string) $e['id'], 'libelle' => $e['libelle'], 'prenom' => null, 'organisation' => null],
+                $this->apercuReel->exemples($this->ws($r), $brouillon),
+            );
+
+            return response()->json(['data' => $data]);
+        });
     }
 
     private function ws(Request $r): string
@@ -161,6 +182,10 @@ final class CreationController extends Controller
             return $f();
         } catch (ErreurCreation $e) {
             return response()->json(['error' => $e->erreur, 'message' => $e->getMessage()], $e->statut);
+        } catch (SelectionRefusee $e) {   // échec fermé : aucune liste partielle, jamais le détail technique
+            return response()->json(['error' => $e->reessayable ? 'indisponible' : 'non_trouve', 'message' => $e->getMessage()], $e->reessayable ? 503 : 404);
+        } catch (MessageRefuse $e) {
+            return response()->json(['error' => 'contenu_refuse', 'message' => implode(' ', $e->motifs)], 422);
         } catch (CampagneRefusee $e) {
             return response()->json(['error' => match ($e->getCode()) {
                 404 => 'non_trouve', 409 => 'conflit', 503 => 'indisponible', default => 'validation'

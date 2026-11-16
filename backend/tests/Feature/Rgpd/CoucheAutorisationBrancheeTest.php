@@ -223,7 +223,6 @@ test('F36-001 — RECENSEMENT : toute ecriture authentifiee porte une permission
         // est câblé, cette garde le dira.
         'api/v1/cold-email{any?}',
         'api/v1/linkedin{any?}',
-        'api/v1/crm/bulk',
     ];
 
     $sansPermission = [];

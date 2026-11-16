@@ -167,6 +167,14 @@ function aigAdaptateur(string $ws, string $domaine, string $adaptateur): void
     WorkspaceContext::run($ws, fn () => DB::selectOne('SELECT envoi_domaine_adaptateur_changer(?, ?, ?, ?)', [$ws, $domaine, $adaptateur, 'auteur-test']));
 }
 
+function aigInjectionLocale(string $ws, string $adaptateur): string
+{
+    $id = (string) Str::uuid();
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_injections_locales')->insert(['workspace_id' => $ws, 'id_injection' => $id, 'cle_idempotence' => 'cle-' . $id, 'adaptateur' => $adaptateur]));
+
+    return $id;
+}
+
 function aigMessage(string $ws, string $domaine, string $cle = 'cle-1'): MessageAEnvoyer
 {
     return new MessageAEnvoyer($ws, 'dest@client.example.test', 'from@' . $domaine, 'Sujet', 'Corps', $cle);
@@ -452,12 +460,13 @@ test('etat(), sante(), reprise(), lireEvenements(), etatEnvoi() : sans les trois
 
 test('etat(), sante(), reprise(), lireEvenements(), etatEnvoi() : les trois conditions valent ⇒ l\'adaptateur répond (une fois) ; hors contexte ⇒ faux serveur', function (string $methode) {
     $m = aigMontage();
+    $id = aigInjectionLocale($m['ws'], 'kumo');
     $appel = fn () => match ($methode) {
         'etat' => $m['aig']->etat(),
         'sante' => $m['aig']->sante(),
         'reprise' => $m['aig']->reprise(),
         'lireEvenements' => $m['aig']->lireEvenements('c0'),
-        'etatEnvoi' => $m['aig']->etatEnvoi('id-1'),
+        'etatEnvoi' => $m['aig']->etatEnvoi($id),
     };
     $appel();
     expect($m['kumo']->appels)->toBe([$methode => 1]);
@@ -622,4 +631,45 @@ test('lecture : l\'infrastructure expose le champ adaptateur du domaine', functi
     $m = aigMontage('kumo', true, false, false);
     $d = app(LectureInfrastructure::class)->domaines($m['ws'])['data'][0];
     expect($d['adaptateur'])->toBe('kumo');
+});
+
+// ── A1 : fabriques par (espace, domaine), aucun cache ────────────────────────
+
+test('deux espaces sur kumo : chacun reçoit SON adaptateur (aucun cache entre espaces)', function () {
+    $recus = [];
+    $fabrique = function (string $ws, string $domaine) use (&$recus): ServeurEnvoi {
+        $recus[] = [$ws, $domaine];
+
+        return new AigDouble('kumo');
+    };
+    $faux = new FauxServeurEnvoi;
+    $aig = new AiguilleurServeurEnvoi($faux, ['kumo' => $fabrique], fn () => true, fn () => app(ListeFeuVert::class));
+    aigSimuler();
+    $domaines = [];
+    foreach (['zz-aig-a', 'zz-aig-b'] as $slug) {
+        $ws = F::espace($slug);
+        $d = $slug . '.example.test';
+        DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => $d, 'achete_le' => '2026-01-01']);
+        aigAdaptateur($ws, $d, 'kumo');
+        aigDecider($ws, 'accorde');
+        aigDns($ws, $d);
+        $domaines[$ws] = $d;
+    }
+    foreach ($domaines as $ws => $d) {
+        WorkspaceContext::set($ws);
+        expect($aig->injecter(aigMessage($ws, $d, 'cle-' . $ws))->accepte)->toBeTrue();
+    }
+    expect($recus)->toBe(array_map(fn ($ws, $d) => [$ws, $d], array_keys($domaines), array_values($domaines)));
+});
+
+test('etatEnvoi d\'une injection smtp interroge smtp même si kumo est actif ; id inconnu ou non UUID ⇒ Inconnu, aucun adaptateur', function () {
+    $m = aigMontage('kumo');
+    aigAdaptateur($m['ws'], $m['domaine'], 'smtp'); // le domaine porte smtp : smtp et kumo ne peuvent pas être tous deux actifs ici
+    $id = aigInjectionLocale($m['ws'], 'smtp');
+    $idKumo = aigInjectionLocale($m['ws'], 'kumo');
+    expect($m['aig']->etatEnvoi($id))->toBe(EtatMessage::Inconnu)
+        ->and($m['smtp']->appels)->toBe(['etatEnvoi' => 1])->and($m['kumo']->total())->toBe(0);
+    expect($m['aig']->etatEnvoi($idKumo))->toBe(EtatMessage::Inconnu)->and($m['kumo']->total())->toBe(0); // kumo n'est pas actif (aucun domaine kumo) : jamais deviné
+    expect($m['aig']->etatEnvoi((string) Str::uuid()))->toBe(EtatMessage::Inconnu)->and($m['aig']->etatEnvoi('pas-un-uuid'))->toBe(EtatMessage::Inconnu)
+        ->and($m['smtp']->total())->toBe(1);
 });

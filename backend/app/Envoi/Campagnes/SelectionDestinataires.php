@@ -471,10 +471,10 @@ final class SelectionDestinataires
             $rgpd = [];
             if ($formes !== []) {
                 foreach (DB::select(
-                    "SELECT DISTINCT lower(subject_email::text) AS adresse FROM rgpd_requests WHERE workspace_id = ? AND status IN ('pending','processing') AND subject_email = ANY(?::citext[])",
+                    "SELECT DISTINCT subject_email::text AS adresse FROM rgpd_requests WHERE workspace_id = ? AND status IN ('pending','processing') AND subject_email = ANY(?::citext[])",
                     [$ws, self::tableau(array_values(array_unique($formes)))],
                 ) as $r) {
-                    $rgpd[(string) $r->adresse] = true;
+                    $rgpd[mb_strtolower((string) $r->adresse)] = true; // subject_email est CITEXT : la casse est déjà ignorée par la base
                 }
             }
             $console = $normalisees === [] ? [] : GardeConsoleClient::exclues($ws, $normalisees);

@@ -32,8 +32,6 @@ class RgpdVerificationsEnAttente extends Command
     public function handle(): int
     {
         $heures = max(1, (int) $this->option('heures'));
-        $limite = now()->subHours($heures);
-
         $enRetard = [];
         foreach (DB::table('workspaces')->pluck('id')->all() as $espace) {
             $ids = WorkspaceContext::run((string) $espace, static fn (): array => DB::table('rgpd_requests')
@@ -41,7 +39,10 @@ class RgpdVerificationsEnAttente extends Command
                 ->where('type', 'erasure')
                 ->where('status', 'processing')
                 ->whereRaw("metadata->>'verification' IN ('en_attente', 'echec')")
-                ->where('updated_at', '<', $limite)
+                // Seuil calculé PAR POSTGRES : lié en `Y-m-d H:i:s` sans décalage,
+                // un `Carbon` serait relu à l'heure murale de la session, ambiguë
+                // pendant l'heure doublée du passage à l'heure d'hiver.
+                ->whereRaw("updated_at < now() - (? * interval '1 hour')", [$heures])
                 ->orderBy('id')
                 ->pluck('id')
                 ->map(static fn ($id): int => (int) $id)

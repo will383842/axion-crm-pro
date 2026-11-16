@@ -57,6 +57,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000121_envoi_reponses_classements.php',
     // Filet modifié : pourquoi — envoi R12 : canal d'opposition `reponse` (CHECK élargi NOT VALID, aucune donnée touchée) ; la retirer fausserait le registre ; down() inerte, up() rejouable.
     '2026_12_02_000122_envoi_oppositions_canal_reponse.php',
+    // Filet modifié : pourquoi — VERDICTS : colonne motif nullable + CHECK NOT VALID ; la retirer effacerait le pourquoi des verdicts ; down() inerte, up() rejouable.
+    '2026_12_05_000500_envoi_verdicts_adresse_motif.php',
     '2026_11_10_000063_envoi_echecs_releve.php',
     '2026_11_10_000064_envoi_messages_envoyes.php',
     // Envoi K13 : contrôles de listes noires, ajout seul (trigger), down() inerte.

@@ -14,6 +14,8 @@ const ROLE: Record<EnregistrementDns['role'], string> = {
   mta_sts: 'MTA-STS et rapports TLS',
   helo: 'Nom du serveur (HELO)',
   tls_rpt: 'Rapports TLS',
+  bounce_mx: 'Rebonds : MX',
+  bounce_spf: 'Rebonds : SPF',
 };
 
 export function dnsVerts(dns: EnregistrementDns[]): number {

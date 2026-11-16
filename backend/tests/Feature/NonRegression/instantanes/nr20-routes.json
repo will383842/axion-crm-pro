@@ -108,6 +108,7 @@
     "OPTIONS /api/v1/cold-email{any?} | api,auth,first-login,workspace",
     "OPTIONS /api/v1/linkedin{any?} | api,auth,first-login,workspace",
     "PATCH /api/v1/cold-email{any?} | api,auth,first-login,workspace",
+    "PATCH /api/v1/crm/contacts/{contactId} | api,auth,crm-console,first-login,permission,workspace",
     "PATCH /api/v1/crm/taches/{id} | api,auth,crm-console,first-login,permission,workspace",
     "PATCH /api/v1/evenements/{event}/demarche | api,auth,first-login,permission,workspace",
     "PATCH /api/v1/federations/{federation}/demarche | api,auth,first-login,permission,workspace",

@@ -14,8 +14,7 @@ canal des retours. Elle n'envoie aucun message. Interrupteurs : `ENVOI_REEL_ACTI
 - Elles se complètent. Éteindre la seconde ne coupe pas la première, mais plus personne ne lit les seuils.
 
 ## Couplage avec l'ADR K0 (homme mort)
-L'ADR veut qu'un serveur sans appel `sante` signé pendant 15 minutes soit mis en pause. Tant que la route `/v1/sante` n'existe pas côté
-passerelle (dette K2-suite), allumer la supervision mettrait les files en pause : `ENVOI_SANTE_ACTIF` est donc faux par défaut. Garde-fou :
+L'ADR veut qu'un serveur sans appel `sante` signé pendant 15 minutes soit mis en pause. La route `/v1/sante` existe côté passerelle (C2-1) mais `file_age_s` et `tunnel_ok` restent absents (lot C4) ; allumer la supervision mettrait les files en pause : `ENVOI_SANTE_ACTIF` est donc faux par défaut. Garde-fou :
 si `ENVOI_REEL_ACTIF` **et** `ENVOI_K1_ACTIF` sont vrais alors que `ENVOI_SANTE_ACTIF` est faux, la configuration est signalée : journal
 critique au démarrage (`CouplageSante`), alerte du Socle, et la commande planifiée **échoue** au lieu de rester « inerte ».
 
@@ -57,7 +56,7 @@ posés dans la migration `2026_11_13_000150_envoi_sante.php` avant sa première 
 Index couvrants sur `(workspace_id, source, mesure_le)` pour `max`/`min(mesure_le)` (le second restreint aux relevés réussis).
 
 ## Dettes nommées
-- **K2-suite** : route `GET /v1/sante` côté passerelle (calcul de `file_age_s`, pourcentage mémoire sans division par zéro) et `401` signé `horloge_hors_fenetre`.
+- **K2-suite** : *(route `GET /v1/sante` et `401` signé `horloge_hors_fenetre` livrés en C2-1 ; reste `file_age_s` et `tunnel_ok`, lot C4.)*
 - **K15-D1** : *(livré dans cette PR : canal des retours muet 2 h en campagne, constat `retours_muets`.)*
 - **K15-D4** (M4) : un espace sans serveur actif n'a ni constat DNS ni constat de listes noires (la supervision est tenue par serveur).
 - **Contrat de `GET /api/v1/envoi/sante`** : la forme de la réponse est celle de `backend/openapi/envoi/pilotage.yaml` (calculée par `App\Envoi\Sante\VueSante`) ; ce document ne la décrit plus.

@@ -51,6 +51,16 @@ final class FauxResolveurDnsR15 implements ResolveurDns
         return $this->ptr[$ip] ?? [];
     }
 
+    /** @var array<string, list<string>> */
+    public array $mx = [];
+
+    public function mx(string $nom): array
+    {
+        $this->appels++;
+
+        return $this->mx[$nom] ?? [];
+    }
+
     public function politiqueMtaSts(string $domaine): ?string
     {
         $this->appels++;
@@ -116,6 +126,11 @@ test('POST /envoi/domaines : domaine et flux enregistrés, plan DNS rendu, aucun
         expect(ContratOpenApiEnvoi::ecarts('infrastructure.yaml', 'EnregistrementDns', $ligne))->toBe([]);
     }
     expect(ContratOpenApiEnvoi::ecarts('commun.yaml', 'DomaineResume', $j['domaine']))->toBe([]);
+    // C1-3 : le domaine de rebond est exposé (MX + SPF), en modèles à jetons.
+    $rebonds = array_values(array_filter($j['dns'], fn ($l) => str_starts_with($l['role'], 'bounce_')));
+    expect(array_column($rebonds, 'role'))->toBe(['bounce_mx', 'bounce_spf'])
+        ->and(array_column($rebonds, 'nom'))->toBe(['bounce.xn--bcher-fictif-r15-jzb.fr', 'bounce.xn--bcher-fictif-r15-jzb.fr'])
+        ->and(array_column($rebonds, 'valeur'))->toBe(['10 {HOTE_RECEPTION_REBONDS}.', 'v=spf1 ip4:{IP_ENVOI} -all']);
     // Modèles à jetons : jamais d'adresse réelle ni de clé.
     expect($r->getContent())->toContain('{IP_ENVOI}')->and($r->getContent())->not->toMatch('/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/');
 });
@@ -186,10 +201,12 @@ test('POST dns/verifier : ControleurDns avec le résolveur faux ; date de vérif
             $nom => ['v=spf1 ip4:192.0.2.10 -all'],
             's1._domainkey.' . $nom => ['v=DKIM1; k=rsa; p=' . base64_encode(str_repeat('k', 300))],
             '_dmarc.' . $nom => ['v=DMARC1; p=none; rua=mailto:rapports@' . $nom],
+            'bounce.' . $nom => ['v=spf1 ip4:192.0.2.10 -all'],
         ],
         a: ['mail.' . $nom => ['192.0.2.10']],
         ptr: ['192.0.2.10' => ['mail.' . $nom]],
     );
+    $faux->mx['bounce.' . $nom] = ['reception.rebonds.example.test'];
     $this->app->instance(ResolveurDns::class, $faux);
     $r = $this->actingAs($s['owner'])->postJson('/api/v1/envoi/domaines/' . $s['domaine'] . '/dns/verifier')->assertOk();
     expect($faux->appels)->toBeGreaterThan(0)->and($r->json('pret'))->toBeTrue();

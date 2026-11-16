@@ -69,7 +69,6 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/doublons/fusions/{p}/annuler',
   'GET /api/v1/crm/contacts/corbeille',
   'GET /api/v1/crm/contacts/doublons',
-  'PATCH /api/v1/crm/contacts/{p}',
   'POST /api/v1/crm/contacts',
   'POST /api/v1/crm/contacts/export',
   'POST /api/v1/crm/contacts/import',

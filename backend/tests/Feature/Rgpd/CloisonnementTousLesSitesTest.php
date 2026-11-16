@@ -155,9 +155,13 @@ test('B12-001 — ECRIRE sur un contact d un autre espace est refuse', function 
     // 🔴 Le jour où `I48-001` sera réparé, ce témoin rougira. C'est voulu : il
     // faudra alors vérifier que la garde d'espace tient toujours devant une
     // route qui, elle, fait enfin quelque chose.
+    //
+    // G1-A (cahier #619) : `update()` n'est plus un bouchon. ALPHA modifie SA fiche (200) ;
+    // BETA reste refusé en 404 plus haut (garde d'espace inchangée, fiche relue intacte).
     $this->actingAs($alpha)
         ->putJson('/api/v1/contacts/' . $contact, ['first_name' => 'Jeanne'])
-        ->assertStatus(501);
+        ->assertOk();
+    expect(DB::table('contacts')->where('id', $contact)->value('first_name'))->toBe('Jeanne');
 });
 
 test('B12-001 — une etiquette d un autre espace n est ni modifiable ni supprimable', function () {

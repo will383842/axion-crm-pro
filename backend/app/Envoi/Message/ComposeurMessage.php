@@ -118,7 +118,6 @@ final class ComposeurMessage
             'Content-Type' => 'multipart/alternative; boundary="' . $boundary . '"',
             'List-Unsubscribe' => '<' . $d->urlDesinscription . '>, <' . $d->mailtoDesinscription . '>',
             'List-Unsubscribe-Post' => 'List-Unsubscribe=One-Click',
-            'X-Envoi-Jeton' => $d->jetonEnvoi,
         ];
         if ($d->inReplyTo !== null) {
             $entetes['In-Reply-To'] = $d->inReplyTo;

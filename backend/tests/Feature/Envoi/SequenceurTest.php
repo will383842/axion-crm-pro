@@ -930,7 +930,7 @@ test('B1 : l\'injection a lieu HORS de toute transaction du séquenceur ; la ré
     expect((int) $etat->etape_courante)->toBe(2)                 // une seule avance
         ->and(count(seqMessages($ins)))->toBe(1)
         ->and(seqMessages($ins)[0]->statut)->toBe('envoye')
-        ->and(seqMessages($ins)[0]->id_injection)->toBe('id-b1');
+        ->and(seqMessages($ins)[0]->id_injection_serveur)->toBe('id-b1')->and(seqMessages($ins)[0]->id_injection)->toMatch('/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/');
 });
 
 test('B1 : refus net, report ou issue incertaine du serveur => l\'étape n\'avance pas ; incertain = message gardé « reserve », inscription arrêtée, alerte APRÈS le COMMIT', function () {
@@ -1202,7 +1202,7 @@ test('ligne « reserve » ancienne reprise par le rejeu : message ACCEPTÉ mais 
 
     expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ENVOYE)
         ->and($espion->appels)->toBe(1) // jamais renvoyé
-        ->and(seqMessages($i)[0]->statut)->toBe('envoye')->and(seqMessages($i)[0]->id_injection)->toBe('id-perdu');
+        ->and(seqMessages($i)[0]->statut)->toBe('envoye')->and(seqMessages($i)[0]->id_injection_serveur)->toBe('id-perdu')->and(seqMessages($i)[0]->id_injection)->toMatch('/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/');
 });
 
 test('audit 4 : reprise après plantage, message DÉJÀ accepté puis garde fermée entre-temps => conclu « envoyé » (jamais « refuse »), puis inscription arrêtée', function () {
@@ -1219,7 +1219,7 @@ test('audit 4 : reprise après plantage, message DÉJÀ accepté puis garde ferm
 
     expect(seqViaPasserelle($this, $espion)->traiter($this->ws, $i, $this->maintenant))->toBe(Sequenceur::ARRETEE)
         ->and($espion->appels)->toBe(1)
-        ->and(seqMessages($i)[0]->statut)->toBe('envoye')->and(seqMessages($i)[0]->id_injection)->toBe('id-parti')
+        ->and(seqMessages($i)[0]->statut)->toBe('envoye')->and(seqMessages($i)[0]->id_injection_serveur)->toBe('id-parti')->and(seqMessages($i)[0]->id_injection)->toMatch('/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/')
         ->and(seqEtat($i)->statut)->toBe('arretee');
 });
 

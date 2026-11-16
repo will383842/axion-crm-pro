@@ -107,8 +107,10 @@ test('C1-0 garde de source : additives, aucun DROP/DELETE/UPDATE de données, do
         ->and(preg_match('~function down\(\): void \{\}~', $idx))->toBe(1);
 });
 
-test('C1-0 l\'ajout ne touche à aucun code applicatif de l\'envoi (migration seule)', function () {
-    foreach (['Sequence/Sequenceur.php', 'Contrat/MessageAEnvoyer.php', 'Message/ComposeurMessage.php'] as $f) {
+test('C1-0 puis C1-1 : seuls le séquenceur et le message portent id_injection_serveur ; aucun adaptateur ni serveur n\'est touché (cahier §1.9)', function () {
+    // C1-1 (cette PR) écrit la colonne dans le séquenceur : le garde de C1-0 « aucun code applicatif » devient, en plus strict, « aucun adaptateur ».
+    expect((string) file_get_contents(app_path('Envoi/Sequence/Sequenceur.php')))->toContain('id_injection_serveur');
+    foreach (['Serveur/ServeurEnvoiKumo.php', 'Serveur/Kumo/TransportSmtpTunnel.php', 'PasserelleLocale.php', 'Simulateur/FauxServeurEnvoi.php', 'Imap/Verp.php', 'Message/ComposeurMessage.php'] as $f) {
         expect((string) file_get_contents(app_path('Envoi/' . $f)))->not->toContain('id_injection_serveur');
     }
 });

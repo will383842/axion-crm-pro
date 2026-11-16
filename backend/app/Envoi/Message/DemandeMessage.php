@@ -28,6 +28,7 @@ final class DemandeMessage
         public readonly string $sujet,
         public readonly string $texte,
         public readonly string $html,
+        /** Contrôlé (forme) mais n'est plus émis dans le message (C1, décision E2 : aucun en-tête X-Envoi-*). */
         public readonly string $jetonEnvoi,
         public readonly string $urlDesinscription,
         public readonly string $mailtoDesinscription,

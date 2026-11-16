@@ -97,9 +97,9 @@ it('pose List-Unsubscribe https ET mailto et le One-Click', function () {
         ->and($h['list-unsubscribe-post'])->toBe('List-Unsubscribe=One-Click');
 });
 
-it('pose X-Envoi-Jeton', function () {
+it('n\'émet aucun en-tête X-Envoi-* (C1, décisions E2/E6)', function () {
     [$h] = l2Analyse(l2Composeur()->composer(l2Demande()));
-    expect($h['x-envoi-jeton'])->toBe('jeton-test-12345');
+    expect(array_filter(array_keys($h), fn (string $nom): bool => str_starts_with(strtolower($nom), 'x-envoi')))->toBe([]);
 });
 
 it('encode le sujet accentué en RFC 2047', function () {

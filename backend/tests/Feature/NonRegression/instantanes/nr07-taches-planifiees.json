@@ -300,6 +300,16 @@
         "sauts": 1
     },
     {
+        "tache": "envoi:verdicts:rafraichir",
+        "horaire": "17 * * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 30,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 1,
+        "sauts": 1
+    },
+    {
         "tache": "journalists:scrape-ours --editorial --limit=300",
         "horaire": "40 5 * * *",
         "fuseau": "Europe/Paris",

@@ -30,8 +30,8 @@ foreach (getallheaders() ?: [] as $k => $v) {
 }
 $chemin = $_SERVER['REQUEST_URI'] ?? '/';
 // Base ouverte à la demande, DANS le try de Passerelle::traiter() : une base illisible donne un 500 propre.
-$stockage = static fn (): Stockage => new Stockage(getenv('PASSERELLE_BASE') ?: '/var/lib/passerelle/passerelle.sqlite', static fn (): int => time());
 $base = getenv('PASSERELLE_BASE') ?: '/var/lib/passerelle/passerelle.sqlite';
+$stockage = static fn (): Stockage => new Stockage($base, static fn (): int => time());
 $mesureur = new MesureurSysteme(dirname($base), getenv('PASSERELLE_CERTIFICAT') ?: null);
 $rep = (new Passerelle($stockage, new KumoInactif, Configuration::cles(), null, null, null, $mesureur))
     ->traiter(new Requete($_SERVER['REQUEST_METHOD'] ?? 'GET', $chemin, (string) file_get_contents('php://input'), $entetes));

@@ -43,8 +43,8 @@ de requête » signée est vide), réponse signée liée au nonce, `workspace_id
 | Champ | Type et unité | Plage acceptée par le CRM | Qui le calcule |
 | --- | --- | --- | --- |
 | `file_age_s` | entier, secondes | 0 à 31 536 000 | la passerelle : `maintenant − date du plus ancien message en file` (0 si la file est vide) |
-| `disque_libre_pct` | nombre, % | 0 à 100 | la passerelle : octets libres du volume des files / octets totaux × 100 |
-| `memoire_libre_pct` | nombre, % | 0 à 100 | la passerelle : mémoire disponible / `memory_limit`. **`memory_limit` peut valoir 0 ou −1 (illimitée) : la division est interdite, la clé est alors OMISE (ou `null`), jamais 0, NaN ni INF.** |
+| `disque_libre_pct` | nombre, % | 0 à 100 | la passerelle : octets libres du volume du dossier de la base / octets totaux × 100 |
+| `memoire_libre_pct` | nombre, % | 0 à 100 | la passerelle : `MemAvailable` / `MemTotal` de `/proc/meminfo`, × 100. **Si `MemTotal` est nul ou illisible : la division est interdite, la clé est alors OMISE (ou `null`), jamais 0, NaN ni INF.** |
 | `certificat_jours` | entier, jours entiers restants avant l'échéance du plus proche certificat (TLS du serveur ou client) | −36 500 à 36 500 (négatif = expiré) | la passerelle |
 | `tunnel_ok` | booléen | — | la passerelle : le lien d'administration répond |
 | `ntp_synchro` | booléen | — | la passerelle : l'horloge est synchronisée (NTP) |

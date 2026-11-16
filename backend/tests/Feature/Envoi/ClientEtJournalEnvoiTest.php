@@ -562,3 +562,51 @@ test('K7 : le drapeau « observation » de la passerelle est conservé par K1 (f
     $lot = app(TireurEvenements::class)->tirer($this->ws, 'srv1', '0', 10, new DateTimeImmutable('-1 hour'));
     expect(array_map(fn ($e) => $e->observation, $lot->evenements))->toBe([true, false, false]);
 });
+
+/** E4 : ids rejouables (commande_id) pour l'espace de test, dans l'ordre de rejeu. */
+function envoiRejouables(string $ws): array
+{
+    return array_column(app(JournalCommandes::class)->nonAcquittees($ws, 50), 'commande_id');
+}
+
+test('E4 : pause non acquittée suivie d’une reprise acquittée => la pause n’est pas rejouée', function () {
+    $j = app(JournalCommandes::class);
+    [$p, $r] = [envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $p, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $r, 'reprise', 'srv1');
+    $j->acquitter($this->ws, $r);
+
+    expect(envoiRejouables($this->ws))->toBe([]);
+});
+
+test('E4 : pause acquittée, reprise non acquittée, pause non acquittée => seule la dernière pause est rejouée', function () {
+    $j = app(JournalCommandes::class);
+    [$p1, $r, $p2] = [envoiCmd(), envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $p1, 'pause', 'srv1');
+    $j->acquitter($this->ws, $p1);
+    $j->enregistrer($this->ws, $r, 'reprise', 'srv1');
+    $j->enregistrer($this->ws, $p2, 'pause', 'srv1');
+
+    expect(envoiRejouables($this->ws))->toBe([$p2]);
+});
+
+test('E4 : un retrait non acquitté est TOUJOURS rejoué, même suivi d’une pause ou d’une reprise', function () {
+    $j = app(JournalCommandes::class);
+    [$x, $p, $r] = [envoiCmd(), envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $x, 'retrait', 'srv1');
+    $j->enregistrer($this->ws, $p, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $r, 'reprise', 'srv1');
+
+    expect(envoiRejouables($this->ws))->toBe([$x, $r]);
+});
+
+test('E4 : le filtre est propre à la source et le journal reste en ajout seul', function () {
+    $j = app(JournalCommandes::class);
+    [$a, $b] = [envoiCmd(), envoiCmd()];
+    $j->enregistrer($this->ws, $a, 'pause', 'srv1');
+    $j->enregistrer($this->ws, $b, 'reprise', 'srv2');
+    $avant = WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->count());
+
+    expect(envoiRejouables($this->ws))->toBe([$a, $b]);
+    expect(WorkspaceContext::run($this->ws, fn () => DB::table('envoi_journal_commandes')->count()))->toBe($avant);
+});

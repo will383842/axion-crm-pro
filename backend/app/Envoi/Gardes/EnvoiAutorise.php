@@ -4,12 +4,14 @@ namespace App\Envoi\Gardes;
 
 use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\Segments;
+use App\Crm\Opposition\StatutOpposition;
 use App\Crm\Personnes\NatureEmail;
 use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Envoi\ListesNoires\GardeListes;
 use App\Socle\Espace\FonctionsEspace;
 use App\Support\EligibiliteCampagne;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use DateTimeInterface;
 use DateTimeZone;
@@ -73,6 +75,12 @@ final class EnvoiAutorise
     public const IP_LISTE_NOIRE = 'ip_envoi_sur_liste_noire';
 
     public const OPPOSITION_REGISTRE = 'opposition_registre_manuel';
+
+    public const OPPOSITION_ART21 = 'opposition_art21';
+
+    public const OPPOSITION_STOP = 'opposition_stop';
+
+    public const OPPOSITION_LISTE_REFUS = 'opposition_liste_refus';
 
     public const DATE_FUTURE = 'date_de_collecte_dans_le_futur';
 
@@ -179,12 +187,39 @@ final class EnvoiAutorise
         if (($m = self::garderSegment($d)) !== null) {
             return new VerdictEnvoi($m, $alertes);
         }
-        // R13, TOUJOURS EN DERNIER (durcissement seul) : domaine ou organisation inscrits au registre d'opposition manuel.
+        // R13 : domaine ou organisation inscrits au registre d'opposition manuel (durcissement seul).
         if (RegistreOppositionManuel::refuse($d->workspaceId, $d->email, $d->siren)) {
             return new VerdictEnvoi(self::OPPOSITION_REGISTRE, $alertes);
         }
+        // X7/B10, TOUJOURS EN DERNIER : oppositions art. 21 (`rgpd_requests`), STOP et liste de refus. Placée après R13 pour que
+        // les motifs rendus jusqu'ici restent identiques. Fermée en cas d'erreur : aucune exception n'est attrapée.
+        if (($m = self::garderOppositions($d)) !== null) {
+            return new VerdictEnvoi($m, $alertes);
+        }
 
         return new VerdictEnvoi(null, $alertes);
+    }
+
+    /**
+     * Relit, AU DÉPART, ce que le filtre de création de campagne lit déjà (`StatutOpposition`, lecture seule) : demande
+     * d'opposition art. 21 en cours, STOP, liste de refus. Le contexte d'espace est posé ICI : sous le rôle applicatif, la
+     * RLS cache `rgpd_requests` et le reste sans lui. Aucune exception attrapée : une erreur de lecture fait échouer
+     * `verifier`, donc rien ne part.
+     */
+    private static function garderOppositions(DemandeEnvoi $d): ?string
+    {
+        $statut = WorkspaceContext::run($d->workspaceId, fn () => app(StatutOpposition::class)->pourLignes(
+            $d->workspaceId,
+            [0 => ['email' => $d->email, 'siren' => $d->siren]],
+        ));
+        $motifs = $statut[0]['motifs'] ?? [];
+
+        return match (true) {
+            in_array('art21', $motifs, true) => self::OPPOSITION_ART21,
+            in_array('stop', $motifs, true) => self::OPPOSITION_STOP,
+            in_array('liste_refus', $motifs, true) => self::OPPOSITION_LISTE_REFUS,
+            default => null,
+        };
     }
 
     /**

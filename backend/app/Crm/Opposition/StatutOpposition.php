@@ -33,24 +33,33 @@ final class StatutOpposition
     public function pourLignes(string $workspaceId, array $lignes): array
     {
         $sortie = [];
-        $empreintes = []; // empreinte d'adresse => true
-        $adresses = [];   // adresse normalisée => true
+        $empreintes = []; // empreinte d'adresse (toutes variantes) => true
+        $adresses = [];   // adresse normalisée (toutes variantes) => true
         $registre = [];   // empreinte (adresse, domaines, SIREN) => true
-        $cles = [];       // clé => ['h' => empreinte adresse|null, 'cles' => list<[portee, empreinte]>, 'a' => adresse|null]
+        $cles = [];       // clé => ['h' => list<empreinte>, 'a' => list<adresse>, 'registre' => list<[portee, empreinte]>]
 
         foreach ($lignes as $cle => $l) {
             $sortie[$cle] = self::SANS;
-            $adresse = is_string($l['email'] ?? null) ? mb_strtolower(trim($l['email'])) : '';
+            $brute = is_string($l['email'] ?? null) ? $l['email'] : '';
             $siren = is_string($l['siren'] ?? null) ? (string) preg_replace('/\s+/', '', $l['siren']) : '';
             $registreLigne = [];
-            $h = null;
-            if ($adresse !== '') {
-                $h = ListeSuppression::empreinte($adresse);
-                $empreintes[$h] = true;
-                $adresses[$adresse] = true;
-                $registreLigne[] = ['adresse', $h];
-                foreach (self::domainesEtParents($adresse) as $d) {
-                    $registreLigne[] = ['domaine', RegistreOppositionManuel::empreinte($d)];
+            $h = [];
+            $a = [];
+            if (mb_strtolower(trim($brute)) !== '') {
+                // M5 : l'adresse sous TOUTES ses formes (point final, alias +, espaces Unicode, IDN). `ListeSuppression::empreinte`
+                // reste la seule source d'empreinte, appelée sur chaque forme.
+                foreach (FormesAdresse::variantes($brute) as $forme) {
+                    $e = ListeSuppression::empreinte($forme);
+                    $h[$e] = $e;
+                    $a[$forme] = $forme;
+                    $empreintes[$e] = true;
+                    $adresses[$forme] = true;
+                    $registreLigne[] = ['adresse', $e];
+                }
+                foreach (FormesAdresse::domaines($brute) as $domaine) {
+                    foreach (self::domainesEtParents('x@' . $domaine) as $d) {
+                        $registreLigne[] = ['domaine', RegistreOppositionManuel::empreinte($d)];
+                    }
                 }
             }
             if (preg_match('/^\d{9}$/', $siren) === 1) {
@@ -59,13 +68,12 @@ final class StatutOpposition
             foreach ($registreLigne as [, $e]) {
                 $registre[$e] = true;
             }
-            $cles[$cle] = ['h' => $h, 'a' => $adresse === '' ? null : $adresse, 'registre' => $registreLigne];
+            $cles[$cle] = ['h' => array_values($h), 'a' => array_values($a), 'registre' => $registreLigne];
         }
         if ($cles === []) {
             return $sortie;
         }
 
-        $motifs = []; // clé => [motif => true]
         $hashs = array_keys($empreintes);
         $parHash = []; // empreinte => motifs
         $parAdresse = []; // adresse => motifs
@@ -85,8 +93,8 @@ final class StatutOpposition
             $demandes = DB::table('rgpd_requests')->where('workspace_id', $workspaceId)->where('type', 'opposition')
                 ->whereNotIn('status', ['rejected', 'expired'])
                 ->whereIn('subject_email', array_map('strval', array_keys($adresses)))->pluck('subject_email');
-            foreach ($demandes as $a) {
-                $parAdresse[mb_strtolower(trim((string) $a))]['art21'] = true;
+            foreach ($demandes as $adresse) {
+                $parAdresse[mb_strtolower(trim((string) $adresse))]['art21'] = true;
             }
         }
         $presents = [];
@@ -98,7 +106,13 @@ final class StatutOpposition
         }
 
         foreach ($cles as $cle => $c) {
-            $m = ($c['h'] === null ? [] : ($parHash[$c['h']] ?? [])) + ($c['a'] === null ? [] : ($parAdresse[$c['a']] ?? []));
+            $m = [];
+            foreach ($c['h'] as $e) {
+                $m += $parHash[$e] ?? [];
+            }
+            foreach ($c['a'] as $forme) {
+                $m += $parAdresse[$forme] ?? [];
+            }
             foreach ($c['registre'] as [$portee, $e]) {
                 if (isset($presents[$portee . '|' . $e])) {
                     $m['liste_refus'] = true;
@@ -115,7 +129,7 @@ final class StatutOpposition
     private static function domainesEtParents(string $adresse): array
     {
         $pos = strrpos($adresse, '@');
-        $libelles = explode('.', $pos === false ? '' : substr($adresse, $pos + 1));
+        $libelles = explode('.', rtrim($pos === false ? '' : substr($adresse, $pos + 1), '.'));
         $liste = [];
         while (count($libelles) >= 2 && $libelles[0] !== '') {
             $liste[] = implode('.', $libelles);

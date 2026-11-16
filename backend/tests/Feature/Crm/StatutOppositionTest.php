@@ -194,3 +194,85 @@ test('la liste des contacts porte opposition', function () {
     expect($lignes['bloque@contact.example.test']['opposition'])->toBe(['opposee' => true, 'motifs' => ['liste_refus']])
         ->and($lignes['libre@contact.example.test']['opposition'])->toBe(['opposee' => false, 'motifs' => []]);
 });
+
+// ── X7 / M5 : une même adresse sous une autre forme est encore opposée ───────────────────────────────────
+
+function x7Art21(string $adresse): void
+{
+    DB::table('opt_out')->insert(['email_hash' => g4Hash($adresse), 'scope' => 'business', 'source' => 'gdpr_art21_console', 'reason' => 'gdpr_art21']);
+}
+
+test('M5 — opposition sur nom@exemple.test : Nom@Exemple.test., nom+x@ et espace insécable ressortent opposées', function () {
+    x7Art21('nom@exemple.test');
+    $attendu = ['opposee' => true, 'motifs' => ['art21']];
+
+    foreach (['nom@exemple.test', 'Nom@Exemple.test.', 'nom+x@exemple.test', "nom@exemple.test\u{00A0}", "nom@exemple.test\u{200B}", ' NOM+a+b@EXEMPLE.test. '] as $forme) {
+        expect(g4Statut($this->ws->id, $forme))->toBe($attendu, json_encode($forme));
+    }
+    expect(g4Statut($this->ws->id, 'autre@exemple.test')['opposee'])->toBeFalse();
+});
+
+test('M5 — STOP : la forme avec point final ou alias est opposée (motif stop)', function () {
+    $e = 'stop@forme.example.test';
+    $lien = DB::table('envoi_liens_desinscription')->insertGetId(['workspace_id' => $this->ws->id, 'empreinte_adresse' => g4Hash($e), 'portee' => 'business']);
+    DB::table('envoi_oppositions')->insert(['workspace_id' => $this->ws->id, 'lien_id' => $lien, 'empreinte_adresse' => g4Hash($e), 'canal' => 'one_click']);
+
+    expect(g4Statut($this->ws->id, 'stop+promo@forme.example.test.'))->toBe(['opposee' => true, 'motifs' => ['stop']]);
+});
+
+test('M5 — domaine IDN accentué face à sa forme xn--, dans les deux sens', function () {
+    $ascii = idn_to_ascii('exemplé.test', IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
+    x7Art21("nom@{$ascii}");
+    expect(g4Statut($this->ws->id, 'nom@exemplé.test')['opposee'])->toBeTrue();
+
+    x7Art21('autre@exemplé.test');
+    expect(g4Statut($this->ws->id, "autre@{$ascii}")['opposee'])->toBeTrue();
+});
+
+test('M5 — registre de domaine atteint par le domaine avec point final, la forme IDN et ses parents', function () {
+    g4Registre($this->ws->id, 'domaine', 'bloque.example.test');
+    $ascii = idn_to_ascii('bloqué.example.test', IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
+    g4Registre($this->ws->id, 'domaine', $ascii);
+    $attendu = ['opposee' => true, 'motifs' => ['liste_refus']];
+
+    expect(g4Statut($this->ws->id, 'x@bloque.example.test.'))->toBe($attendu)
+        ->and(g4Statut($this->ws->id, 'x@equipe.bloque.example.test.'))->toBe($attendu)
+        ->and(g4Statut($this->ws->id, 'x@bloqué.example.test'))->toBe($attendu)
+        ->and(g4Statut($this->ws->id, 'x@bloque.example.test.autre.test')['opposee'])->toBeFalse();
+});
+
+test('M5 — adresse du registre atteinte par variante', function () {
+    g4Registre($this->ws->id, 'adresse', 'reg@forme.example.test');
+    expect(g4Statut($this->ws->id, 'Reg+x@forme.example.test.'))->toBe(['opposee' => true, 'motifs' => ['liste_refus']]);
+});
+
+test('M5 — rgpd_requests atteint par variante, sans fuite entre espaces', function () {
+    DB::table('rgpd_requests')->insert(['workspace_id' => $this->ws->id, 'type' => 'opposition', 'status' => 'processing', 'subject_email' => 'dem@forme.example.test']);
+
+    expect(g4Statut($this->ws->id, "Dem+x@Forme.example.test.\u{00A0}"))->toBe(['opposee' => true, 'motifs' => ['art21']])
+        ->and(g4Statut($this->autre->id, 'dem+x@forme.example.test.')['opposee'])->toBeFalse();
+});
+
+test('M5 — les clés de l\'appelant et la forme de sortie ne changent pas', function () {
+    x7Art21('cle@forme.example.test');
+    $sortie = (new StatutOpposition)->pourLignes($this->ws->id, [
+        'a' => ['email' => 'Cle+1@forme.example.test.', 'siren' => null],
+        7 => ['email' => 'propre@forme.example.test', 'siren' => null],
+    ]);
+
+    expect($sortie)->toBe(['a' => ['opposee' => true, 'motifs' => ['art21']], 7 => ['opposee' => false, 'motifs' => []]]);
+});
+
+test('M5 — un lot de 1000 lignes reste sous la limite de 65 535 paramètres par requête', function () {
+    $lignes = [];
+    for ($i = 0; $i < 1000; $i++) {
+        $lignes[$i] = ['email' => "Pers+{$i}@Sous.Dom{$i}.exemplé.test.", 'siren' => '55210055' . ($i % 10)];
+    }
+    $max = 0;
+    DB::listen(function ($q) use (&$max): void {
+        $max = max($max, count($q->bindings));
+    });
+    (new StatutOpposition)->pourLignes($this->ws->id, $lignes);
+
+    expect($max)->toBeGreaterThan(1000)->and($max)->toBeLessThan(65535);
+});

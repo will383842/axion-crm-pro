@@ -143,6 +143,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_05_000110_envoi_inscriptions_personne_index.php',
     // Filet modifié : pourquoi — envoi P2-A : garde de la clé `envoi.population_personnes` (propriétaire seul, true/false) ; la retirer laisserait l'application allumer l'interrupteur ; down() inerte, up() rejouable.
     '2026_12_05_000120_envoi_reglages_interrupteur_population.php',
+    // Filet modifié : pourquoi — envoi C1-0 : colonne `id_injection_serveur` (ADD COLUMN IF NOT EXISTS, NULL) + CHECK ; la retirer effacerait les identifiants serveur ; down() inerte, up() rejouable.
+    '2026_12_05_000200_envoi_messages_id_injection_serveur.php',
+    // Filet modifié : pourquoi — envoi C1-0 : deux index partiels d'`envoi_messages` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
+    '2026_12_05_000210_envoi_messages_index_injection.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

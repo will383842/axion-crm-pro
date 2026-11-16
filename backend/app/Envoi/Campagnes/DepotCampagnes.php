@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Campagnes (modèle de données ; les routes de suivi et de gestes sont dans GestesCampagne / LectureCampagnes, R09). Aucun lien avec les séquences ni les inscriptions.
- * AUCUNE méthode n'écrit `sequence_id` : une campagne ne peut pas devenir exécutable par ce dépôt (et le rôle applicatif
- * n'a aucun droit sur cette colonne). Aucune suppression. Tout passe par WorkspaceContext (RLS) ET filtre l'espace.
+ * Campagnes (modèle de données ; les routes de suivi et de gestes sont dans GestesCampagne / LectureCampagnes, R09). Aucun lien avec les inscriptions.
+ * Une seule méthode écrit `sequence_id` : `lierSequence`, appelée par `ConstructionSequence` sous `sousVerrou` (la base la garde : une fois,
+ * campagne programmée, séquence de la même campagne). Aucune suppression. Tout passe par WorkspaceContext (RLS) ET filtre l'espace.
  */
 final class DepotCampagnes
 {
@@ -128,6 +128,26 @@ final class DepotCampagnes
     }
 
     /**
+     * Pose le lien campagne -> séquence UNE fois (version + 1). À appeler DANS la transaction ouverte par sousVerrou($ws, $campagneId, …).
+     *
+     * @return int la nouvelle version
+     */
+    public function lierSequence(string $ws, string $campagneId, int $version, string $sequenceId): int
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new \LogicException('lierSequence exige la transaction de sousVerrou');
+        }
+        $n = WorkspaceContext::run($ws, fn (): int => DB::table('envoi_campagnes')->where('workspace_id', $ws)->where('id', $campagneId)->where('version', $version)
+            ->where('statut', 'programmee')->whereNull('sequence_id')
+            ->update(['sequence_id' => $sequenceId, 'version' => $version + 1, 'maj_le' => now()]));
+        if ($n !== 1) {
+            throw CampagneRefusee::versionPerimee();
+        }
+
+        return $version + 1;
+    }
+
+    /**
      * Change le statut et journalise (même transaction). Idempotent : une clé déjà journalisée ne rejoue rien (retourne false).
      */
     public function transitionner(string $ws, string $id, string $vers, int $version, string $auteur, string $motif, string $cleIdempotence): bool
@@ -140,8 +160,8 @@ final class DepotCampagnes
             if ($c->version !== $version) {
                 throw CampagneRefusee::versionPerimee();   // la version LUE doit être celle que l'appelant a lue
             }
-            if (! self::autorisee($c->statut, $vers)) {
-                throw CampagneRefusee::transition($c->statut, $vers);
+            if (! self::autorisee($c->statut, $vers) || ($c->sequence_id !== null && $c->statut === 'programmee' && $vers === 'a_valider')) {
+                throw CampagneRefusee::transition($c->statut, $vers);   // reliée : la base refuse aussi programmee -> a_valider (matrice inchangée)
             }
             if (in_array($vers, self::EXIGENT_SEQUENCE, true) && $c->sequence_id === null) {
                 throw CampagneRefusee::sansSequence($vers);

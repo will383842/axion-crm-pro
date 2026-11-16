@@ -102,6 +102,16 @@ test('1. une réponse humaine, rattachée par l\'identifiant du registre, ARRÊT
     expect($ins->statut)->toBe('arretee')->and($ins->motif_arret)->toBe('reponse');
 });
 
+test('1b. même scénario sous le rôle applicatif (pgsql_app)', function () {
+    DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
+    expect(($this->cycle)())->toBe([Sequenceur::ENVOYE => 1]);
+    $origine = c1Origine($this);
+    RecepteurRetoursSequence::parDefaut()->recevoir($this->ws, new RetourDetecte(ClasseRetour::ReponseHumaine, $origine->idInjection, C1_ADRESSE, null, 'c1-rep-app'));
+
+    expect(DB::table('envoi_inscriptions')->where('id', $this->ins)->value('statut'))->toBe('arretee')
+        ->and(DB::table('envoi_messages')->where('inscription_id', $this->ins)->value('id_injection_serveur'))->toBe('sim-1');
+});
+
 test('2. id_injection = registre = injections_locales ; l\'identifiant du serveur va dans id_injection_serveur', function () {
     ($this->cycle)();
     $m = DB::table('envoi_messages')->where('inscription_id', $this->ins)->first();
@@ -136,7 +146,7 @@ test('3. stabilité : un report puis un nouveau cycle gardent le même identifia
         ->and(DB::table('envoi_injections_locales')->where('workspace_id', $this->ws)->count())->toBe(1);
 });
 
-test('3b. reprise d\'une ligne « reserve » ancienne (dejaParti) : même identifiant, serveur déjà accepté', function () {
+test('3b. reprise d\'une ligne « reserve » ancienne, porte ouverte : même identifiant, serveur déjà accepté', function () {
     $plante = new ServeurEspion(fn () => throw new RuntimeException('plantage simulé'));
     ($this->cycleAvec)($plante);
     $avant = DB::table('envoi_injections_locales')->where('workspace_id', $this->ws)->value('id_injection');
@@ -155,6 +165,29 @@ test('3b. reprise d\'une ligne « reserve » ancienne (dejaParti) : même identi
 
     $m = DB::table('envoi_messages')->where('inscription_id', $this->ins)->first();
     expect($m->statut)->toBe('envoye')->and($m->id_injection)->toBe($avant)->and($m->id_injection_serveur)->toBe('srv-deja')
+        ->and(DB::table('envoi_messages_envoyes')->where('workspace_id', $this->ws)->value('id_injection'))->toBe($avant);
+});
+
+test('3c. reprise par dejaParti (garde fermée à la reprise, message déjà accepté) : même identifiant du registre', function () {
+    $plante = new ServeurEspion(fn () => throw new RuntimeException('plantage simulé'));
+    ($this->cycleAvec)($plante);
+    $avant = DB::table('envoi_injections_locales')->where('workspace_id', $this->ws)->value('id_injection');
+    DB::table('envoi_messages')->where('inscription_id', $this->ins)->update(['maj_le' => $this->lundi->modify('-3 hours')->format('c')]);
+    DB::table('envoi_inscriptions')->where('id', $this->ins)->update(['prochaine_echeance' => $this->lundi->modify('-1 minute')->format('c')]);
+    // La garde se ferme entre-temps (adresse changée) : seul dejaParti peut conclure « envoyé ».
+    DB::table('contacts')->where('workspace_id', $this->ws)->where('email', C1_ADRESSE)->update(['email' => 'autre@client.example.test']);
+    $deja = new class(fn () => throw new RuntimeException('ne doit pas être rappelé')) extends ServeurEspion implements ConsultationAcceptation
+    {
+        public function dejaAccepte(string $workspaceId, string $cleIdempotence): ?ResultatInjection
+        {
+            return ResultatInjection::accepte('srv-deja');
+        }
+    };
+    ($this->cycleAvec)($deja);
+
+    $m = DB::table('envoi_messages')->where('inscription_id', $this->ins)->first();
+    expect($deja->appels)->toBe(0)
+        ->and($m->statut)->toBe('envoye')->and($m->id_injection)->toBe($avant)->and($m->id_injection_serveur)->toBe('srv-deja')
         ->and(DB::table('envoi_messages_envoyes')->where('workspace_id', $this->ws)->value('id_injection'))->toBe($avant);
 });
 
@@ -185,7 +218,21 @@ test('6. domaine sur smtp : aucune ligne envoi_injections_locales créée par la
 
     expect($serveur->recus[0]->idInjection)->toBeNull()->and($serveur->recus[0]->cheminRetour)->toBeNull()
         ->and(DB::table('envoi_messages')->where('inscription_id', $this->ins)->value('id_injection'))->toBe('smtp-1')
-        ->and(DB::table('envoi_messages')->where('inscription_id', $this->ins)->value('id_injection_serveur'))->toBeNull();
+        ->and(DB::table('envoi_messages')->where('inscription_id', $this->ins)->value('id_injection_serveur'))->toBeNull()
+        ->and(DB::table('envoi_injections_locales')->where('cle_idempotence', 'like', 'seq-%')->where('adaptateur', 'smtp')->count())->toBe(0);
+});
+
+test('6b. même nom de domaine en smtp dans l\'espace B, faux dans A : A garde son identifiant de registre', function () {
+    $b = F::espace('zz-registre-c1-b');
+    DB::table('envoi_domaines')->insert(['workspace_id' => $b, 'nom' => C1_DOMAINE, 'achete_le' => '2026-01-01']);
+    WorkspaceContext::run($b, fn () => DB::selectOne('SELECT envoi_domaine_adaptateur_changer(?, ?, ?, ?)', [$b, C1_DOMAINE, 'smtp', 'auteur-test']));
+    // Réécrit la ligne de A après celle de B : sans filtre d'espace, une lecture non bornée verrait « smtp » d'abord.
+    DB::table('envoi_domaines')->where('workspace_id', $this->ws)->update(['achete_le' => '2026-01-02']);
+    $serveur = new ServeurEspion(fn (MessageAEnvoyer $m) => ResultatInjection::accepte('srv-1'));
+    ($this->cycleAvec)($serveur);
+
+    expect($serveur->recus[0]->idInjection)->not->toBeNull()
+        ->and(DB::table('envoi_injections_locales')->where('workspace_id', $this->ws)->value('id_injection'))->toBe($serveur->recus[0]->idInjection);
 });
 
 test('7. domaine kumo : la ligne du registre porte « kumo » même si le serveur rend sim-…', function () {

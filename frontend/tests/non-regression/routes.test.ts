@@ -100,11 +100,7 @@ const ECARTS_CONNUS: string[] = [
   'PUT /api/v1/envoi/reglages/identite',
   'PUT /api/v1/envoi/reglages/regles',
   'GET /api/v1/crm/affaires',
-  'GET /api/v1/crm/taches',
   'PATCH /api/v1/crm/affaires/{p}',
-  'PATCH /api/v1/crm/taches/{p}',
-  'POST /api/v1/crm/taches',
-  'PUT /api/v1/crm/taches/rappel-matin',
   // DM2-PIL — résultats, santé, chercher un envoi, feu vert.
   'GET /api/v1/envoi/envois/chercher',
   'GET /api/v1/envoi/feu-vert',

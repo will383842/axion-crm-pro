@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\Crm\PersonnesController;
 use App\Http\Controllers\Api\Crm\PersonTimelineController;
 use App\Http\Controllers\Api\Crm\PropositionsController;
 use App\Http\Controllers\Api\Crm\ProvenancesTiersController;
+use App\Http\Controllers\Api\Crm\TachesController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DoublonsController;
 use App\Http\Controllers\Api\EvenementsController;
@@ -582,6 +583,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/candidates/counts', [CandidatesController::class, 'counts']);
 
             Route::get('/persons/{personKey}/timeline', [PersonTimelineController::class, 'show']);
+
+            // Lot G2-A — « Mes tâches » (cahier G1-G2 § 8). `rappel-matin`
+            // précède `{id}` (contraint aux chiffres) ; le réglage est refusé (409).
+            Route::get('/taches', [TachesController::class, 'index'])->middleware('permission:companies.view');
+            Route::post('/taches', [TachesController::class, 'store'])->middleware('permission:companies.update');
+            Route::put('/taches/rappel-matin', [TachesController::class, 'rappelMatin'])->middleware('permission:companies.update');
+            Route::patch('/taches/{id}', [TachesController::class, 'marquer'])->whereNumber('id')->middleware('permission:companies.update');
 
             // Lot L4-C — « Personnes (lettre et guide) ». Les segments fixes
             // (`counts`, `export`) précèdent `{id}`, contraint aux chiffres.

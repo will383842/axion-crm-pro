@@ -58,6 +58,7 @@ export const EVENEMENTS: Record<string, string> = {
   'contact.ajoute': 'Contact ajouté',
   'contact.modifie': 'Contact modifié',
   'contact.retire': 'Contact retiré (corbeille)',
+  'contacts.import': 'Contacts importés',
   'contact.restaure': 'Contact restauré',
   'liste_manuelle.creee': 'Liste créée',
   'liste_manuelle.modifiee': 'Liste modifiée',

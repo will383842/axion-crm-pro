@@ -6,10 +6,12 @@ use App\Crm\Console\CompteursHub;
 use App\Crm\FichesProtegees;
 use App\Crm\Ingest\SiteSyncClassifier;
 use App\Crm\Taxonomy;
+use App\Models\Company;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * ACTIONS DE MASSE (plan §2.11, conception §3c).
@@ -43,6 +45,10 @@ class BulkController extends ConsoleController
 
     public function __invoke(Request $request): JsonResponse
     {
+        // Défense en profondeur : la route porte déjà `permission:companies.update`,
+        // la politique le redit ici — un compte en lecture seule ne modifie rien.
+        Gate::forUser($this->currentUser($request))->authorize('actionDeMasse', Company::class);
+
         $validated = $request->validate([
             'entity' => ['nullable', 'string', 'in:company,candidate'],
             'ids' => ['required', 'array', 'min:1', 'max:' . self::MAX_IDS],

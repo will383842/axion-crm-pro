@@ -159,7 +159,7 @@
     "POST /api/v1/coverage/launch | api,auth,first-login,permission,throttle,workspace",
     "POST /api/v1/crm/arbitrage/{activityId}/attach | api,auth,crm-console,first-login,permission,workspace",
     "POST /api/v1/crm/arbitrage/{activityId}/dismiss | api,auth,crm-console,first-login,permission,workspace",
-    "POST /api/v1/crm/bulk | api,auth,crm-console,delai-sql,first-login,workspace",
+    "POST /api/v1/crm/bulk | api,auth,crm-console,delai-sql,first-login,permission,workspace",
     "POST /api/v1/crm/personnes/{personneId}/rattacher | api,auth,crm-console,first-login,permission,workspace",
     "POST /api/v1/crm/personnes/{personneId}/taches | api,auth,crm-console,first-login,permission,workspace",
     "POST /api/v1/crm/personnes/{personneId}/taches/{activityId}/terminer | api,auth,crm-console,first-login,permission,workspace",

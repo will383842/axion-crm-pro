@@ -4,6 +4,7 @@ use App\Crm\Console\CompteursHub;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\WorkspaceContext;
+use Database\Seeders\PermissionsAndRolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -375,6 +376,14 @@ test('le cache des compteurs ne fuit pas vers un autre workspace', function () {
 // ── 4. FRAÎCHEUR — le produit ne contredit pas ce qu'on vient de faire ──────
 
 test('une action de masse fait bouger la pastille tout de suite', function () {
+    // Cette garde mesure la FRAÎCHEUR, pas les droits : l'action de masse exige
+    // désormais `companies.update` (route + politique), on donne donc le rôle
+    // `admin` à l'opérateur. Les refus sont mesurés dans
+    // `tests/Feature/Droits/ActionDeMasseRouteTest.php`.
+    $this->seed(PermissionsAndRolesSeeder::class);
+    setPermissionsTeamId($this->workspace->id);
+    $this->user->assignRole('admin');
+
     $id = compteursCompany($this->workspace->id, '910000030', ['relation_type' => 'client', 'lifecycle_stage' => 'nouveau']);
 
     $this->getJson('/api/v1/crm/contacts-hub/counts')

@@ -627,7 +627,7 @@ Route::prefix('v1')->group(function () {
                 ->whereNumber('activityId')
                 ->middleware('permission:companies.update');
 
-            Route::post('/bulk', BulkController::class)->middleware('delai-sql:300');
+            Route::post('/bulk', BulkController::class)->middleware(['permission:companies.update', 'delai-sql:300']);
 
             // Pastilles « À traiter » du menu (audit UX lot 8) : les totaux des
             // files « Doublons à vérifier » et « Personnes à rattacher », par

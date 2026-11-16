@@ -16,6 +16,7 @@ interface TransportInjection
      * @throws EchecAuthentification AUTH ou certificat refusé
      * @throws RefusConnexion 5xx de bannière, EHLO ou STARTTLS (avant MAIL FROM) : refus de la connexion
      * @throws ServeurEnvoiRefuse refus local (enveloppe, jeton, transaction)
+     * @throws InjectionRetiree 409 `retire` : adresse en liste de retrait (transport HTTPS signé)
      */
     public function envoyer(MessageAEnvoyer $message, string $jeton, string $source = ''): int;
 }

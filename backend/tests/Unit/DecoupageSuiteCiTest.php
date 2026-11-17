@@ -120,7 +120,12 @@ test('DECOUPAGE — ci.yml : la matrice backend est sans needs, et le verdict po
     $verdict = (array) $jobs['backend-verdict'];
     expect($verdict['name'])->toBe('Backend Laravel (install + PHPStan + Pint + Pest)');
     expect($verdict['needs'])->toBe(['filet-non-regression', 'backend']);
-    expect(trim((string) $verdict['if']))->toBe('always()');
+    // Lot G (#680) : `always()` reste obligatoire ; seule la garde brouillon peut s'y ajouter
+    // (en brouillon le verdict est SAUTÉ = vert ; sinon il tourne même si une garde rougit).
+    expect(trim((string) $verdict['if']))->toBeIn([
+        'always()',
+        "\${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}",
+    ]);
     expect($verdict['timeout-minutes'])->toBe(10);
 
     // PHPStan et Pint ne tournent que sur la part 1.

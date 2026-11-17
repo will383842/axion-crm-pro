@@ -623,6 +623,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/origines/apercu', [OriginesController::class, 'apercu'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/par-reseau', [OriginesController::class, 'parReseau'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/par-mot', [OriginesController::class, 'parMot'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
+            Route::get('/origines/par-guide', [OriginesController::class, 'parGuide'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/tendance', [OriginesController::class, 'tendance'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/personnes', [OriginesController::class, 'personnes'])->middleware(['throttle:scraper-list', 'delai-sql:120']);
             Route::get('/origines/export', [OriginesController::class, 'export'])

@@ -134,6 +134,68 @@ describe('ReponsesPage — boîte des réponses', () => {
   });
 });
 
+describe('ReponsesPage — RR-6C classer « Intéressé » et « Question »', () => {
+  beforeEach(() => {
+    demoDb.reinitialiser();
+  });
+
+  function espionClasser(corps: unknown[]) {
+    return http.post(api('/envoi/reponses/:id/classer'), async ({ request }) => {
+      corps.push(await request.clone().json());
+      return undefined;
+    });
+  }
+
+  it('le bouton « Intéressé » envoie creer_tache et affiche la confirmation CRM', async () => {
+    const user = userEvent.setup();
+    const recus: unknown[] = [];
+    await monter([espionClasser(recus)]);
+    const detail = await ouvrirPaul(user);
+    const bouton = within(detail).getByRole('button', { name: /Intéressé/ });
+    expect(bouton).toHaveAttribute('aria-keyshortcuts', '4');
+    await user.click(bouton);
+    await waitFor(() => expect(recus).toHaveLength(1));
+    expect(recus[0]).toMatchObject({ classement: 'interesse', creer_tache: true });
+    expect(await screen.findByRole('status', { name: 'Résumé envoyé au CRM' })).toBeInTheDocument();
+  });
+
+  it('la touche 5 classe en « Question » avec une tâche', async () => {
+    const user = userEvent.setup();
+    const recus: unknown[] = [];
+    await monter([espionClasser(recus)]);
+    await ouvrirPaul(user);
+    await user.keyboard('5');
+    await waitFor(() => expect(recus).toHaveLength(1));
+    expect(recus[0]).toMatchObject({ classement: 'question', creer_tache: true });
+  });
+
+  it('« Plus tard » envoie aussi creer_tache', async () => {
+    const user = userEvent.setup();
+    const recus: unknown[] = [];
+    await monter([espionClasser(recus)]);
+    const detail = await ouvrirPaul(user);
+    await user.click(within(detail).getByRole('button', { name: /Plus tard/ }));
+    await waitFor(() => expect(recus).toHaveLength(1));
+    expect(recus[0]).toMatchObject({ classement: 'pas_maintenant', creer_tache: true });
+  });
+
+  it('la touche 4 tapée dans le champ de réponse ne classe rien', async () => {
+    const user = userEvent.setup();
+    const recus: unknown[] = [];
+    await monter([espionClasser(recus)]);
+    const detail = await ouvrirPaul(user);
+    await user.type(within(detail).getByRole('textbox', { name: 'Votre réponse' }), '4');
+    expect(recus).toHaveLength(0);
+  });
+
+  it('les boutons ont une cible de 44 px sur mobile', async () => {
+    const user = userEvent.setup();
+    await monter();
+    const detail = await ouvrirPaul(user);
+    expect(within(detail).getByRole('button', { name: /Question/ })).toHaveClass('max-md:h-11');
+  });
+});
+
 function reponsePaulId(): string {
   return String(reponsePaul().id);
 }

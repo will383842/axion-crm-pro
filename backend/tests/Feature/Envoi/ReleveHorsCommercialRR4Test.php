@@ -6,6 +6,7 @@
  */
 
 use App\Crm\FichesProtegees;
+use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Chauffe\ResolveurEnMemoire;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Depot\DepotSocleDb;
@@ -14,6 +15,7 @@ use App\Envoi\Imap\FabriqueLecteurs;
 use App\Envoi\Imap\LecteurBoiteMemoire;
 use App\Envoi\Imap\MessageBrut;
 use App\Envoi\Imap\ReleveImap;
+use App\Envoi\JourEnvoi;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Reglages\DepotReglages;
 use App\Envoi\Sequence\Inscriptions;
@@ -212,9 +214,8 @@ test('H2 plainte et rebond dur hors espace commercial : freins comptés, inscrip
         rr4Scenario($this->a, $mode, "h2r-{$mode}", [$r], '', '5.1.1');
         $s = rr4Statuts($this->a);
         expect($s[ListeSuppression::empreinte($p)])->toBe('arretee', $mode)->and($s[ListeSuppression::empreinte($r)])->toBe('arretee', $mode);
-        $compte = fn (string $colonne): int => WorkspaceContext::run($this->a, fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $this->a)
-            ->where('commande', 'retour_applique')->whereRaw("(details::jsonb)->>'colonne' = ?", [$colonne])->count());
-        expect($compte('plaintes'))->toBeGreaterThanOrEqual(1, $mode)->and($compte('rebonds_durs'))->toBeGreaterThanOrEqual(1, $mode);
+        $freins = app(DepotChauffe::class)->totaux7Jours($this->a, JourEnvoi::de(now()->toDateTimeImmutable()), 'domaine');
+        expect($freins['plaintes'])->toBeGreaterThanOrEqual(1, $mode)->and($freins['rebonds_durs'])->toBeGreaterThanOrEqual(1, $mode);
     }
 });
 

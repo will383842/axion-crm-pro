@@ -19,7 +19,7 @@ function pl_motifs_interdits(): array
         'fsockopen' => '/\bfsockopen\s*\(/i',
         'file_get_contents vers http' => '/file_get_contents\s*\(\s*[\'"]https?:/i',
         'fetch( vers un domaine externe' => '/\bfetch\s*\(\s*[`\'"]https?:\/\//i',
-        'table morte linkedin_*' => '/\blinkedin_(accounts|campaigns|health_checks|invitations|messages|search_results|sequences)\b/i',
+        'table morte linkedin_*' => '/\blinkedin_(accounts|campaigns|health_checks|invitations|messages|profiles_cache|search_results|sequence_runs|sequences)\b/i',
         'cookie_blob' => '/cookie_blob/i',
         'proxy_id' => '/proxy_id/i',
         'suppression ->delete(' => '/->\s*delete\s*\(/i',
@@ -127,6 +127,8 @@ it('détecte les autres interdits (table morte, proxy_id, suppression, env, fetc
     }
 })->with([
     'table morte' => ["<?php DB::table('linkedin_messages');", 'a.php'],
+    'table morte 2' => ["<?php DB::table('linkedin_profiles_cache');", 'k.php'],
+    'table morte 3' => ["<?php DB::table('linkedin_sequence_runs');", 'l.php'],
     'proxy_id' => ["<?php \$p = 'proxy_id';", 'b.php'],
     'delete' => ['<?php $m->delete();', 'c.php'],
     'DELETE FROM' => ["<?php DB::statement('DELETE FROM pl_journal');", 'd.php'],
@@ -140,6 +142,15 @@ it('détecte les autres interdits (table morte, proxy_id, suppression, env, fetc
 
 it('accepte un fichier conforme (appel à l\'API du CRM)', function () {
     $dir = pl_dossier_temoin("fetch('/api/prospection-linkedin/file');\n", 'ok.ts');
+    try {
+        expect(pl_violations([$dir]))->toBe([]);
+    } finally {
+        pl_nettoyer($dir);
+    }
+});
+
+it('accepte linkedin_url et le canal linkedin_message (valeurs légitimes)', function () {
+    $dir = pl_dossier_temoin("<?php \$c->linkedin_url; \$canal = 'linkedin_message';", 'm.php');
     try {
         expect(pl_violations([$dir]))->toBe([]);
     } finally {

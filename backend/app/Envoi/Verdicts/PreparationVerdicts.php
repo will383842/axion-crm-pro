@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * Ce que la matérialisation des campagnes (lot L4) appellera AVANT `Inscriptions::inscrire` : vérifie, écrit, puis
- * rend le DERNIER verdict de chaque contact. L4 n'inscrit que si `permetInscription`.
+ * Appelée par `MaterialisationCampagne` AVANT l'écriture des inscriptions : vérifie, écrit, puis
+ * rend le DERNIER verdict de chaque contact. La matérialisation écarte `invalide` et `risque`.
  */
 final class PreparationVerdicts
 {

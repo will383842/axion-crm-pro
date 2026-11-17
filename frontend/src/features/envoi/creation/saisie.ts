@@ -2,7 +2,7 @@
  * Ce que la personne a saisi dans l'assistant, et sa traduction vers le
  * contrat (`ContenuEtape`) pour l'enregistrement du brouillon à chaque étape.
  */
-import type { Brouillon, Cible, ContenuEtape, EtapeSequence } from './api';
+import { RESEAUX_MAX, type Brouillon, type Cible, type ContenuEtape, type EtapeSequence } from './api';
 import { FENETRES, ajouterJours, estOuvre, parisVersIso } from './outils';
 
 export interface LigneSequence {
@@ -17,6 +17,10 @@ export interface Saisie {
   cible: { type: Cible['type']; reference: string; libelle: string } | null;
   exclusionsLibres: string;
   reverifier: boolean;
+  /** Réseaux d'origine retenus (filtre de la cible) ; vide = pas de filtre. */
+  reseaux: string[];
+  /** Vrai dès que la personne a touché au filtre : sans cela, on ne renvoie pas la clé (le serveur garde la colonne). */
+  reseauxModifies: boolean;
   sequence: LigneSequence[];
   ab: boolean;
   objetB: string;
@@ -37,6 +41,8 @@ export const SAISIE_INITIALE: Saisie = {
   cible: null,
   exclusionsLibres: '',
   reverifier: true,
+  reseaux: [],
+  reseauxModifies: false,
   sequence: [{ message_id: 'msg-1', delai_jours: 0 }],
   ab: false,
   objetB: '',
@@ -56,6 +62,21 @@ export function cibleDeContrat(s: Saisie): Cible | null {
   return { type: s.cible.type, reference: s.cible.reference, libelle: s.cible.libelle, reverifier_anciennes: s.reverifier, ...(libres.length > 0 ? { exclusions_libres: libres } : {}) };
 }
 
+/** Trié, sans doublon, 10 au plus : la forme exacte que le serveur normalise. */
+export function reseauxNormalises(reseaux: readonly string[]): string[] {
+  return [...new Set(reseaux)].sort().slice(0, RESEAUX_MAX);
+}
+
+/**
+ * `undefined` : clé absente (colonne inchangée) ; `null` : retire le filtre ;
+ * sinon `{ reseaux }`. Rien n'est renvoyé tant que la personne n'a pas touché au filtre.
+ */
+export function origineDeContrat(s: Saisie): { reseaux: string[] } | null | undefined {
+  if (!s.reseauxModifies) return undefined;
+  const reseaux = reseauxNormalises(s.reseaux);
+  return reseaux.length > 0 ? { reseaux } : null;
+}
+
 export function sequenceDeContrat(s: Saisie): EtapeSequence[] {
   return s.sequence.map((l, i) => ({
     etape: i + 1,
@@ -69,7 +90,9 @@ export function sequenceDeContrat(s: Saisie): EtapeSequence[] {
 export function contenuEtape(etape: number, s: Saisie): ContenuEtape {
   if (etape === 1) {
     const cible = cibleDeContrat(s);
-    return { nom: s.nom, ...(cible ? { cible } : {}) };
+    const origine = origineDeContrat(s);
+    // `origine` ne part qu'ici (étape 1) : l'estimation et les champs gardent la cible sans filtre.
+    return { nom: s.nom, ...(cible ? { cible: { ...cible, ...(origine !== undefined ? { origine } : {}) } } : {}) };
   }
   if (etape === 2) {
     return { sequence: sequenceDeContrat(s), repli: s.repli };
@@ -97,6 +120,7 @@ export function saisieDepuis(b: Brouillon): Saisie {
     s.cible = { type: c.cible.type, reference: c.cible.reference, libelle: c.cible.libelle ?? c.cible.reference };
     s.exclusionsLibres = (c.cible.exclusions_libres ?? []).join(', ');
     s.reverifier = c.cible.reverifier_anciennes !== false;
+    s.reseaux = reseauxNormalises(c.cible.origine?.reseaux ?? []);
   }
   if (c.sequence && c.sequence.length > 0) {
     s.sequence = c.sequence.map((e) => ({ message_id: e.message_id, delai_jours: e.delai_jours }));

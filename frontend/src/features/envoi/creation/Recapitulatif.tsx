@@ -1,7 +1,8 @@
 /** Récapitulatif du brouillon, à droite de l'assistant (en dessous sur téléphone). */
-import { CalendarClock, Mail, Target, Timer } from 'lucide-react';
+import { CalendarClock, Mail, Share2, Target, Timer } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { dateCourte, dateDeFin, dateLongue, joursNecessaires } from './outils';
+import { libelleReseau } from '@/features/origines/libelles';
 import type { Saisie } from './saisie';
 
 function Ligne({ icone, titre, children }: { icone: ReactNode; titre: string; children: ReactNode }) {
@@ -42,6 +43,11 @@ export function Recapitulatif({
         <Ligne icone={<Target className="h-4 w-4" />} titre="Cible">
           {saisie.cible ? `${saisie.cible.libelle}${restant !== null ? ` · ${restant.toLocaleString('fr-FR')}` : ''}` : 'Pas encore choisie'}
         </Ligne>
+        {saisie.reseaux.length > 0 ? (
+          <Ligne icone={<Share2 className="h-4 w-4" />} titre="Réseau d’origine">
+            Uniquement les personnes venues de : {saisie.reseaux.map((r) => libelleReseau(r) ?? r).join(', ')}
+          </Ligne>
+        ) : null}
         <Ligne icone={<Mail className="h-4 w-4" />} titre="Message">
           {nomsMessages.length > 0 ? nomsMessages.join(', ') : 'Pas encore choisi'}
           {saisie.ab ? ' · test A/B' : ''}

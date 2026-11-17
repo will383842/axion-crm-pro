@@ -4,6 +4,7 @@ import { Button, Skeleton } from '@/components/ui';
 import { Bloc, CHAMP, Jauge, Puces } from './composants';
 import { useEstimation, type CibleProposee } from './api';
 import { cibleDeContrat, type Saisie } from './saisie';
+import { FiltreReseau, MENTION_ESTIMATION } from './FiltreReseau';
 import { cn } from '@/components/ui';
 
 type TypeAffiche = CibleProposee['type'];
@@ -88,6 +89,8 @@ export function EtapeCible({
         })}
       </div>
 
+      <FiltreReseau reseaux={saisie.reseaux} modifier={(reseaux) => { modifier({ reseaux, reseauxModifies: true }); }} />
+
       <div className="mt-4 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200" role="status" aria-live="polite">
         {saisie.cible === null ? (
           <p className="text-sm text-slate-600">
@@ -102,6 +105,7 @@ export function EtapeCible({
             <p className="mt-0.5 text-xs text-slate-600">
               Oppositions ({e.exclusions['opposition'] ?? 0}), clients et affaires en cours ({e.exclusions['clients'] ?? 0}), adresses partagées ({e.exclusions['adresses_partagees'] ?? 0}).
             </p>
+            {saisie.reseaux.length > 0 ? <p className="mt-1 text-xs text-slate-600">{MENTION_ESTIMATION}</p> : null}
             {saisies > 0 ? <p className="mt-1 text-xs text-slate-600">{saisies.toLocaleString('fr-FR')} de plus selon vos exclusions.</p> : null}
           </>
         )}

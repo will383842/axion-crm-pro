@@ -134,6 +134,9 @@ Route::prefix('v1')->group(function () {
         // sous la garde serveur `produit-envoi` (404 si l'espace n'a pas le produit). Mêmes middlewares de groupe qu'ici.
         require __DIR__ . '/envoi.php';
 
+        // PONT-LINKEDIN LI-C : API de la file « prêt à cliquer » (drapeau éteint ⇒ 404 ; propriétaire seul).
+        require __DIR__ . '/prospection-linkedin.php';
+
         // « Mon compte → Changer mon mot de passe » (constat prod du 2026-10-02 :
         // aucun écran ne le permettait une fois connecté). L'ancien mot de passe
         // est exigé, sauf session ouverte par lien magique il y a moins de 30 min.

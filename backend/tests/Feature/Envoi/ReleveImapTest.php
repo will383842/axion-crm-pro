@@ -239,13 +239,6 @@ test('échec de l\'arrêt : l\'événement n\'est pas noté, il sera relu', func
     expect(releveCompte($this->ws))->toBe(1);
 });
 
-test('espace autre que le commercial : l\'arrêt est refusé bruyamment, jamais oublié', function () {
-    config(['crm.ingest.business_workspace' => 'zz-autre-espace-inexistant']);
-    releveDeposer($this, releveMsg(1, ['corps' => 'STOP']));
-    expect(fn () => $this->releve->relever($this->ws, RELEVE_BOITE))->toThrow(RuntimeException::class);
-    expect(releveCompte($this->ws))->toBe(0);
-});
-
 test('rattrapage après panne : une opposition reçue entre la sauvegarde et la panne est retrouvée et bloque l\'envoi', function () {
     $maintenant = new DateTimeImmutable('2026-12-06 10:00:00', new DateTimeZone('Europe/Paris')); // panne
     $sauvegarde = new DateTimeImmutable('2026-12-01 03:00:00', new DateTimeZone('Europe/Paris'));

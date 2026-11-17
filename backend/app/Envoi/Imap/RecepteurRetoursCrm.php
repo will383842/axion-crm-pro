@@ -5,6 +5,7 @@ namespace App\Envoi\Imap;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -14,7 +15,7 @@ use RuntimeException;
  * transmises aux arrêts de séquence de L1 par une autre implémentation).
  *
  * La commande ne sert que l'espace commercial : pour tout autre espace on
- * REFUSE (exception) plutôt que d'oublier une opposition en silence.
+ * rend la main (RR-4A) ; l'arrêt est alors tenu par les effets Envoi (opposition « releve », séquences, freins).
  * L'adresse n'existe que dans un fichier temporaire (0600) supprimé dans un `finally`.
  * Adresse invalide = `RetourInapplicable` (propre au message, isolée par la relève) ;
  * toute autre exception = indisponibilité, qui interrompt la relève.
@@ -40,7 +41,10 @@ final class RecepteurRetoursCrm implements RecepteurRetours
         $slug = (string) config('crm.ingest.business_workspace', 'axion-ia');
         $espace = DB::table('workspaces')->where('slug', $slug)->whereNull('deleted_at')->value('id');
         if ($espace === null || (string) $espace !== $workspaceId) {
-            throw new RuntimeException('Arrêt non appliqué : la commande de retours ne sert que l\'espace commercial.');
+            // RR-4A : plus d'exception. L'arrêt hors espace commercial est tenu par l'opposition Envoi (RR-3A) ; le CRM n'est pas touché.
+            Log::info('Relève : retour hors espace commercial, effets Envoi seuls.', ['workspace_id' => $workspaceId, 'classe' => $retour->classe->value]);
+
+            return;
         }
 
         $adresses = [$retour->adresse];

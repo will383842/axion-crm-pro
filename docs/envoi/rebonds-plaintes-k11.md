@@ -52,6 +52,8 @@ Avant M3, `ReleveImap`, le registre des messages envoyés, la fabrique de lecteu
 
 Garde-fous inchangés : `ENVOI_RELEVE_ACTIF=false` et `ENVOI_REEL_ACTIF=false` par défaut, la commande reste inerte avant toute résolution ; aucune route, aucune planification nouvelle ; aucune écriture dans `envoi_drapeaux`.
 
+- **RR-4A — hors espace commercial : effets Envoi seuls.** `RecepteurRetoursCrm` ne lève plus d'exception : il journalise (`Log::info`, jamais d'adresse) et rend la main ; freins, séquences et stockage continuent. Limite connue : le CRM ne marque pas l'adresse `invalid` après un rebond dur et ne compte pas les rebonds mous (l'adresse est tout de même arrêtée côté Envoi : échec fermé).
+
 ### Rebond mou : seuil de répétition (constat)
 
 Il **existe** : `crm:campagne:retours` appelle `ListeSuppression::rebondTemporaire`, qui compte les rebonds mous par adresse (fenêtre glissante de 30 jours) et ne supprime qu'à partir de `SEUIL_REBONDS_TEMPORAIRES` = 3. `RecepteurRetoursCrm` n'a pas de seuil propre : il transmet chaque rebond mou une seule fois (marque d'idempotence par message) et le seuil s'applique côté CRM. Rien n'a donc été inventé. Limite connue : ce compteur vit **en cache** (hors transaction, perdu si le cache est vidé) ; les freins L7 comptent de leur côté les rebonds mous dans leurs propres seuils.

@@ -125,7 +125,7 @@ final class MaterialisationCampagne
                 if ($e->motif === 'cible_introuvable') {
                     return $this->bloquer($ws, $id, $sequenceId, 'cible_introuvable');
                 }
-                throw in_array($e->motif, ['cible_non_supportee', 'population_non_ouverte'], true)
+                throw in_array($e->motif, ['cible_non_supportee', 'population_non_ouverte', 'filtre_origine_inactif'], true)
                     ? new MaterialisationRefusee($e->motif, false, $e->getMessage(), $e)
                     : new MaterialisationRefusee('lecture_impossible', true, $e->getMessage(), $e);
             }

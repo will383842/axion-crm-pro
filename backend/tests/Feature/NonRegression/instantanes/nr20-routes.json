@@ -55,6 +55,7 @@
     "GET /api/v1/crm/entreprises/choix | api,auth,crm-console,delai-sql,first-login,throttle,workspace",
     "GET /api/v1/crm/origines/apercu | api,auth,crm-console,delai-sql,first-login,throttle,workspace",
     "GET /api/v1/crm/origines/export | api,auth,crm-console,delai-sql,first-login,permission,throttle,workspace",
+    "GET /api/v1/crm/origines/par-guide | api,auth,crm-console,delai-sql,first-login,throttle,workspace",
     "GET /api/v1/crm/origines/par-mot | api,auth,crm-console,delai-sql,first-login,throttle,workspace",
     "GET /api/v1/crm/origines/par-reseau | api,auth,crm-console,delai-sql,first-login,throttle,workspace",
     "GET /api/v1/crm/origines/personnes | api,auth,crm-console,delai-sql,first-login,throttle,workspace",

@@ -41,14 +41,15 @@ describe('L8-F10 — liste des boîtes', () => {
     expect(screen.queryByText(/palier/i)).toBeNull();
   });
 
-  it('affiche un bouton d’ajout désactivé « bientôt disponible », sans aucun formulaire', async () => {
+  it('F3-B2 : le propriétaire voit « Ajouter une boîte » ; le formulaire ne s’ouvre qu’au clic, sans champ secret avant le code', async () => {
     const u = userEvent.setup();
     await monterListe();
-    const bouton = screen.getByRole('button', { name: 'Ajout de boîte : bientôt disponible' });
-    expect(bouton).toBeDisabled();
-    await u.click(bouton);
+    expect(screen.queryByRole('button', { name: /bientôt disponible/ })).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByRole('textbox')).toBeNull();
+    await u.click(screen.getByRole('button', { name: 'Ajouter une boîte' }));
+    const d = await screen.findByRole('dialog');
+    expect(within(d).getByRole('button', { name: 'Recevoir un code' })).toBeInTheDocument();
+    expect(within(d).queryByLabelText('Mot de passe de la boîte')).toBeNull();
     expect(screen.queryByRole('button', { name: /Tester la connexion/ })).toBeNull();
   });
 

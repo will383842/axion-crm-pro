@@ -447,9 +447,10 @@ class ListeFeuVert
     }
 
     /**
-     * A12 : lettre et prospection ne partagent ni domaine ni adresse IP. Les domaines doivent tous porter un flux
-     * (colonne `flux` non NULL) ; les adresses IP n'ont aucune source lisible aujourd'hui : le point reste FAUX
-     * (un constat peut freiner, jamais libérer). Lecture seule.
+     * A12 : lettre et prospection ne partagent ni domaine ni adresse IP. Vert seulement si : (a) colonne `flux` présente et
+     * aucun domaine sans flux ; (b) au moins un domaine et CHAQUE domaine relié à une IP non retirée (`ip_id`, inventaire
+     * `envoi_ips`) ; (c) aucune IP reliée à des domaines de deux flux (la base l'interdit déjà : revérifié ici) ;
+     * (d) au moins une IP par flux utilisé. Sinon rouge avec la raison. Lecture seule, aucun réseau.
      */
     private function separation(string $ws): PointFeuVert
     {
@@ -457,11 +458,46 @@ class ListeFeuVert
         if (! Schema::hasColumn('envoi_domaines', 'flux')) {
             return self::pointAuto($code, false, 'Colonne flux absente (migration R07 pas posée).');
         }
-        $sans = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->whereNull('flux')->count());
-        if ($sans > 0) {
-            return self::pointAuto($code, false, $sans . ' domaine(s) sans flux étiqueté (prospection ou lettre).');
+        if (! Schema::hasTable('envoi_ips') || ! Schema::hasColumn('envoi_domaines', 'ip_id')) {
+            return self::pointAuto($code, false, 'Inventaire des IP absent (migration pas posée).');
         }
 
-        return self::pointAuto($code, false, 'Flux étiquetés, mais la séparation des adresses IP n’a pas encore de source lisible.');
+        return WorkspaceContext::run($ws, function () use ($ws, $code): PointFeuVert {
+            $domaines = DB::table('envoi_domaines')->where('workspace_id', $ws)->get(['flux', 'ip_id']);
+            if ($domaines->isEmpty()) {
+                return self::pointAuto($code, false, 'Aucun domaine d’envoi inscrit : rien à séparer, rien à prouver.');
+            }
+            $sans = $domaines->whereNull('flux')->count();
+            if ($sans > 0) {
+                return self::pointAuto($code, false, $sans . ' domaine(s) sans flux étiqueté (prospection ou lettre).');
+            }
+            $sansIp = $domaines->whereNull('ip_id')->count();
+            if ($sansIp > 0) {
+                return self::pointAuto($code, false, $sansIp . ' domaine(s) sans IP d’envoi reliée.');
+            }
+            $retirees = DB::table('envoi_domaines as d')
+                ->join('envoi_ips as i', fn ($j) => $j->on('i.id', '=', 'd.ip_id')->on('i.workspace_id', '=', 'd.workspace_id'))
+                ->where('d.workspace_id', $ws)->whereNotNull('i.retiree_le')->count();
+            if ($retirees > 0) {
+                return self::pointAuto($code, false, $retirees . ' domaine(s) relié(s) à une IP retirée.');
+            }
+            $partagees = DB::query()->fromSub(
+                DB::table('envoi_domaines')->where('workspace_id', $ws)->whereNotNull('ip_id')
+                    ->groupBy('ip_id')->havingRaw('count(distinct flux) > 1')->select('ip_id'),
+                'p',
+            )->count();
+            if ($partagees > 0) {
+                return self::pointAuto($code, false, $partagees . ' IP partagée(s) entre deux flux (lettre et prospection).');
+            }
+            // (d) : chaque flux utilisé a au moins une IP active de ce flux, reliée à un domaine.
+            foreach ($domaines->pluck('flux')->unique() as $flux) {
+                $ok = DB::table('envoi_ips')->where('workspace_id', $ws)->where('flux', $flux)->whereNull('retiree_le')->exists();
+                if (! $ok) {
+                    return self::pointAuto($code, false, 'Aucune IP active pour le flux ' . $flux . '.');
+                }
+            }
+
+            return self::pointAuto($code, true, 'Chaque domaine a son IP ; aucune IP n’est partagée entre lettre et prospection.');
+        });
     }
 }

@@ -1,6 +1,6 @@
 /**
  * T-BOITES — l'écran des boîtes face aux réponses réelles du palier 0 (écran inchangé) :
- * C1 ajout désactivé et expliqué, aucun POST /envoi/boites ; C2 suspendre puis réactiver une suspension manuelle ;
+ * C1 ajout par formulaire en deux temps (F3-B2), aucun POST /envoi/boites à l’ouverture ; C2 suspendre puis réactiver une suspension manuelle ;
  * C3 réactiver une pause automatique ⇒ refus expliqué, sans renvoyer vers une commande.
  */
 import { describe, expect, it } from 'vitest';
@@ -48,14 +48,15 @@ function serveur(depart: 'prete' | 'suspendue', pauseAutomatique = false) {
 }
 
 describe('T-BOITES — boîtes au palier 0', () => {
-  it('C1 : le bouton d’ajout est désactivé et expliqué, aucun POST /envoi/boites', async () => {
+  it('C1 : le bouton d’ajout ouvre le formulaire, aucun POST /envoi/boites sans code', async () => {
     const u = userEvent.setup();
     const s = serveur('prete');
     await renderScreen(<BoitesPage />, { path: '/envoi/boites', handlers: [moi, ...s.reponses, ...handlers] });
     await screen.findByText(ADRESSE);
-    const bouton = screen.getByRole('button', { name: 'Ajout de boîte : bientôt disponible' });
-    expect(bouton).toBeDisabled();
+    const bouton = screen.getByRole('button', { name: 'Ajouter une boîte' });
+    expect(bouton).toBeEnabled();
     await u.click(bouton);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(s.appels).not.toContain('ajouter');
   });
 

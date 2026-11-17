@@ -83,6 +83,15 @@ final class ServiceReponses
         });
     }
 
+    /** Réponses non classées par un humain (« à traiter » + « à rattacher ») : nourrit le frein humain de la chauffe. */
+    public static function nonTraitees(string $ws): int
+    {
+        return WorkspaceContext::run($ws, fn (): int => (int) DB::selectOne(
+            'SELECT count(*) AS n FROM (' . self::BASE . ') x WHERE ' . self::filtreFile('a_traiter') . ' OR ' . self::filtreFile('a_rattacher'),
+            [$ws],
+        )->n);
+    }
+
     private static function filtreFile(string $file): string
     {
         return match ($file) {

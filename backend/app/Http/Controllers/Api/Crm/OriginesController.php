@@ -86,6 +86,25 @@ class OriginesController extends ConsoleController
         });
     }
 
+    public function parGuide(Request $request): JsonResponse
+    {
+        $espace = $this->gardeOrigines($request);
+        $f = $this->filtres($request);
+        $page = (int) ($request->validate(['page' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_PAGE_MOTS]])['page'] ?? 1);
+        if ($this->actif() === false) {
+            return $this->inactif();
+        }
+
+        return WorkspaceContext::run($espace, function () use ($espace, $f, $page): JsonResponse {
+            $r = RequetesOrigines::parGuide($espace, $f, $page, self::PAR_PAGE_MOTS);
+
+            return $this->ok(['actif' => true, 'data' => $r['data'], 'meta' => [
+                'per_page' => self::PAR_PAGE_MOTS, 'page' => $page, 'total' => $r['total'],
+                'has_more' => $page * self::PAR_PAGE_MOTS < $r['total'],
+            ]]);
+        });
+    }
+
     public function tendance(Request $request): JsonResponse
     {
         $espace = $this->gardeOrigines($request);
@@ -328,6 +347,7 @@ class OriginesController extends ConsoleController
             'detail' => ['nullable', 'string', 'max:64'],
             'reseau' => ['nullable', 'string', 'regex:' . RequetesOrigines::JETON],
             'mot' => ['nullable', 'string', 'regex:' . RequetesOrigines::JETON],
+            'guide' => ['nullable', 'string', 'regex:' . RequetesOrigines::JETON],
             'oppose' => ['nullable', 'string', 'in:oui,non,tous'],
             'du' => ['nullable', 'date_format:Y-m-d'],
             'au' => ['nullable', 'date_format:Y-m-d'],
@@ -362,7 +382,7 @@ class OriginesController extends ConsoleController
 
         return [
             'famille' => $famille, 'detail' => $detail,
-            'reseau' => $v['reseau'] ?? null, 'mot' => $v['mot'] ?? null,
+            'reseau' => $v['reseau'] ?? null, 'mot' => $v['mot'] ?? null, 'guide' => $v['guide'] ?? null,
             'oppose' => $v['oppose'] ?? 'tous', 'du' => $du, 'au' => $au,
         ];
     }

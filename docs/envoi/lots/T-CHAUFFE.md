@@ -16,9 +16,10 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche T-CHAUFFE, décision D5. `ENVOI_REE
 - **F07b (lot X6, fait pour les DOMAINES)** : `GardeChauffe::refus()` lit `reculsDe` du domaine d'envoi ; sans recul, comportement strictement inchangé. Avec reculs, le budget du domaine est rejoué sur la table P1-P8 (`plafondDomaineAvecReculs`) : limite du domaine = min(3 x quota de boîte, budget avec reculs), limite de la boîte = min(quota, budget avec reculs) (le recul d'un domaine porte sur toutes ses boîtes). Les deux `min` empêchent toute montée : un recul ne peut qu'abaisser. `DepotChauffe::volumesRessource` est la source unique des volumes (recul, écran, garde). `jourDeChauffe()` et la règle « palier tenu après plainte » ne changent pas.
 - **X11-A (fait)** : la garde lit la MÊME table que l'écran et le budget (`PALIERS_ETENDUS`, avec les reculs du domaine pour le jour de chauffe de la boîte), bornée à `Seuils::PALIER_MAX` (3) : P1 10, P2 18, P3 25 sans fin, donc aucune montée. Passer à 8 = ESCALADE E1 (décision écrite du fondateur). La règle « palier tenu après plainte » s'applique au jour borné. `DOMAINE_FACTEUR` non touché (ESCALADE E2).
 - **Hors lot X6 (ESCALADES, non faites)** :
-  - Reculs d'IP : aucun lien message -> IP dans la garde ; il faut que le transport fournisse l'IP d'envoi.
+  - Reculs d'IP : FAIT par X6-B (voir plus bas) ; le lien message -> IP vient de l'inventaire X6-A, pas du transport.
   - Montée P4-P8 : elle ferait MONTER les quotas appliqués ; valeurs « hypothèses à confirmer en banc ».
   - Alignement 30/20 sans recul : la garde plafonne le domaine à 3 x quota de boîte = 30 en P1, alors que l'écran affiche 20.
+- **X6-B (fait)** : `GardeChauffe::refus()` lit l'IP du domaine d'envoi dans l'inventaire ; domaine d'adaptateur autre que `faux` sans IP = `ip_inconnue` ; avec reculs d'IP, plafond cumulé `quota_ip_atteint` (table P1-P8 bornée à `Seuils::PALIER_MAX`, jamais de montée) ; `noter()` incrémente aussi `ip:<ref>` dans la même transaction. Sans recul, seuils inchangés. `enCours['ip']` non fourni par la passerelle (0).
 - **Pièges connus (voulus, non corrigés)** : un recul posé pendant qu'un message est en contrôle vaut pour le message SUIVANT ; le rejeu d'une clé déjà réservée n'applique pas les quotas (`portes()`), sa place étant déjà comptée.
 
 ## Risques

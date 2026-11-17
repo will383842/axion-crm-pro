@@ -54,6 +54,13 @@ it('le job changements répond « oui » hors PR et en cas de doute', function (
     expect($script)->toContain('"$EVENEMENT" != "pull_request"')
         ->toContain('API en erreur')->toContain('3000')
         ->toContain('workers=true')->toContain('workers=false');
+    // Chaque branche « dans le doute » doit répondre workers=true (pas seulement contenir le texte).
+    foreach (['API en erreur', 'Liste vide ou trop longue'] as $branche) {
+        expect(preg_match('/' . $branche . '[^\n]*workers=(\w+)/', $script, $m))->toBe(1, $branche)
+            ->and($m[1])->toBe('true', $branche);
+    }
+    expect(preg_match('/if \[ "\$EVENEMENT" != "pull_request" \]; then\s*\n\s*echo "workers=(\w+)"/', $script, $m))->toBe(1)
+        ->and($m[1])->toBe('true');
     expect(ciLotC()['jobs']['changements']['permissions'])->toBe(['contents' => 'read', 'pull-requests' => 'read']);
 });
 

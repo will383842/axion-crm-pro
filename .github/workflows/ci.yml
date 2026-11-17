@@ -1054,9 +1054,9 @@ jobs:
         run: pnpm build
 
   # LOT C (plan CI allégée, #680) — le contrôle exigé « Workers Node + Playwright »
-  # est SAUTÉ (un job sauté par un `if:` de job rend un verdict vert, jamais « en
-  # attente ») quand la PR ne touche ni `workers/`, ni `Dockerfile.worker`, ni ce
-  # workflow. JAMAIS de `paths:` sur ce fichier : un workflow non déclenché
+  # n'est JAMAIS sauté (`if: always()`) ; seules ses étapes lourdes sautent, et le
+  # job rend un vrai verdict, quand la PR ne touche ni `workers/`, ni `Dockerfile.worker`,
+  # ni ce workflow. JAMAIS de `paths:` sur ce fichier : un workflow non déclenché
   # laisserait les 4 contrôles exigés « en attente » pour toujours. Hors PR (mise
   # en ligne par `workflow_call`, push, manuel) la réponse est toujours « oui ».
   # Sans checkout : liste des fichiers de la PR par l'API. Erreur, réponse vide ou

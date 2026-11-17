@@ -1006,12 +1006,14 @@ jobs:
       # l'ÉCRIT dans son résumé ; elle n'en tire AUCUNE décision (la CI y reste
       # rejouée). Retour arrière : retirer ces deux étapes.
       - name: Récupérer l'arbre testé
+        continue-on-error: true  # observation : une panne ne rougit jamais le verdict
         if: github.event_name == 'pull_request' && success()
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Calculer l'empreinte de l'arbre testé
+        continue-on-error: true  # observation : une panne ne rougit jamais le verdict
         id: arbre
         if: github.event_name == 'pull_request' && success()
         run: |
@@ -1021,6 +1023,7 @@ jobs:
           echo "${arbre}" > arbre.txt
 
       - name: Publier ci-arbre-<empreinte de l'arbre>
+        continue-on-error: true  # observation : une panne ne rougit jamais le verdict
         if: github.event_name == 'pull_request' && success()
         uses: actions/upload-artifact@v4
         with:

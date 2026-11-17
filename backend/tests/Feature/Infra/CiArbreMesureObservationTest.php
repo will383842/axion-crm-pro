@@ -114,3 +114,14 @@ test('E1 — le garde de NR-18 et H44-003 reste vrai sur les deux workflows de m
         expect(preg_match('/^\s+needs:\s*\[ci\]\s*$/m', $texte))->toBe(1, "{$f} doit garder « needs: [ci] ».");
     }
 });
+
+test('E1 — les trois étapes ajoutées au verdict sont non bloquantes (continue-on-error)', function () {
+    [, $ci] = workflowE1('ci.yml');
+    $etapes = collect(etapesE1($ci, 'backend-verdict'));
+    $ajoutees = $etapes->filter(fn ($e) => str_contains((string) ($e['if'] ?? ''), "github.event_name == 'pull_request'"));
+
+    expect($ajoutees)->toHaveCount(3);
+    foreach ($ajoutees as $etape) {
+        expect($etape['continue-on-error'] ?? false)->toBeTrue('« ' . $etape['name'] . ' » doit être en continue-on-error : une panne d\'observation ne rougit jamais le verdict.');
+    }
+});

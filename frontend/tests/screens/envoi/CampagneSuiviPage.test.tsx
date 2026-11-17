@@ -392,3 +392,94 @@ describe('L6-C — cartes des compteurs réels', () => {
     }
   });
 });
+
+// ── B8-B : bandeau « bloquée, pourquoi » et bouton Lancer ──────────────────────
+
+describe('B8-B — suivi : bandeau blocage', () => {
+  const poserBlocage = (id: string, blocage: unknown) =>
+    fixerFiche(id, (f) => ({ ...f, campagne: { ...(f['campagne'] as object), blocage } }));
+
+  it('affiche le message du serveur tel quel, en role="status", sans recalcul ni code brut', async () => {
+    const id = idDe('programmee');
+    poserBlocage(id, { code: 'frein_arret_general', message: 'MESSAGE-SERVEUR « tel quel » 123' });
+    await pret(id);
+    const bandeau = screen.getByTestId('bandeau-blocage');
+    expect(bandeau).toHaveAttribute('role', 'status');
+    expect(bandeau).toHaveTextContent('MESSAGE-SERVEUR « tel quel » 123');
+    expect(bandeau).not.toHaveTextContent('frein_arret_general');
+  });
+
+  it('Lancer est désactivé et sa raison est reliée par aria-describedby', async () => {
+    const id = idDe('programmee');
+    poserBlocage(id, { code: 'reglage_non_applique', message: 'Boîtes ou plafond : renvoyez à valider.' });
+    await pret(id);
+    const lancer = screen.getByRole('button', { name: 'Lancer' });
+    expect(lancer).toBeDisabled();
+    const ref = lancer.getAttribute('aria-describedby');
+    expect(ref).toBeTruthy();
+    expect(document.getElementById(ref!)).toHaveTextContent('Boîtes ou plafond : renvoyez à valider.');
+    expect(lancer).toHaveAccessibleDescription(/Boîtes ou plafond : renvoyez à valider\./);
+  });
+
+  it('blocage nul : Lancer actif, aucun bandeau', async () => {
+    const id = idDe('programmee');
+    poserBlocage(id, null);
+    await pret(id);
+    expect(screen.getByRole('button', { name: 'Lancer' })).toBeEnabled();
+    expect(screen.queryByTestId('bandeau-blocage')).not.toBeInTheDocument();
+  });
+
+  it('le bandeau est au-dessus du bandeau de préparation', async () => {
+    const id = idDe('programmee');
+    fixerFiche(id, (f) => ({
+      ...f,
+      campagne: { ...(f['campagne'] as object), blocage: { code: 'preparation_bloquee', message: 'Préparation bloquée côté serveur.' } },
+      preparation: { etat: 'bloquee', motif: 'jours_non_applicables', inscrits: 0, membres: 30 },
+    }));
+    await pret(id);
+    const haut = screen.getByTestId('bandeau-blocage');
+    const bas = screen.getByTestId('bandeau-preparation');
+    expect(haut.compareDocumentPosition(bas) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('les gestes autres que Lancer restent possibles (Arrêter)', async () => {
+    const id = idDe('programmee');
+    poserBlocage(id, { code: 'aucun_destinataire', message: 'm' });
+    await pret(id);
+    expect(screen.getByRole('button', { name: 'Arrêter' })).toBeEnabled();
+  });
+
+  it.each([
+    ['jours_non_applicables', 'les jours d’envoi choisis ne sont pas encore appliqués'],
+    ['objet_b_non_applicable', 'le test A/B de l’objet n’est pas encore appliqué'],
+    ['etapes_invalides', 'les étapes de la séquence ne sont pas valides'],
+    ['sequence_incoherente', 'la séquence de la campagne est incohérente'],
+  ])('préparation bloquée, motif %s : phrase en français', async (motif, phrase) => {
+    const id = idDe('programmee');
+    fixerFiche(id, (f) => ({ ...f, preparation: { etat: 'bloquee', motif, inscrits: 0, membres: 30 } }));
+    await pret(id);
+    const b = screen.getByTestId('bandeau-preparation');
+    expect(b).toHaveTextContent(phrase);
+    expect(b).not.toHaveTextContent(motif);
+  });
+});
+
+describe('B8-B — démo : une campagne par code', () => {
+  it.each([
+    'reglage_non_applique',
+    'preparation_bloquee',
+    'aucun_destinataire',
+    'frein_arret_general',
+    'frein_pause_automatique',
+    'sequence_en_pause',
+  ])('cmp-blq-%s : bandeau du serveur, jamais le code', async (code) => {
+    await ouvrir(`cmp-blq-${code}`);
+    const bandeau = await screen.findByTestId('bandeau-blocage');
+    expect(bandeau).not.toHaveTextContent(code);
+    expect(bandeau.textContent.length).toBeGreaterThan(20);
+  });
+
+  it('les campagnes de démo de blocage ne changent pas la liste ordinaire', () => {
+    expect(demoDb.campagnes.tous().some((c) => String(c.id).startsWith('cmp-blq-'))).toBe(false);
+  });
+});

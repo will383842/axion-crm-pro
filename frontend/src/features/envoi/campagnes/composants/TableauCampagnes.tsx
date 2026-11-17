@@ -3,12 +3,13 @@
  * une carte par campagne (aucun défilement horizontal). Les rôles ARIA sont
  * posés à la main : l'affichage change, la structure lue ne change pas.
  */
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { StatusPill } from '@/components/ui';
 import type { Campagne } from '../api';
 import { BarreProgression } from './BarreProgression';
 import { GestesCampagne } from './GestesCampagne';
-import { dateRelative, STATUT_LIBELLE, STATUT_TON } from './libelles';
+import { dateRelative, phraseBlocage, STATUT_LIBELLE, STATUT_TON } from './libelles';
 
 const GRILLE = 'md:grid-cols-[minmax(0,2.2fr)_8rem_minmax(0,1.6fr)_9rem_9rem_minmax(0,2.4fr)]';
 const BOUTON_LIEN =
@@ -25,7 +26,49 @@ function Reponses({ c }: { c: Campagne }) {
   );
 }
 
+/** B8-B : pastille « Bloquée » + raison en texte (lisible sans couleur) + lien vers le suivi. Rien si `blocage` est nul. */
+function Blocage({ c }: { c: Campagne }) {
+  if (c.blocage === null || c.blocage === undefined) return null;
+  return (
+    <p data-testid="blocage-ligne" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-700">
+      <StatusPill tone="danger">Bloquée</StatusPill>
+      <span>{phraseBlocage(c.blocage.code)}</span>
+      <Link to="/envoi/campagnes/$campagneId" params={{ campagneId: String(c.id) }} className="font-medium text-produit underline" aria-label={`Voir pourquoi : ${c.nom}`}>
+        Voir pourquoi
+      </Link>
+    </p>
+  );
+}
+
 export function TableauCampagnes({ campagnes, maintenant }: { campagnes: readonly Campagne[]; maintenant: string }) {
+  // Filtre « Bloquées » : côté écran, sur la page chargée seulement.
+  const [seulementBloquees, setSeulementBloquees] = useState(false);
+  const nbBloquees = campagnes.filter((c) => c.blocage !== null && c.blocage !== undefined).length;
+  const visibles = seulementBloquees ? campagnes.filter((c) => c.blocage !== null && c.blocage !== undefined) : campagnes;
+  return (
+    <>
+      <div className="mb-2 flex items-center gap-3">
+        <button
+          type="button"
+          aria-pressed={seulementBloquees}
+          onClick={() => setSeulementBloquees((v) => !v)}
+          className="inline-flex h-9 items-center rounded-full px-3 text-sm font-medium text-slate-800 ring-1 ring-slate-300 hover:bg-slate-50 aria-pressed:bg-slate-900 aria-pressed:text-white max-md:h-11"
+        >
+          Bloquées ({nbBloquees})
+        </button>
+      </div>
+      {seulementBloquees && visibles.length === 0 ? (
+        <p role="status" className="rounded-xl bg-white px-4 py-6 text-sm text-slate-700 ring-1 ring-slate-200">
+          Aucune campagne bloquée sur cette page.
+        </p>
+      ) : (
+        <Table campagnes={visibles} maintenant={maintenant} />
+      )}
+    </>
+  );
+}
+
+function Table({ campagnes, maintenant }: { campagnes: readonly Campagne[]; maintenant: string }) {
   return (
     <div role="table" aria-label="Campagnes" className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
       <div role="row" className={`hidden gap-4 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid ${GRILLE}`}>
@@ -62,6 +105,7 @@ export function TableauCampagnes({ campagnes, maintenant }: { campagnes: readonl
                     {c.cible.libelle} · {c.cible.total.toLocaleString('fr-FR')}
                   </span>
                 </div>
+                <Blocage c={c} />
               </div>
               <div role="cell">
                 <StatusPill tone={STATUT_TON[c.statut]} pulse={c.statut === 'en_cours'}>

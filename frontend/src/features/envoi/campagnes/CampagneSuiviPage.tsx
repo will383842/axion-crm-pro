@@ -5,7 +5,7 @@
  * Les réponses sont l'indicateur principal. Aucun clic n'est suivi : les
  * ouvertures ne sont pas mesurées et la carte dit « non suivi », jamais 0.
  */
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from '@tanstack/react-router';
 import { Card, EmptyState, KpiCard, PageHeader, QueryErrorState, Skeleton, StatusPill, Tabs } from '@/components/ui';
 import { useCampagne, type FicheCampagne } from './api';
@@ -284,7 +284,22 @@ const MOTIF_PREPARATION: Record<string, string> = {
   cible_non_supportee: 'ce type de cible n’est pas pris en charge',
   population_non_ouverte: 'ce type de contacts n’est pas encore ouvert',
   filtre_origine_inactif: 'le filtre par réseau d’origine n’est pas actif',
+  jours_non_applicables: 'les jours d’envoi choisis ne sont pas encore appliqués',
+  objet_b_non_applicable: 'le test A/B de l’objet n’est pas encore appliqué',
+  etapes_invalides: 'les étapes de la séquence ne sont pas valides',
+  sequence_incoherente: 'la séquence de la campagne est incohérente',
 };
+
+const ID_RAISON_BLOCAGE = 'raison-blocage';
+
+/** B8-B : le message du serveur, tel quel (aucun recalcul ici), au-dessus de la préparation. */
+function BandeauBlocage({ blocage }: { blocage: NonNullable<FicheCampagne['campagne']['blocage']> }) {
+  return (
+    <p id={ID_RAISON_BLOCAGE} data-testid="bandeau-blocage" role="status" className="mb-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-900">
+      <strong className="font-semibold">Bloquée :</strong> {blocage.message}
+    </p>
+  );
+}
 
 /** Préparation de la liste d'une campagne programmée : où elle en est, ou pourquoi elle est bloquée. */
 function BandeauPreparation({ fiche }: { fiche: FicheCampagne }) {
@@ -309,6 +324,21 @@ export function CampagneSuiviPage() {
   const { campagneId } = useParams({ strict: false });
   const [onglet, setOnglet] = useState<Onglet>('progression');
   const requete = useCampagne(campagneId ?? '');
+  const racine = useRef<HTMLDivElement>(null);
+  const blocage = requete.data?.campagne.blocage ?? null;
+  // B8-B : « Lancer » reste désactivé tant que le serveur dit « bloquée » ; sa raison est reliée par aria-describedby.
+  // (Les gestes sont dans GestesCampagne, hors lot : on pose l'état sur le bouton rendu, à chaque rendu.)
+  useLayoutEffect(() => {
+    const bouton = racine.current?.querySelector<HTMLButtonElement>('[data-geste="lancer"]');
+    if (!bouton) return;
+    if (blocage !== null) {
+      bouton.disabled = true;
+      bouton.setAttribute('aria-describedby', ID_RAISON_BLOCAGE);
+    } else if (bouton.getAttribute('aria-describedby') === ID_RAISON_BLOCAGE) {
+      bouton.removeAttribute('aria-describedby');
+      bouton.disabled = false;
+    }
+  });
 
   if (requete.isPending) {
     return (
@@ -339,7 +369,7 @@ export function CampagneSuiviPage() {
   ];
 
   return (
-    <div>
+    <div ref={racine}>
       <PageHeader
         title={c.nom}
         surTitre="Envoi"
@@ -370,6 +400,7 @@ export function CampagneSuiviPage() {
           Envoi réel fermé : rien ne part.
         </p>
       ) : null}
+      {blocage !== null ? <BandeauBlocage blocage={blocage} /> : null}
       <BandeauPreparation fiche={fiche} />
       <div className="mb-4 max-w-full overflow-x-auto">
         <Tabs items={onglets} value={onglet} onChange={setOnglet} />

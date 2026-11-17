@@ -25,6 +25,25 @@ export const STATUT_TON: Record<StatutCampagne, StatusTone> = {
   arretee: 'danger',
 };
 
+/**
+ * B8-B — « Bloquée, pourquoi » : une phrase courte par code du serveur (B8-A). Le code brut ne
+ * s'affiche jamais ; un code inconnu (serveur plus récent que l'écran) reçoit la phrase générique.
+ */
+export const PHRASES_BLOCAGE: Record<string, string> = {
+  reglage_non_applique: 'boîtes ou plafond choisis, pas encore appliqués par l’envoi',
+  preparation_bloquee: 'la préparation de la liste est bloquée',
+  aucun_destinataire: 'aucun destinataire retenu',
+  frein_arret_general: 'arrêt général armé',
+  frein_pause_automatique: 'pause automatique active',
+  sequence_en_pause: 'séquence en pause',
+};
+
+export const PHRASE_BLOCAGE_GENERIQUE = 'cette campagne ne peut pas partir pour l’instant';
+
+export function phraseBlocage(code: string): string {
+  return Object.hasOwn(PHRASES_BLOCAGE, code) ? PHRASES_BLOCAGE[code]! : PHRASE_BLOCAGE_GENERIQUE;
+}
+
 export const ETAT_LIBELLE: Record<EtatDestinataire, string> = {
   a_envoyer: 'En file',
   envoye: 'Parti',

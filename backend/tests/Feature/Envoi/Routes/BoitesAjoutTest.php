@@ -113,7 +113,7 @@ test('parcours complet : 202 puis 201, boîte en pause, réponse au contrat sans
     $l = WorkspaceContext::run($ws->id, fn () => DB::table('envoi_boites')->where('id', $r->json('id'))->first());
     expect($l->etat)->toBe('en_pause')->and($l->pause_motif)->toBe('suspension_manuelle')->and($l->identifiants_chiffres)->not->toContain(BA_MDP);
     // Aucune ligne d'audit ne porte le secret, le code, ni l'empreinte du corps ; une ligne propre par appel, sans corps.
-    $audit = DB::table('audit_logs')->get()->map(fn ($x) => json_encode($x))->implode("\n");
+    $audit = DB::table('audit_logs')->get()->map(fn ($x) => json_encode($x, JSON_UNESCAPED_SLASHES))->implode("\n");
     expect($audit)->not->toContain(BA_MDP)->not->toContain($code)
         ->not->toContain(AuditHashChainLogger::empreinteDuCorps($complet))->not->toContain(AuditHashChainLogger::empreinteDuCorps($corps))
         ->toContain('api/v1/envoi/boites/ajout/code')->toContain('api/v1/envoi/boites');

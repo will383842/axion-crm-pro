@@ -12,3 +12,9 @@ Scénarios : `bebn 1` S1 nominal (2 personnes, 2 étapes, `In-Reply-To`, compteu
 
 Mutations vérifiées rouges : `enregistrerEnvoye` neutralisé ⇒ `bebn 1` ; prédicat local = drapeau réel ⇒ `bebn 1` ; `reel_actif` forcé à vrai ⇒ `bebn 2`.
 Aucun scénario rouge sur `main` : pas de lot `L7-FIX`.
+
+## Corrections de relecture (RELECTURE-OPUS : BLOQUÉ → corrigé)
+1. **Faux serveur de `bebn 2`** : le test lit désormais le faux serveur DU CONTENEUR (`app(FauxServeurEnvoi::class)`, singleton utilisé par l'aiguillage de `envoi:cycle`), horloge à 10:00 (inscriptions dues, dans la fenêtre), et exige `appels` inchangés. L'ancienne assertion portait sur un faux serveur relié à rien.
+   Limite constatée (mutation 3 : porte retirée dans `ChefOrchestre::cycle`, vue rouge seulement par le texte « porte fermée ») : porte ouverte, l'espace du banc reste « sauté » (`bloquant_rouge`). Cause : porte ouverte ⇒ `envoi.reel_actif` vrai ⇒ le point bloquant `auto.reel_actif_faux` du feu vert est rouge (et le mode témoins du banc n'a pas de ligne `envoi_drapeaux`). Pour qu'il soit traité il faudrait un feu vert complet avec réel actif, ce qui est exactement ce que ce lot ne doit jamais faire. Les assertions « 0 message / 0 appel » restent des gardes de non-régression, mais c'est le texte « porte fermée » qui prouve la porte ; le feu vert est la seconde barrière.
+2. **Validation de la campagne (non bloquant)** : `a_valider` passe par `DepotCampagnes::transitionner` (chemin légal) ; le passage à `programmee` reste posé à la main, car le journal est en ajout seul (UPDATE refusé par déclencheur) et la fenêtre d'annulation se mesure sur l'horloge SQL `now()` : le chemin légal ne peut pas la clore dans un test.
+3. **Espionne de flux** : `BancCampagne::espionnerFlux()` / `libererFlux()` (classe `EspionneFluxBanc`) posées en `beforeEach` / `afterEach` ; chaque scénario exige 0 ouverture de flux http(s).

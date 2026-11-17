@@ -14,11 +14,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\Support\BancCampagne;
+use Tests\Support\EspionneFluxBanc;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-afterEach(fn () => Carbon::setTestNow());
+afterEach(function () {
+    Carbon::setTestNow();
+    BancCampagne::libererFlux();
+});
 
 beforeEach(function () {
     config([
@@ -27,6 +31,7 @@ beforeEach(function () {
     ]);
     Http::preventStrayRequests();
     Mail::fake();
+    BancCampagne::espionnerFlux();   // aucune socket http(s) : toute ouverture est comptée, puis refusée
 });
 
 test('bebn 1 S1 nominal : campagne → préparation → lancer → étape 1 → étape 2 (In-Reply-To) → terminée, compteurs justes', function () {
@@ -56,7 +61,8 @@ test('bebn 1 S1 nominal : campagne → préparation → lancer → étape 1 → 
         BancCampagne::sous($mode, fn () => $banc->tic(BancCampagne::jour('10:00', 4)));
         expect(DB::table('envoi_inscriptions')->where('workspace_id', $banc->ws)->where('statut', 'terminee')->count())->toBe(2);
         $cmp = BancCampagne::sous($mode, fn () => app(CompteursCampagne::class)->pour($banc->ws, $id));
-        expect($cmp['envoyes'])->toBe(4)->and($cmp['touches'])->toBe(2)->and(array_sum($cmp['issues']))->toBe(2);
+        expect($cmp['envoyes'])->toBe(4)->and($cmp['touches'])->toBe(2)->and(array_sum($cmp['issues']))->toBe(2)
+            ->and(EspionneFluxBanc::$ouvertures)->toBe(0);
     }
 });
 
@@ -66,13 +72,15 @@ test('bebn 2 S9 porte fermée : envoi:cycle réel ⇒ « porte fermée », 0 mes
         $id = $banc->campagne(2, 2);
         BancCampagne::sous($mode, fn () => $banc->lancer($id));
         $avant = config('envoi.reel_actif');
-        $banc->serveur = new FauxServeurEnvoi;
+        $faux = app(FauxServeurEnvoi::class);   // le faux serveur DU CONTENEUR : celui que l'aiguillage de envoi:cycle utiliserait
+        $appelsAvant = $faux->appels;
+        Carbon::setTestNow(BancCampagne::jour('10:00'));   // inscriptions dues, dans la fenêtre : seule la porte retient
 
         BancCampagne::sous($mode, fn () => Artisan::call('envoi:cycle'));
 
         expect($avant)->toBeFalse()->and(config('envoi.reel_actif'))->toBeFalse()
             ->and(Artisan::output())->toContain('porte fermée')
             ->and(DB::table('envoi_messages')->where('workspace_id', $banc->ws)->count())->toBe(0)
-            ->and($banc->serveur->appels)->toBe(0);
+            ->and($faux->appels)->toBe($appelsAvant)->and(EspionneFluxBanc::$ouvertures)->toBe(0);
     }
 });

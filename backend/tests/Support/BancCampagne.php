@@ -297,4 +297,46 @@ final class BancCampagne
             DB::statement('RESET ROLE');
         }
     }
+
+    /** Pose l'espionne de flux http(s) (modèle EssaiABlancSansReseauTest) : à appeler en `beforeEach`. */
+    public static function espionnerFlux(): void
+    {
+        EspionneFluxBanc::$ouvertures = 0;
+        foreach (['http', 'https'] as $schema) {
+            @stream_wrapper_unregister($schema);
+            stream_wrapper_register($schema, EspionneFluxBanc::class);
+        }
+    }
+
+    /** Rend les gardes de flux d'origine : à appeler en `afterEach`. */
+    public static function libererFlux(): void
+    {
+        foreach (['http', 'https'] as $schema) {
+            @stream_wrapper_restore($schema);
+        }
+    }
+}
+
+/** Espionne de flux : toute ouverture est comptée, puis refusée. */
+final class EspionneFluxBanc
+{
+    public static int $ouvertures = 0;
+
+    /** @var resource|null */
+    public $context;
+
+    public function stream_open(string $path, string $mode, int $options, ?string &$opened): bool
+    {
+        self::$ouvertures++;
+
+        return false;
+    }
+
+    /** @return array<string, mixed>|false */
+    public function url_stat(string $path, int $flags): array|false
+    {
+        self::$ouvertures++;
+
+        return false;
+    }
 }

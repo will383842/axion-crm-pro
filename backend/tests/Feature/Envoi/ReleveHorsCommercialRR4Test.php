@@ -195,9 +195,10 @@ afterEach(function () {
 test('H1 STOP relevé hors espace commercial : aucune exception, message noté, opposition « releve », inscription arrêtée, réponse stockée, aucun échec', function () {
     foreach (RR4_MODES as $mode) {
         $x = "stop.{$mode}@zz-client.example.test";
+        $avant = rr4Count($this->a, 'envoi_evenements');
         rr4Scenario($this->a, $mode, "h1-{$mode}", [$x], 'STOP, merci');
         expect(rr4Statuts($this->a)[ListeSuppression::empreinte($x)])->toBe('arretee', $mode);
-        expect(rr4Count($this->a, 'envoi_evenements'))->toBe(1, $mode)->and(rr4Count($this->a, 'envoi_echecs_releve'))->toBe(0, $mode)
+        expect(rr4Count($this->a, 'envoi_evenements'))->toBe($avant + 1, $mode)->and(rr4Count($this->a, 'envoi_echecs_releve'))->toBe(0, $mode)
             ->and(rr4Count($this->a, 'envoi_reponses'))->toBeGreaterThanOrEqual(1);
         expect(WorkspaceContext::run($this->a, fn () => DB::table('envoi_oppositions')->where('empreinte_adresse', ListeSuppression::empreinte($x))->where('canal', 'releve')->count()))->toBe(1, $mode);
     }
@@ -211,8 +212,9 @@ test('H2 plainte et rebond dur hors espace commercial : freins comptés, inscrip
         rr4Scenario($this->a, $mode, "h2r-{$mode}", [$r], '', '5.1.1');
         $s = rr4Statuts($this->a);
         expect($s[ListeSuppression::empreinte($p)])->toBe('arretee', $mode)->and($s[ListeSuppression::empreinte($r)])->toBe('arretee', $mode);
-        $freins = WorkspaceContext::run($this->a, fn () => DB::table('envoi_chauffe_jours')->where('workspace_id', $this->a)->selectRaw('COALESCE(SUM(plaintes),0) p, COALESCE(SUM(rebonds_durs),0) r')->first());
-        expect((int) $freins->p)->toBeGreaterThanOrEqual(1, $mode)->and((int) $freins->r)->toBeGreaterThanOrEqual(1, $mode);
+        $compte = fn (string $colonne): int => WorkspaceContext::run($this->a, fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $this->a)
+            ->where('commande', 'retour_applique')->whereRaw("details->>'colonne' = ?", [$colonne])->count());
+        expect($compte('plaintes'))->toBeGreaterThanOrEqual(1, $mode)->and($compte('rebonds_durs'))->toBeGreaterThanOrEqual(1, $mode);
     }
 });
 

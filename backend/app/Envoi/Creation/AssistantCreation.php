@@ -629,11 +629,20 @@ final class AssistantCreation
     }
 
     /** @return list<array<string, mixed>> */
-    public function cibles(string $ws, ?string $recherche, ?string $entreprise): array
+    public function cibles(string $ws, ?string $recherche, ?string $entreprise, ?string $audience = null): array
     {
-        return WorkspaceContext::run($ws, function () use ($ws, $recherche, $entreprise): array {
+        return WorkspaceContext::run($ws, function () use ($ws, $recherche, $entreprise, $audience): array {
             $filtre = fn ($q, string $col) => $recherche === null || $recherche === '' ? $q : $q->where($col, 'ilike', '%' . addcslashes($recherche, '%_\\') . '%');
             $sortie = [];
+            // B8-D : l'audience demandée (chiffres seulement) est TOUJOURS proposée, en tête, même hors des 50 premières par nom ;
+            // hors espace, supprimée ou inactive : ignorée sans erreur (aucun oracle d'existence entre espaces).
+            $demandee = null;
+            if ($audience !== null && ctype_digit($audience) && strlen($audience) < 18) {
+                $demandee = DB::table('email_audiences')->where('workspace_id', $ws)->whereNull('deleted_at')->where('is_active', true)->where('id', (int) $audience)->first(['id', 'name', 'member_count']);
+                if ($demandee !== null) {
+                    $sortie[] = ['type' => 'audience', 'reference' => (string) $demandee->id, 'libelle' => $demandee->name, 'total' => (int) $demandee->member_count, 'joignables' => null];
+                }
+            }
             $listes = $filtre(DB::table('listes_manuelles')->where('workspace_id', $ws)->whereNull('deleted_at'), 'nom')->orderBy('nom')->limit(50)->get(['id', 'nom']);
             foreach ($listes as $l) {
                 $n = $this->compter($ws, 'liste', (string) $l->id);
@@ -641,6 +650,9 @@ final class AssistantCreation
             }
             $audiences = $filtre(DB::table('email_audiences')->where('workspace_id', $ws)->whereNull('deleted_at')->where('is_active', true), 'name')->orderBy('name')->limit(50)->get(['id', 'name', 'member_count']);
             foreach ($audiences as $a) {
+                if ($demandee !== null && (int) $a->id === (int) $demandee->id) {
+                    continue;
+                }
                 $sortie[] = ['type' => 'audience', 'reference' => (string) $a->id, 'libelle' => $a->name, 'total' => (int) $a->member_count, 'joignables' => null];
             }
             $etiquettes = $filtre(DB::table('tags')->where('workspace_id', $ws), 'name')->orderBy('name')->limit(50)->get(['slug', 'name']);

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Envoi\Campagnes\ConstructionRefusee;
+use App\Envoi\Campagnes\PlanSequence;
+use App\Envoi\Campagnes\RaisonBlocage;
 use App\Envoi\Campagnes\SelectionRefusee;
 use App\Envoi\Creation\ApercuReel;
 use App\Envoi\Creation\ServiceMessagesTypes;
@@ -124,7 +127,25 @@ class EnvoiMessagesController extends ApiController
 
     public function contexte(): JsonResponse
     {
-        return response()->json(['maintenant' => now()->utc()->toIso8601String(), 'fuseau' => (string) config('app.timezone')]);
+        return response()->json(['maintenant' => now()->utc()->toIso8601String(), 'fuseau' => (string) config('app.timezone'), 'capacites' => $this->capacites()]);
+    }
+
+    /**
+     * Ce que l'envoi sait appliquer, LU des refus du serveur (jamais une constante du front) : `ab` = faux tant que `PlanSequence` refuse
+     * un `objet_b` ; `boites` et `plafond` = faux tant que `RaisonBlocage::REGLAGES_APPLIQUES` l'est (même constante que la matérialisation).
+     *
+     * @return array{ab: bool, boites: bool, plafond: bool}
+     */
+    private function capacites(): array
+    {
+        try {
+            PlanSequence::depuisCampagne((object) ['nb_etapes' => 1, 'saisie' => ['contenu' => ['sequence' => [['etape' => 1, 'objet_b' => 'sonde']]]]]);
+            $ab = true;
+        } catch (ConstructionRefusee $e) {
+            $ab = $e->motif !== 'objet_b_non_applicable';
+        }
+
+        return ['ab' => $ab, 'boites' => RaisonBlocage::REGLAGES_APPLIQUES, 'plafond' => RaisonBlocage::REGLAGES_APPLIQUES];
     }
 
     /**

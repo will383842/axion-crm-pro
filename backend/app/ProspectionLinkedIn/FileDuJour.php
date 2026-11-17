@@ -40,37 +40,39 @@ final class FileDuJour
         $arret = $this->arret ?? new Arret;
 
         try {
-            if ($arret->actif($workspaceId, $expediteurId)) {
-                return self::vide('arret');
-            }
-            $restants = ($this->plafonds ?? new Plafonds)->restants($workspaceId, $expediteurId, $t);
-            $n = min($restants['jour'], $restants['semaine']);
-            if ($n <= 0) {
-                return self::vide('plafond');
-            }
+            return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $expediteurId, $t, $controles, $arret): array {
+                if ($arret->actif($workspaceId, $expediteurId)) {
+                    return self::vide('arret');
+                }
+                $restants = ($this->plafonds ?? new Plafonds)->restants($workspaceId, $expediteurId, $t);
+                $n = min($restants['jour'], $restants['semaine']);
+                if ($n <= 0) {
+                    return self::vide('plafond');
+                }
 
-            $candidats = $this->candidats($workspaceId, $expediteurId, $t);
-            if ($candidats === []) {
-                return self::vide('aucun');
-            }
-            $c = $controles->verifier($workspaceId, $candidats, $t);
-            if ($c['erreur']) {
-                return self::vide('controle_illisible', true); // l'alerte est déjà journalisée
-            }
-            $retenus = array_slice($c['ok'], 0, $n);
-            if ($retenus === []) {
-                return self::vide('aucun');
-            }
-            if ($this->avantEcriture !== null) {
-                ($this->avantEcriture)();
-            }
+                $candidats = $this->candidats($workspaceId, $expediteurId, $t);
+                if ($candidats === []) {
+                    return self::vide('aucun');
+                }
+                $c = $controles->verifier($workspaceId, $candidats, $t);
+                if ($c['erreur']) {
+                    return self::vide('controle_illisible', true); // l'alerte est déjà journalisée
+                }
+                $retenus = array_slice($c['ok'], 0, $n);
+                if ($retenus === []) {
+                    return self::vide('aucun');
+                }
+                if ($this->avantEcriture !== null) {
+                    ($this->avantEcriture)();
+                }
 
-            $parId = [];
-            foreach ($candidats as $p) {
-                $parId[(string) $p->id] = $p;
-            }
+                $parId = [];
+                foreach ($candidats as $p) {
+                    $parId[(string) $p->id] = $p;
+                }
 
-            return $this->ecrire($workspaceId, $expediteurId, array_map(static fn (string $id): \stdClass => $parId[$id], $retenus), $controles, $arret);
+                return $this->ecrire($workspaceId, $expediteurId, array_map(static fn (string $id): \stdClass => $parId[$id], $retenus), $controles, $arret);
+            });
         } catch (Throwable) {
             try {
                 (new JournalProspection)->ecrire($workspaceId, null, 'alerte', 'systeme', 'file_du_jour', 'alerte-file-' . Str::uuid(), ['motif' => 'file_illisible']);

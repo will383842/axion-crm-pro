@@ -45,11 +45,12 @@ final class ControlesProspect
 
         try {
             // Lectures dans un point de sauvegarde : une erreur SQL n'avorte pas la transaction englobante (l'alerte reste écrivable).
-            [$opposes, $refus] = DB::transaction(function () use ($workspaceId, $prospects, $t): array {
+            // Sous WorkspaceContext::run : sans contexte d'espace, la RLS rendrait zéro ligne sans erreur (échec OUVERT).
+            [$opposes, $refus] = DB::transaction(fn (): array => WorkspaceContext::run($workspaceId, function () use ($workspaceId, $prospects, $t): array {
                 $ident = $this->identites($workspaceId, $prospects);
 
                 return [$this->opposesAvec($workspaceId, $prospects, $ident), $this->refusAvec($workspaceId, $prospects, $ident, $t)];
-            });
+            }));
         } catch (Throwable) {
             $this->alerte($workspaceId);
 
@@ -107,7 +108,8 @@ final class ControlesProspect
      */
     public function opposes(string $workspaceId, array $prospects): array
     {
-        return array_keys($this->opposesAvec($workspaceId, $prospects, $this->identites($workspaceId, $prospects)));
+        // Point de sauvegarde : une lecture en erreur est annulée proprement ; l'exception, elle, remonte toujours.
+        return DB::transaction(fn (): array => WorkspaceContext::run($workspaceId, fn (): array => array_keys($this->opposesAvec($workspaceId, $prospects, $this->identites($workspaceId, $prospects)))));
     }
 
     /** Passe le prospect à `ecarte` (définitif) et journalise (une seule fois). */

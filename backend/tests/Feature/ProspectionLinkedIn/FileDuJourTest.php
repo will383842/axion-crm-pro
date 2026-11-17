@@ -18,7 +18,7 @@ use Tests\TestCase;
  */
 uses(TestCase::class, RefreshDatabase::class);
 
-const FDJ_MODES = ['app', 'proprio'];
+const FDJ_MODES = ['app', 'proprio', 'app-sans-contexte'];
 
 /** Jeudi 19 novembre 2026, 10 h (Paris). */
 function fdjJeudi(): CarbonImmutable
@@ -106,8 +106,9 @@ function fdjSous(string $mode, string $ws, Closure $f): mixed
 {
     DB::beginTransaction();
     try {
-        if ($mode === 'app') {
-            WorkspaceContext::set($ws);
+        if ($mode === 'app' || $mode === 'app-sans-contexte') {
+            // « app-sans-contexte » : rôle applicatif SANS contexte d'espace (tâche planifiée, commande) : la RLS ne rend rien.
+            $mode === 'app' ? WorkspaceContext::set($ws) : WorkspaceContext::clear();
             DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
         }
 
@@ -121,11 +122,11 @@ function fdjSous(string $mode, string $ws, Closure $f): mixed
 /** Rend une table illisible (renommée) pour le propriétaire comme pour le rôle applicatif. */
 function fdjCasser(string $mode, string $table): void
 {
-    if ($mode === 'app') {
+    if ($mode !== 'proprio') {
         DB::statement('RESET ROLE');
     }
     DB::statement("ALTER TABLE {$table} RENAME TO {$table}_cassee");
-    if ($mode === 'app') {
+    if ($mode !== 'proprio') {
         DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
     }
 }
@@ -331,6 +332,21 @@ test('opposition posée PENDANT la construction ⇒ relue avant l\'UPDATE : éca
             $file = new FileDuJour(avantEcriture: static fn () => (new RegistreOppositionManuel)->inscrire($ws, 'adresse', 'tardif@example.test', 'test', 'le fondateur'));
             $r = $file->construire($ws, $exp, fdjJeudi());
             expect($r['prospects'])->toBe([], $mode)->and(fdjEtat($ws, $p))->toBe('ecarte');
+        });
+    }
+});
+
+test('opposition posée PENDANT la construction + registre illisible à la relecture ⇒ file vide, alerte, état inchangé', function () {
+    foreach (FDJ_MODES as $mode) {
+        $ws = fdjEspace();
+        $exp = fdjExpediteur();
+        $p = fdjProspect($ws, $exp, ['contact_id' => fdjContact($ws, 'illisible@example.test')]);
+        fdjSous($mode, $ws, function () use ($ws, $exp, $p, $mode) {
+            $file = new FileDuJour(avantEcriture: static fn () => fdjCasser($mode, 'envoi_oppositions_linkedin'));
+            $r = $file->construire($ws, $exp, fdjJeudi());
+            expect($r['prospects'])->toBe([], $mode)->and($r['raison'])->toBe('controle_illisible')->and($r['alerte'])->toBeTrue();
+            DB::statement('RESET ROLE');
+            expect(fdjEtat($ws, $p))->toBe('qualifie');
         });
     }
 });

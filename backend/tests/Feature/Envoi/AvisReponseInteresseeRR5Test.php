@@ -69,13 +69,15 @@ beforeEach(function () {
     $this->adm = av5Membre($this->compte($this->ws, 'admin'), $this->ws, 'admin');
     $this->lecteur = av5Membre($this->compte($this->ws, 'viewer'), $this->ws, 'viewer');
     $this->invite = av5Membre($this->compte($this->ws, 'admin'), $this->ws, 'admin', false);
+    $this->revoque = av5Membre($this->compte($this->ws, 'admin'), $this->ws, 'admin');
+    DB::table('user_workspaces')->where('user_id', $this->revoque->id)->where('workspace_id', $this->ws->id)->update(['revoked_at' => now()]);
     $this->autre = $this->espace(true);
     $this->pb = av5Membre($this->compte($this->autre, 'owner'), $this->autre, 'owner');
     $this->rep = av5Reponse($this->ws->id);
     $this->url = "/api/v1/envoi/reponses/{$this->rep}/classer";
 });
 
-test('V1 « intéressé » par P1 : avis pour P2 et l’administrateur, aucun pour P1, le lecteur, l’invité, ni l’autre espace', function () {
+test('V1 « intéressé » par P1 : avis pour P2 et l’administrateur, aucun pour P1, le lecteur, l’invité, l’administrateur révoqué, ni l’autre espace', function () {
     $this->actingAs($this->p1)->postJson($this->url, ['classement' => 'interesse', 'creer_tache' => true])->assertOk();
     $avis = av5Avis($this->ws->id);
     $dest = array_map(fn ($a) => $a->user_id, $avis);

@@ -133,6 +133,10 @@ X11-A (`GardeChauffe.php`, `Seuils.php`, 1 test), C4-A (`infra/…/passerelle/sr
 - C `backend/database/migrations/2026_12_07_000140_envoi_boites_codes_ajout.php`
 - C `backend/tests/Feature/Envoi/MigrationsFiniTest.php`
 - C `docs/envoi/lots/FINI-M0B.md`
+- M `backend/tests/Feature/NonRegression/Nr17MigrationsTest.php` : seulement les 3 migrations ajoutées à
+  `NR17_RETOUR_INERTE_VOULU`, **après la fusion de #675** (décision de pilotage, commentaire sur #680)
+- M `backend/tests/Support/SemeurTablesScopees.php` : seulement `envoi_attestations_serveur_reel` et
+  `envoi_boites_codes_ajout` semées (même décision). Rien d'autre hors liste.
 
 **Comportement**
 - `000120` : `envoi_attestations_serveur_reel` : `id`, `workspace_id`, `geste TEXT CHECK (geste IN ('atteste','retire'))`,

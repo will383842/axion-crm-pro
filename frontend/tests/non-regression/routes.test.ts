@@ -114,8 +114,6 @@ const ECARTS_CONNUS: string[] = [
   'GET /api/v1/compte/appareils',
   'GET /api/v1/compte/codes-secours',
   'GET /api/v1/rgpd/oppositions/export',
-  'POST /api/v1/auth/code-email/renvoyer',
-  'POST /api/v1/auth/code-email/verifier',
   'POST /api/v1/compte/appareils/{p}/retirer',
   'POST /api/v1/compte/codes-secours/regenerer',
   'POST /api/v1/crm/propositions/{p}/{p}',

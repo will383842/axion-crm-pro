@@ -26,6 +26,8 @@ class EnforceFirstLoginSetup
             'api/v1/auth/2fa/setup',
             'api/v1/auth/2fa/confirm',
             'api/v1/auth/2fa/verify',
+            'api/v1/auth/code-email/verifier',
+            'api/v1/auth/code-email/renvoyer',
         ];
 
         if ($user->first_login_completed_at === null

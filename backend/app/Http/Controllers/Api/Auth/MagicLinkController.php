@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\ApiController;
 use App\Services\Auth\AuthService;
+use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use App\Services\Auth\MagicLinkService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,7 +95,7 @@ class MagicLinkController extends ApiController
 
         return $this->ok([
             'user' => $user->only(['id', 'email', 'name', 'current_workspace_id', 'totp_enabled_at']),
-            'requires_2fa' => $user->totp_enabled_at !== null,
+            'requires_2fa' => CodesConnexionCourriel::methode($user) !== null,
         ]);
     }
 }

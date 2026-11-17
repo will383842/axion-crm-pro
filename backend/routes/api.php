@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AiActRegisterController;
 use App\Http\Controllers\Api\AudiencesController;
 use App\Http\Controllers\Api\AuditLogsController;
 use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Auth\CodeEmailController;
 use App\Http\Controllers\Api\Auth\MagicLinkController;
 use App\Http\Controllers\Api\Auth\PasswordChangeController;
 use App\Http\Controllers\Api\Auth\PasswordResetController;
@@ -77,6 +78,8 @@ Route::prefix('v1')->group(function () {
     Route::get('/auth/me', [AuthController::class, 'me'])->middleware('auth:sanctum');
     Route::post('/auth/onboarding/complete', [AuthController::class, 'completeOnboardingTour'])->middleware('auth:sanctum');
     Route::post('/auth/2fa/verify', [TwoFactorController::class, 'verify'])->middleware('throttle:login');
+    Route::post('/auth/code-email/verifier', [CodeEmailController::class, 'verifier'])->middleware(['auth:sanctum', 'throttle:login']);
+    Route::post('/auth/code-email/renvoyer', [CodeEmailController::class, 'renvoyer'])->middleware(['auth:sanctum', 'throttle:login']);
     Route::post('/auth/2fa/setup', [TwoFactorController::class, 'setup'])->middleware('auth:sanctum');
     Route::post('/auth/2fa/confirm', [TwoFactorController::class, 'confirm'])->middleware('auth:sanctum');
     Route::post('/auth/magic-link', [MagicLinkController::class, 'request'])->middleware('throttle:magic-link');

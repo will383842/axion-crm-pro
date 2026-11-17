@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api\Auth;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\Auth\AuthService;
+use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends ApiController
 {
@@ -57,6 +59,17 @@ class AuthController extends ApiController
             (bool) $request->validated('remember', false),
         );
 
+        // G3-B : compte « courriel » → un code part à la connexion. Un canal en panne ne bloque pas la réponse
+        // (la page propose « Renvoyer »). Jamais le code dans un journal.
+        $codes = app(CodesConnexionCourriel::class);
+        if (CodesConnexionCourriel::methode($result['user']) === 'email') {
+            try {
+                $codes->emettre($result['user'], 'connexion', $request->ip());
+            } catch (\Throwable $e) {
+                Log::warning('auth.code_courriel.emission_echouee', ['user_id' => (string) $result['user']->id, 'erreur' => $e::class]);
+            }
+        }
+
         return $this->ok([
             'user' => $result['user']->only(['id', 'email', 'name', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
             'requires_2fa' => $result['requires_2fa'],
@@ -101,6 +114,7 @@ class AuthController extends ApiController
             'user' => $user->only(['id', 'email', 'name', 'locale', 'timezone', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
             'roles' => $user->getRoleNames(),
             'workspace' => $espace,
+            'two_factor_method' => CodesConnexionCourriel::methode($user),
         ]);
     }
 

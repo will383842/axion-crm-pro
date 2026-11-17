@@ -166,11 +166,15 @@ test('G4-0 workflow : manuel, lecture seule, trois services, rien de dangereux',
     }
 });
 
-test('G4-0 tables hors RLS volontaires exclues : base saine = 0, table à workspace_id sans FORCE = 1', function () {
+test('G4-0 tables hors RLS volontaires exclues : base saine = 0', function () {
     config(['crm.db_app_role' => false]);
 
     expect(g40Diagnostic()['TABLES_ESPACE_SANS_FORCE'])->toBe('0');
+});
 
+test('G4-0 une table à workspace_id sans FORCE est comptée : 1', function () {
+    config(['crm.db_app_role' => false]);
+    // Avant le diagnostic : il ouvre une transaction en lecture seule.
     DB::statement('CREATE TABLE g40_sans_force (id int, workspace_id uuid)');
 
     expect(g40Diagnostic()['TABLES_ESPACE_SANS_FORCE'])->toBe('1');

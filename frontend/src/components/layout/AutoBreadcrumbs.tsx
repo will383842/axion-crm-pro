@@ -69,6 +69,7 @@ const LABELS: Record<string, string> = {
   '/rgpd/requests': 'Demandes RGPD',
   '/rgpd/effacements': 'Effacements demandés',
   '/origines': 'Origines des contacts',
+  '/prospection-linkedin': 'File LinkedIn',
   // Technique
   '/scraper-runs': 'Historique des collectes',
   '/admin/observability': 'Santé du système',

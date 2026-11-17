@@ -24,4 +24,10 @@ class CompanyPolicy extends BasePolicy
     {
         return $user->hasPermissionTo('companies.update');
     }
+
+    /** Affaires (lot G2-D) : créer et changer d'étape. Le rôle lecteur ne peut que voir. */
+    public function gererAffaires(User $user): bool
+    {
+        return $user->hasPermissionTo('companies.update');
+    }
 }

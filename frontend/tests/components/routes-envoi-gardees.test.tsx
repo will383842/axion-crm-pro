@@ -30,7 +30,6 @@ import {
 import { createHash } from 'node:crypto';
 
 import { renderScreen } from '../helpers/renderScreen';
-import { TEXTE_EN_PREPARATION } from '@/features/socle/PageEnAttente';
 import { FEATURES_LES_DEUX_PRODUITS, ME_FIXTURE, apiUrl, getJson, handlersEnvoi, http, HttpResponse } from '../msw/handlers';
 import { server } from '../msw/server';
 import { cleRoute, handlers as handlersDemo } from '@/demo/handlers';
@@ -208,17 +207,13 @@ describe('S2-ROUTEUR — les onglets mènent aux bonnes routes', () => {
 });
 
 describe('Routes du CRM et des écrans communs créées « en attente »', () => {
-  it.each([
-    // Lot G2-B : /taches n'est plus « en attente » (le serveur a ses routes) ; voir G2bMesTachesHorsDemo.test.tsx.
-    ['/affaires', 'DM1-ACC'],
-    // Filet modifié : pourquoi. DM1-COM livre /compte : la page n'est plus « en attente ».
-  ])('%s → page en attente du lot %s, texte neutre sans code de lot', async (url, lot) => {
-    await monter(url);
-    const page = await screen.findByTestId('page-en-attente');
-    expect(page).toHaveAttribute('data-lot', lot);
-    // Joignable en production par son adresse : aucun code de lot interne affiché.
-    expect(page.textContent).toContain(TEXTE_EN_PREPARATION);
-    expect(page.textContent).not.toMatch(/\bDM\d|\blot\b/i);
+  // Filet modifié : pourquoi. Lots G2-B et G2-D : /taches et /affaires ne sont plus « en attente » (le serveur
+  // a leurs routes) ; voir G2bMesTachesHorsDemo.test.tsx. Cette vérification positive remplace la liste, aussi
+  // stricte : plus aucune route du CRM n'est « en attente », et le texte neutre reste prouvé par PageEnAttente.
+  it('/affaires n\'est plus une page « en attente » (G2-D)', async () => {
+    await monter('/affaires');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Affaires' })).toBeInTheDocument();
+    expect(screen.queryByTestId('page-en-attente')).toBeNull();
   });
 
   // Filet modifié : pourquoi. /compte quitte la liste « en attente » (DM1-COM l'a livrée) : cette

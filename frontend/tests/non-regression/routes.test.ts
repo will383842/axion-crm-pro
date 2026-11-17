@@ -49,7 +49,7 @@ const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantane
 // Filet modifié : pourquoi. DM1-ACC (#399) : Mes tâches et Affaires. Ces appels ne partent qu'en démo
 // (`VITE_DEMO`, figé au build) : hors démo, donc en production, /taches et /affaires gardent leur page
 // « en attente » et le tableau de bord n'a pas d'onglets. La démo les sert ; le lot serveur du CRM reprendra
-// le contrat et retirera ces six lignes. La liste reste fermée : tout autre appel sans route fait toujours rougir.
+// le contrat et retirera ces lignes (G2-A et G2-D en ont déjà retiré : « Mes tâches » et « Affaires » sont servis par le serveur). La liste reste fermée : tout autre appel sans route fait toujours rougir.
 // Filet modifié : pourquoi. DM2-PIL : résultats, santé, chercher un envoi et feu vert d'Envoi. Mêmes raisons que
 // ci-dessus (Envoi absent en production, servi par la démo) ; la route serveur arrive avec le lot serveur d'Envoi.
 // Filet modifié : pourquoi. R18 : page Réputation d'Envoi, deux appels (lecture, saisie) vers les routes R17 ; la photo NR-20 ne liste aucune route Envoi (module absent en production), mêmes raisons que DM2-PIL. Liste toujours fermée.
@@ -92,8 +92,6 @@ const ECARTS_CONNUS: string[] = [
   'PUT /api/v1/envoi/reglages/alertes',
   'PUT /api/v1/envoi/reglages/identite',
   'PUT /api/v1/envoi/reglages/regles',
-  'GET /api/v1/crm/affaires',
-  'PATCH /api/v1/crm/affaires/{p}',
   // DM2-PIL — résultats, santé, chercher un envoi, feu vert.
   'GET /api/v1/envoi/envois/chercher',
   'GET /api/v1/envoi/feu-vert',

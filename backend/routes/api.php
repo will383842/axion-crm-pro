@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\CompanyTachesController;
 use App\Http\Controllers\Api\CompanyTagsBulkController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
+use App\Http\Controllers\Api\Crm\AffairesController;
 use App\Http\Controllers\Api\Crm\ArbitrageController;
 use App\Http\Controllers\Api\Crm\ATraiterController;
 use App\Http\Controllers\Api\Crm\BulkController;
@@ -598,6 +599,10 @@ Route::prefix('v1')->group(function () {
 
             // Lot G2-A — « Mes tâches » (cahier G1-G2 § 8). `rappel-matin`
             // précède `{id}` (contraint aux chiffres) ; le réglage est refusé (409).
+            // G2-D : affaires. Aucune route de suppression (test de source).
+            Route::get('/affaires', [AffairesController::class, 'index'])->middleware('permission:companies.view');
+            Route::post('/affaires', [AffairesController::class, 'store'])->middleware('permission:companies.update');
+            Route::patch('/affaires/{id}', [AffairesController::class, 'deplacer'])->whereNumber('id')->middleware('permission:companies.update');
             Route::get('/taches', [TachesController::class, 'index'])->middleware('permission:companies.view');
             Route::post('/taches', [TachesController::class, 'store'])->middleware('permission:companies.update');
             Route::put('/taches/rappel-matin', [TachesController::class, 'rappelMatin'])->middleware('permission:companies.update');

@@ -196,6 +196,7 @@ test('4 bis. POST : validations et projection (signature à Paris)', function ()
 test('5. fusion de fiches : l’affaire suit l’entreprise conservée', function () {
     $garde = affEntreprise($this->espaceA->id, '111111111', 'Société gardée');
     $absorbee = affEntreprise($this->espaceA->id, '444444444', 'Société absorbée');
+    DB::table('companies')->where('id', $absorbee)->update(['siren' => null, 'foreign_id' => 'evt:zz-affaires-1']);
     $id = affAffaire($this->espaceA->id, $absorbee);
 
     $fusion = WorkspaceContext::run($this->espaceA->id, fn () => app(FusionFiches::class)

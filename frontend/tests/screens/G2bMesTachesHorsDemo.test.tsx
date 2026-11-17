@@ -3,13 +3,13 @@
  *
  * Hors démo (`VITE_DEMO` vide, donc en production) :
  *  - /taches montre la vraie liste, servie par `/crm/taches` (serveur simulé par MSW) ;
- *  - /affaires garde la page « en attente » ;
+ *  - /affaires (lot G2-D) est servi par `/crm/affaires` : plus de page « en attente » ;
  *  - Ctrl K propose « Mes tâches », pas « Affaires » ;
  *  - le menu a une entrée « Mes tâches » ;
  *  - le rappel du matin disparaît au premier 409, sans boucle.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { MesTachesPage } from '@/features/crm/taches/MesTachesPage';
@@ -40,7 +40,7 @@ function serveur(appels: string[], rappel: () => Response = () => HttpResponse.j
     }),
     http.get(apiUrl('/crm/affaires'), () => {
       appels.push('GET /crm/affaires');
-      return HttpResponse.json({ data: [] });
+      return HttpResponse.json({ aujourdhui: '2027-01-12', data: [] });
     }),
   ];
 }
@@ -54,9 +54,9 @@ afterEach(() => {
 });
 
 describe('G2-B — disponibilité hors démo', () => {
-  it('tachesDisponibles() est vrai hors démo ; affairesDisponibles() reste faux', () => {
+  it('tachesDisponibles() et affairesDisponibles() sont vrais hors démo (G2-D : le serveur a ses routes)', () => {
     expect(tachesDisponibles()).toBe(true);
-    expect(affairesDisponibles()).toBe(false);
+    expect(affairesDisponibles()).toBe(true);
   });
 
   it('en démo, les deux sont vrais', () => {
@@ -75,17 +75,18 @@ describe('G2-B — /taches et /affaires hors démo', () => {
     expect(appels).toContain('GET /crm/taches');
   });
 
-  it('/affaires garde la page « en attente » et n’appelle pas /crm/affaires', async () => {
+  it('/affaires (G2-D) n’est plus « en attente » : la page appelle /crm/affaires', async () => {
     const appels: string[] = [];
     await renderScreen(<AffairesPage />, { path: '/affaires', handlers: serveur(appels) });
-    expect(await screen.findByTestId('page-en-attente')).toBeVisible();
-    expect(appels).toEqual([]);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Affaires' })).toBeVisible();
+    expect(screen.queryByTestId('page-en-attente')).not.toBeInTheDocument();
+    await waitFor(() => expect(appels).toContain('GET /crm/affaires'));
   });
 
-  it('la barre d’onglets n’offre pas « Affaires » hors démo, mais offre « Mes tâches »', () => {
+  it('la barre d’onglets offre « Mes tâches » et « Affaires » hors démo', () => {
     const cibles = ONGLETS_DISPONIBLES().map((o) => o.to);
     expect(cibles).toContain('/taches');
-    expect(cibles).not.toContain('/affaires');
+    expect(cibles).toContain('/affaires');
   });
 });
 
@@ -105,12 +106,12 @@ describe('G2-B — rappel du matin : 409 au premier essai', () => {
 });
 
 describe('G2-B — Ctrl K', () => {
-  it('propose « Mes tâches », pas « Affaires », hors démo', async () => {
+  it('propose « Mes tâches » et « Affaires » hors démo', async () => {
     vi.resetModules();
     const { commandes } = await import('@/features/crm/taches/commandes');
     const ids = commandes.map((c) => c.id);
     expect(ids).toContain('crm-mes-taches');
-    expect(ids).not.toContain('crm-affaires');
+    expect(ids).toContain('crm-affaires');
   });
 });
 

@@ -90,10 +90,9 @@ describe('DashboardPage — rendu des blocs', () => {
     // Le prénom vient de `/auth/me` (handler par défaut : « Will Test »).
     expect(await screen.findByRole('heading', { level: 1, name: 'Bonjour Will' })).toBeVisible();
     expect(screen.getByText(new RegExp(dateDuJour()))).toBeVisible();
-    // Le mot du menu et du fil d'Ariane reste sur la page. Hors démo (production),
-    // DM1-ACC n'ajoute PAS la barre d'onglets : un seul « Tableau de bord », comme avant.
-    expect(screen.getByText('Tableau de bord')).toBeVisible();
-    expect(screen.queryByRole('navigation', { name: 'Tableau de bord' })).toBeNull();
+    // Lot G2-D : « Mes tâches » et « Affaires » ont leurs routes serveur, la barre d'onglets est offerte
+    // aussi hors démo (production).
+    expect(await screen.findByRole('navigation', { name: 'Tableau de bord' })).toBeVisible();
   });
 
   it('en démo (DM1-ACC) : la barre d’onglets Tableau de bord / Mes tâches / Affaires', async () => {

@@ -127,8 +127,8 @@ describe('AffairesPage', () => {
   });
 });
 
-describe('AffairesPage hors démo (production : le serveur n’a pas encore ses routes)', () => {
-  it('reste « en attente », texte neutre, et n’appelle pas /crm/affaires', async () => {
+describe('AffairesPage hors démo (production : le serveur a ses routes, lot G2-D)', () => {
+  it('n’est plus « en attente » et appelle /crm/affaires', async () => {
     vi.stubEnv('VITE_DEMO', '');
     const appels: string[] = [];
     const espion = http.get(apiUrl('/crm/affaires'), () => {
@@ -137,10 +137,9 @@ describe('AffairesPage hors démo (production : le serveur n’a pas encore ses 
     });
     try {
       await renderScreen(<AffairesPage />, { path: PATH, handlers: [espion] });
-      const page = await screen.findByTestId('page-en-attente');
-      expect(page).toHaveAttribute('data-lot', 'DM1-ACC');
-      expect(screen.getByRole('heading', { level: 1, name: 'Affaires' })).toBeVisible();
-      expect(appels).toEqual([]);
+      expect(await screen.findByRole('heading', { level: 1, name: 'Affaires' })).toBeVisible();
+      expect(screen.queryByTestId('page-en-attente')).not.toBeInTheDocument();
+      await waitFor(() => expect(appels).toEqual(['/crm/affaires']));
     } finally {
       vi.unstubAllEnvs();
     }

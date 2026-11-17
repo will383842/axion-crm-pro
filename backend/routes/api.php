@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\CompaniesController;
 use App\Http\Controllers\Api\CompanyRelationController;
 use App\Http\Controllers\Api\CompanyTachesController;
 use App\Http\Controllers\Api\CompanyTagsBulkController;
+use App\Http\Controllers\Api\Compte\SecuriteCompteController;
 use App\Http\Controllers\Api\ContactsController;
 use App\Http\Controllers\Api\CoverageController;
 use App\Http\Controllers\Api\Crm\AffairesController;
@@ -139,6 +140,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/auth/password/change', [PasswordChangeController::class, 'status']);
         Route::post('/auth/password/change', [PasswordChangeController::class, 'change'])
             ->middleware('throttle:password-change');
+        // G3-C : appareils de confiance et code reçu pour un geste sensible (écran « Mon compte et sécurité »).
+        Route::get('/compte/appareils', [SecuriteCompteController::class, 'appareils'])->middleware('throttle:password-change');
+        Route::post('/compte/appareils/{id}/retirer', [SecuriteCompteController::class, 'retirerAppareil'])->middleware('throttle:password-change');
+        Route::post('/compte/code', [SecuriteCompteController::class, 'envoyerCode'])->middleware('throttle:password-change');
         // `/search` est declaree PLUS BAS, sur `GlobalSearchController`. Elle
         // l'etait deja : la closure supprimee ici la MASQUAIT, la premiere route
         // qui correspond l'emportant. Deux implementations vides du meme point

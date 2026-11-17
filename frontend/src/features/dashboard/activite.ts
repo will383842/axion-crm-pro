@@ -50,6 +50,7 @@ export const EVENEMENTS: Record<string, string> = {
   'audience.refresh.failed': 'Échec de mise à jour d’audience',
   'auth.code_courriel.verifie': 'Connexion : code reçu par courriel accepté',
   'auth.code_courriel.refuse': 'Connexion : code reçu par courriel refusé',
+  'compte.appareil.retire': 'Compte : appareil de confiance retiré',
   'company.tags_synced': 'Étiquettes synchronisées',
   'company.archived': 'Fiche archivée',
   'envoi.recherche': 'Recherche d’un envoi par adresse',

@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api\Auth;
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Services\Auth\AuthService;
+use App\Services\Auth\CodeCourriel\AppareilsConfiance;
 use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
+use App\Services\Auth\CodeCourriel\TropDeRenvois;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -59,20 +61,30 @@ class AuthController extends ApiController
             (bool) $request->validated('remember', false),
         );
 
-        // G3-B : compte « courriel » → un code part à la connexion. Un canal en panne ne bloque pas la réponse
-        // (la page propose « Renvoyer »). Jamais le code dans un journal.
-        $codes = app(CodesConnexionCourriel::class);
+        // G3-B : compte « courriel » → un code part à la connexion. G3-C : sauf appareil de confiance reconnu (même compte).
+        // L'émission passe par le MÊME plafond que les renvois (3 par 10 min) : un tiers qui connaît le mot de passe
+        // n'obtient pas un code neuf à chaque connexion. Un canal en panne ou le plafond atteint ne bloquent pas la
+        // réponse (la page propose « Renvoyer »). Jamais le code dans un journal.
+        $requires2fa = $result['requires_2fa'];
         if (CodesConnexionCourriel::methode($result['user']) === 'email') {
-            try {
-                $codes->emettre($result['user'], 'connexion', $request->ip());
-            } catch (\Throwable $e) {
-                Log::warning('auth.code_courriel.emission_echouee', ['user_id' => (string) $result['user']->id, 'erreur' => $e::class]);
+            $jeton = $request->cookie(AppareilsConfiance::COOKIE);
+            if (app(AppareilsConfiance::class)->reconnaitre($result['user'], is_string($jeton) ? $jeton : null)) {
+                $request->session()->put('2fa_passed_at', now()->toIso8601String());
+                $requires2fa = false;
+            } else {
+                try {
+                    app(CodesConnexionCourriel::class)->renvoyer($result['user'], $request->ip());
+                } catch (TropDeRenvois) {
+                    Log::info('auth.code_courriel.plafond_connexion', ['user_id' => (string) $result['user']->id]);
+                } catch (\Throwable $e) {
+                    Log::warning('auth.code_courriel.emission_echouee', ['user_id' => (string) $result['user']->id, 'erreur' => $e::class]);
+                }
             }
         }
 
         return $this->ok([
             'user' => $result['user']->only(['id', 'email', 'name', 'current_workspace_id', 'totp_enabled_at', 'first_login_completed_at', 'onboarding_tour_completed_at']),
-            'requires_2fa' => $result['requires_2fa'],
+            'requires_2fa' => $requires2fa,
         ]);
     }
 

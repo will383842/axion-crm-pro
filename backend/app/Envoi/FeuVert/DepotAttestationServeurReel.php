@@ -41,9 +41,12 @@ class DepotAttestationServeurReel
     /** Vrai si la dernière ligne de l'espace est « atteste ». */
     public function active(string $ws): bool
     {
-        return $this->derniere($ws)?->geste === self::ATTESTE;
+        $derniere = $this->derniere($ws);
+
+        return $derniere !== null && $derniere->geste === self::ATTESTE;
     }
 
+    /** @return object{geste: string}|null */
     private function derniere(string $ws): ?object
     {
         return WorkspaceContext::run($ws, fn () => DB::selectOne(
@@ -73,6 +76,7 @@ class DepotAttestationServeurReel
             [$ws, $ws],
         ));
 
+        /** @var list<object{code: string}> $lignes */
         return array_map(static fn (object $l): string => (string) $l->code, $lignes);
     }
 }

@@ -31,6 +31,9 @@ final class EnregistrerOpposition
     /** STOP classé par un humain sur une réponse reçue (R12) : le registre ne prétend pas que le lien a été cliqué. */
     public const CANAL_REPONSE = 'reponse';
 
+    /** STOP ou plainte relevé dans la boîte (RR-3A) : le registre ne prétend ni un clic ni un geste humain. */
+    public const CANAL_RELEVE = 'releve';
+
     /** Lecture seule : l'opposition de cette inscription est-elle déjà acquise ? */
     public function dejaEnregistree(string $workspaceId, string $reference): bool
     {

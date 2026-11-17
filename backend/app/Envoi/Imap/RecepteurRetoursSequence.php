@@ -2,16 +2,19 @@
 
 namespace App\Envoi\Imap;
 
+use App\Envoi\Desinscription\EnregistrerOpposition;
+use App\Envoi\Desinscription\OpposerAdresse;
 use App\Envoi\Sequence\Evenement;
 use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
-use App\Envoi\Sequence\RegistreInjectionsSequence;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
+ * RR-3A : voir `recevoir` (STOP, plainte et rebond dur arrêtent aussi la séquence).
+ *
  * S11 — réponse humaine rattachée : la séquence du destinataire s'ARRÊTE (et, comme le veut `Inscriptions`, celles
  * des autres personnes de la même entreprise). Rattachement exact : l'injection du retour -> les messages du
  * séquenceur (`envoi_messages.id_injection`) -> leur inscription. Aucune adresse n'est lue ni écrite ici.
@@ -24,51 +27,53 @@ use Illuminate\Support\Facades\DB;
  */
 final class RecepteurRetoursSequence implements RecepteurRetours
 {
-    public function __construct(private readonly Inscriptions $inscriptions) {}
+    public function __construct(
+        private readonly Inscriptions $inscriptions,
+        private readonly InscriptionsDuRetour $rattachees = new InscriptionsDuRetour,
+        private readonly ?OpposerAdresse $opposer = null,
+    ) {}
 
     public static function parDefaut(): self
     {
-        return new self(new Inscriptions(new LecteurFicheDb));
-    }
-
-    public function recevoir(string $workspaceId, RetourDetecte $retour): void
-    {
-        if ($retour->classe !== ClasseRetour::ReponseHumaine) {
-            return;
-        }
-        $maintenant = DateTimeImmutable::createFromInterface(now());
-        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $retour, $maintenant): void {
-            $ids = $this->inscriptionsRattachees($workspaceId, $retour->idInjection);
-            foreach ($ids as $id) {
-                $this->inscriptions->evenement($workspaceId, (string) $id, Evenement::REPONSE, $maintenant);
-            }
-        });
+        return new self(new Inscriptions(new LecteurFicheDb), new InscriptionsDuRetour, new OpposerAdresse(app(EnregistrerOpposition::class)));
     }
 
     /**
-     * C1-2 — lecture des DEUX formes d'identifiant pendant la transition (cahier C1, §1.5). Un identifiant rattache les
-     * messages où : (1) `id_injection` le porte (nouvelle forme, ou VERP Kumo ancien) ; (2) `id_injection_serveur` le porte ;
-     * (3) s'il s'agit d'un UUID du registre local dont la clé est `seq-<inscription>-<étape>` : le message de cette
-     * inscription et de cette étape (ancienne forme : le serveur seul était écrit dans `envoi_messages`).
-     * Branches 2 et 3 à retirer dans un lot ultérieur, pas ici. Filtre d'espace explicite (la RLS est contournée en propriétaire).
-     *
-     * @return Collection<int, mixed>
+     * RR-3A — réponse : `reponse` ; STOP et plainte : `opposition` (adresse ET entreprise) puis registre (canal `releve`) ;
+     * rebond dur : `rebond_dur` (adresse). D'abord les arrêts d'inscriptions, ensuite le registre : l'arrêt ne dépend pas des effets aval.
      */
-    private function inscriptionsRattachees(string $workspaceId, string $id)
+    public function recevoir(string $workspaceId, RetourDetecte $retour): void
     {
-        $cle = null;
-        if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id) === 1) {
-            $nomCle = DB::table('envoi_injections_locales')->where('workspace_id', $workspaceId)->where('id_injection', strtolower($id))->value('cle_idempotence');
-            $cle = is_string($nomCle) ? RegistreInjectionsSequence::inscriptionDeCle($nomCle) : null;
+        $evenement = match ($retour->classe) {
+            ClasseRetour::ReponseHumaine => Evenement::REPONSE,
+            ClasseRetour::Desinscription, ClasseRetour::Hostile => Evenement::OPPOSITION,
+            ClasseRetour::RebondDur => Evenement::REBOND_DUR,
+            default => null,
+        };
+        if ($evenement === null) {
+            return;
         }
-
-        return DB::table('envoi_messages')->where('workspace_id', $workspaceId)
-            ->where(function ($q) use ($id, $cle): void {
-                $q->where('id_injection', $id)->orWhere('id_injection_serveur', $id);
-                if ($cle !== null) {
-                    $q->orWhere(fn ($r) => $r->where('inscription_id', $cle[0])->where('etape', $cle[1]));
+        $maintenant = DateTimeImmutable::createFromInterface(now());
+        WorkspaceContext::run($workspaceId, function () use ($workspaceId, $retour, $maintenant, $evenement): void {
+            $ids = $this->rattachees->pour($workspaceId, $retour->idInjection);
+            if ($ids === [] && $evenement === Evenement::REBOND_DUR) {
+                $id = DB::table('envoi_inscriptions')->where('workspace_id', $workspaceId)->where('statut', 'active')
+                    ->where('empreinte_adresse', ListeSuppression::empreinte($retour->adresse))->orderBy('id')->value('id');
+                $ids = $id === null ? [] : [(string) $id];
+            }
+            foreach ($ids as $id) {
+                $this->inscriptions->evenement($workspaceId, $id, $evenement, $maintenant);
+            }
+            if ($evenement === Evenement::OPPOSITION) {
+                $opposer = $this->opposer ?? new OpposerAdresse(app(EnregistrerOpposition::class));
+                $empreintes = [ListeSuppression::empreinte($retour->adresse)];
+                if ($retour->adresseExpediteur !== null && $retour->adresseExpediteur !== '') {
+                    $empreintes[] = ListeSuppression::empreinte($retour->adresseExpediteur);
                 }
-            })
-            ->orderBy('inscription_id')->distinct()->pluck('inscription_id');
+                foreach (array_unique($empreintes) as $empreinte) {
+                    $opposer->executer($workspaceId, $empreinte, EnregistrerOpposition::CANAL_RELEVE);
+                }
+            }
+        });
     }
 }

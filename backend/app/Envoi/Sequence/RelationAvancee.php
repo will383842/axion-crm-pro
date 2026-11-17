@@ -24,7 +24,10 @@ final class RelationAvancee
     /** @return ?string `client`, `rendez_vous`, ou null : la séquence continue. */
     public function motif(string $ws, int $entrepriseId, int $contactId, DateTimeImmutable $inscriteLe): ?string
     {
-        if (DB::table('companies')->where('workspace_id', $ws)->where('id', $entrepriseId)->where('lifecycle_stage', 'client')->exists()) {
+        // Lecture CONSCIENTE de `deleted_at` (elle le nomme) : une entreprise cliente mise à la corbeille arrête tout de même
+        // la séquence (échec fermé : jamais de relance à un client), donc on ne filtre pas la corbeille.
+        $fiche = DB::table('companies')->where('workspace_id', $ws)->where('id', $entrepriseId)->first(['lifecycle_stage', 'deleted_at']);
+        if ($fiche !== null && $fiche->lifecycle_stage === 'client') {
             return self::MOTIF_CLIENT;
         }
 

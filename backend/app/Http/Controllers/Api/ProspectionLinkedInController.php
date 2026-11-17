@@ -52,9 +52,9 @@ class ProspectionLinkedInController extends ApiController
             if (in_array($r['raison'], ['arret', 'controle_illisible'], true)) {
                 return $vide((string) $r['raison']);
             }
-            $lignes = WorkspaceContext::run($ws, static fn (): array => DB::table('pl_prospects')
+            $lignes = WorkspaceContext::run($ws, static fn (): array => array_values(DB::table('pl_prospects')
                 ->where('workspace_id', $ws)->where('expediteur_user_id', $uid)->where('etat', 'en_file')
-                ->orderByDesc('score')->orderBy('cree_le')->orderBy('id')->limit(50)->get()->all());
+                ->orderByDesc('score')->orderBy('cree_le')->orderBy('id')->limit(50)->get()->all()));
             $controles = new ControlesProspect;
             $opposes = array_flip($controles->opposes($ws, $lignes)); // lève si illisible : rien n'est proposé
             $arret = (new Arret)->actif($ws, $uid);

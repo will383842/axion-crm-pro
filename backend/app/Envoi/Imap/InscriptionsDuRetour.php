@@ -25,7 +25,7 @@ final class InscriptionsDuRetour
             $cle = is_string($nomCle) ? RegistreInjectionsSequence::inscriptionDeCle($nomCle) : null;
         }
 
-        return DB::table('envoi_messages')->where('workspace_id', $workspaceId)
+        $ids = DB::table('envoi_messages')->where('workspace_id', $workspaceId)
             ->where(function ($q) use ($id, $cle): void {
                 $q->where('id_injection', $id)->orWhere('id_injection_serveur', $id);
                 if ($cle !== null) {
@@ -33,5 +33,7 @@ final class InscriptionsDuRetour
                 }
             })
             ->orderBy('inscription_id')->distinct()->pluck('inscription_id')->map(fn ($v): string => (string) $v)->all();
+
+        return array_values($ids);
     }
 }

@@ -28,7 +28,7 @@ afterEach(function () {
     }
 });
 
-function xaSur(string $nom, Closure $f): mixed
+function attSrSur(string $nom, Closure $f): mixed
 {
     $avant = DB::getDefaultConnection();
     DB::setDefaultConnection($nom);
@@ -40,39 +40,39 @@ function xaSur(string $nom, Closure $f): mixed
 }
 
 /** @return list<string> codes manuels qui attendent le vrai serveur */
-function xaCodesServeur(): array
+function attSrCodesServeur(): array
 {
     return array_values(array_filter(CatalogueManuels::codesManuels(), static fn (string $c): bool => CatalogueManuels::POINTS[$c]['serveur_reel']));
 }
 
-function xaEspace(): string
+function attSrEspace(): string
 {
     $ws = (string) Str::uuid();
-    xaSur('pgsql_owner', fn () => DB::statement("INSERT INTO workspaces (id, name, slug, settings, created_at, updated_at) VALUES (?, 'Test', ?, '{}', now(), now())", [$ws, 'xa-' . substr($ws, 0, 8)]));
+    attSrSur('pgsql_owner', fn () => DB::statement("INSERT INTO workspaces (id, name, slug, settings, created_at, updated_at) VALUES (?, 'Test', ?, '{}', now(), now())", [$ws, 'xa-' . substr($ws, 0, 8)]));
 
     return $ws;
 }
 
 /** Attestation posée il y a $minutes minutes (base). */
-function xaAttestation(string $ws, string $geste, int $minutes): void
+function attSrAttestation(string $ws, string $geste, int $minutes): void
 {
-    xaSur('pgsql_owner', fn () => DB::statement(
+    attSrSur('pgsql_owner', fn () => DB::statement(
         "INSERT INTO envoi_attestations_serveur_reel (workspace_id, geste, auteur, motif, le) VALUES (?, ?, 'responsable', 'Serveur installe, constat ecrit', now() - make_interval(mins => ?))",
         [$ws, $geste, $minutes],
     ));
 }
 
-function xaPreuve(string $ws, string $code, int $minutes, bool $fait = true): void
+function attSrPreuve(string $ws, string $code, int $minutes, bool $fait = true): void
 {
-    xaSur('pgsql_owner', fn () => DB::statement(
+    attSrSur('pgsql_owner', fn () => DB::statement(
         'INSERT INTO envoi_feu_vert_preuves (workspace_id, code, preuve, auteur, fait, cree_le) VALUES (?, ?, ?, ?, ?, now() - make_interval(mins => ?))',
         [$ws, $code, 'Constat du 17/11 : reference interne 42', 'responsable', $fait ? 'true' : 'false', $minutes],
     ));
 }
 
-function xaPoint(string $conn, string $ws, string $code): PointFeuVert
+function attSrPoint(string $conn, string $ws, string $code): PointFeuVert
 {
-    return xaSur($conn, function () use ($ws, $code): PointFeuVert {
+    return attSrSur($conn, function () use ($ws, $code): PointFeuVert {
         foreach (app(ListeFeuVert::class)->points($ws) as $p) {
             if ($p->code === $code) {
                 return $p;
@@ -82,9 +82,9 @@ function xaPoint(string $conn, string $ws, string $code): PointFeuVert
     });
 }
 
-function xaNettoyer(array $espaces): void
+function attSrNettoyer(array $espaces): void
 {
-    xaSur('pgsql_owner', function () use ($espaces): void {
+    attSrSur('pgsql_owner', function () use ($espaces): void {
         foreach (['envoi_attestations_serveur_reel', 'envoi_feu_vert_preuves', 'envoi_journal_commandes'] as $t) {
             DB::transaction(function () use ($t, $espaces): void {
                 DB::statement("ALTER TABLE {$t} DISABLE TRIGGER USER");
@@ -96,120 +96,120 @@ function xaNettoyer(array $espaces): void
     });
 }
 
-function xaScenario(Closure $f): void
+function attSrScenario(Closure $f): void
 {
     $espaces = [];
     try {
         $f(function () use (&$espaces): string {
-            return $espaces[] = xaEspace();
+            return $espaces[] = attSrEspace();
         });
     } finally {
-        xaNettoyer($espaces);
+        attSrNettoyer($espaces);
     }
 }
 
 dataset('connexions', ['propriétaire (pgsql)' => ['pgsql'], 'applicatif (pgsql_app)' => ['pgsql_app']]);
 
 test('sans attestation : les points serveur réel attendent le serveur (comportement de main)', function (string $conn) {
-    xaScenario(function (Closure $espace) use ($conn): void {
+    attSrScenario(function (Closure $espace) use ($conn): void {
         $ws = $espace();
-        $codes = xaCodesServeur();
+        $codes = attSrCodesServeur();
         expect($codes)->toHaveCount(22);
-        xaPreuve($ws, $codes[0], 5);
+        attSrPreuve($ws, $codes[0], 5);
         foreach ($codes as $c) {
-            $p = xaPoint($conn, $ws, $c);
+            $p = attSrPoint($conn, $ws, $c);
             expect($p->etat)->toBe(PointFeuVert::ETAT_ATTEND_SERVEUR)->and($p->fait)->toBeFalse();
         }
     });
 })->with('connexions');
 
 test('attestation + preuve postérieure ⇒ fait ; autres points inchangés', function (string $conn) {
-    xaScenario(function (Closure $espace) use ($conn): void {
+    attSrScenario(function (Closure $espace) use ($conn): void {
         $ws = $espace();
-        [$a, $b] = xaCodesServeur();
-        xaAttestation($ws, 'atteste', 10);
-        xaPreuve($ws, $a, 5);
-        expect(xaPoint($conn, $ws, $a)->fait)->toBeTrue()->and(xaPoint($conn, $ws, $a)->etat)->toBe(PointFeuVert::ETAT_FAIT)
-            ->and(xaPoint($conn, $ws, $b)->fait)->toBeFalse();
+        [$a, $b] = attSrCodesServeur();
+        attSrAttestation($ws, 'atteste', 10);
+        attSrPreuve($ws, $a, 5);
+        expect(attSrPoint($conn, $ws, $a)->fait)->toBeTrue()->and(attSrPoint($conn, $ws, $a)->etat)->toBe(PointFeuVert::ETAT_FAIT)
+            ->and(attSrPoint($conn, $ws, $b)->fait)->toBeFalse();
     });
 })->with('connexions');
 
 test('attestation + preuve antérieure ⇒ pas fait (à revalider)', function (string $conn) {
-    xaScenario(function (Closure $espace) use ($conn): void {
+    attSrScenario(function (Closure $espace) use ($conn): void {
         $ws = $espace();
-        [$a] = xaCodesServeur();
-        xaPreuve($ws, $a, 20);
-        xaAttestation($ws, 'atteste', 10);
-        $p = xaPoint($conn, $ws, $a);
+        [$a] = attSrCodesServeur();
+        attSrPreuve($ws, $a, 20);
+        attSrAttestation($ws, 'atteste', 10);
+        $p = attSrPoint($conn, $ws, $a);
         expect($p->fait)->toBeFalse()->and($p->detail)->toContain('revalider');
     });
 })->with('connexions');
 
 test('preuve postérieure puis « défaite » (dernière ligne fait = faux) ⇒ pas fait', function (string $conn) {
-    xaScenario(function (Closure $espace) use ($conn): void {
+    attSrScenario(function (Closure $espace) use ($conn): void {
         $ws = $espace();
-        [$a] = xaCodesServeur();
-        xaAttestation($ws, 'atteste', 10);
-        xaPreuve($ws, $a, 5);
-        xaPreuve($ws, $a, 2, false);
-        expect(xaPoint($conn, $ws, $a)->fait)->toBeFalse();
+        [$a] = attSrCodesServeur();
+        attSrAttestation($ws, 'atteste', 10);
+        attSrPreuve($ws, $a, 5);
+        attSrPreuve($ws, $a, 2, false);
+        expect(attSrPoint($conn, $ws, $a)->fait)->toBeFalse();
     });
 })->with('connexions');
 
 test('« retire » après « atteste » ⇒ tous les points attendent de nouveau le serveur', function (string $conn) {
-    xaScenario(function (Closure $espace) use ($conn): void {
+    attSrScenario(function (Closure $espace) use ($conn): void {
         $ws = $espace();
-        [$a] = xaCodesServeur();
-        xaAttestation($ws, 'atteste', 10);
-        xaPreuve($ws, $a, 5);
-        xaAttestation($ws, 'retire', 1);
-        foreach (xaCodesServeur() as $c) {
-            expect(xaPoint($conn, $ws, $c)->etat)->toBe(PointFeuVert::ETAT_ATTEND_SERVEUR);
+        [$a] = attSrCodesServeur();
+        attSrAttestation($ws, 'atteste', 10);
+        attSrPreuve($ws, $a, 5);
+        attSrAttestation($ws, 'retire', 1);
+        foreach (attSrCodesServeur() as $c) {
+            expect(attSrPoint($conn, $ws, $c)->etat)->toBe(PointFeuVert::ETAT_ATTEND_SERVEUR);
         }
     });
 })->with('connexions');
 
 test('l’attestation de l’espace B est sans effet sur A', function (string $conn) {
-    xaScenario(function (Closure $espace) use ($conn): void {
+    attSrScenario(function (Closure $espace) use ($conn): void {
         $a = $espace();
         $b = $espace();
-        [$code] = xaCodesServeur();
-        xaAttestation($b, 'atteste', 10);
-        xaPreuve($b, $code, 5);
-        xaPreuve($a, $code, 5);
-        expect(xaPoint($conn, $a, $code)->etat)->toBe(PointFeuVert::ETAT_ATTEND_SERVEUR)
-            ->and(xaPoint($conn, $b, $code)->fait)->toBeTrue();
+        [$code] = attSrCodesServeur();
+        attSrAttestation($b, 'atteste', 10);
+        attSrPreuve($b, $code, 5);
+        attSrPreuve($a, $code, 5);
+        expect(attSrPoint($conn, $a, $code)->etat)->toBe(PointFeuVert::ETAT_ATTEND_SERVEUR)
+            ->and(attSrPoint($conn, $b, $code)->fait)->toBeTrue();
     });
 })->with('connexions');
 
 test('l’attestation change l’empreinte du feu vert', function () {
-    xaScenario(function (Closure $espace): void {
+    attSrScenario(function (Closure $espace): void {
         $ws = $espace();
-        [$a] = xaCodesServeur();
+        [$a] = attSrCodesServeur();
         $liste = app(ListeFeuVert::class);
         $avant = $liste->empreinte($ws, $liste->points($ws));
-        xaAttestation($ws, 'atteste', 10);
-        xaPreuve($ws, $a, 5);
+        attSrAttestation($ws, 'atteste', 10);
+        attSrPreuve($ws, $a, 5);
         expect($liste->empreinte($ws, $liste->points($ws)))->not->toBe($avant);
     });
 });
 
 test('erreur de lecture de l’attestation ⇒ exception, jamais « fait » (échec fermé)', function () {
-    xaScenario(function (Closure $espace): void {
+    attSrScenario(function (Closure $espace): void {
         $ws = $espace();
-        xaSur('pgsql_owner', fn () => DB::statement('ALTER TABLE envoi_attestations_serveur_reel RENAME TO envoi_attestations_serveur_reel_x'));
+        attSrSur('pgsql_owner', fn () => DB::statement('ALTER TABLE envoi_attestations_serveur_reel RENAME TO envoi_attestations_serveur_reel_x'));
         try {
             expect(fn () => app(ListeFeuVert::class)->points($ws))->toThrow(Throwable::class);
         } finally {
-            xaSur('pgsql_owner', fn () => DB::statement('ALTER TABLE envoi_attestations_serveur_reel_x RENAME TO envoi_attestations_serveur_reel'));
+            attSrSur('pgsql_owner', fn () => DB::statement('ALTER TABLE envoi_attestations_serveur_reel_x RENAME TO envoi_attestations_serveur_reel'));
         }
     });
 })->skip(fn () => DB::connection()->getDriverName() !== 'pgsql', 'pgsql seulement');
 
 test('commande : écrit la ligne et le journal ; sans --motif, motif court ou avec @ ⇒ échec, rien écrit', function () {
-    xaScenario(function (Closure $espace): void {
+    attSrScenario(function (Closure $espace): void {
         $ws = $espace();
-        $n = fn () => xaSur('pgsql_owner', fn () => DB::table('envoi_attestations_serveur_reel')->where('workspace_id', $ws)->count());
+        $n = fn () => attSrSur('pgsql_owner', fn () => DB::table('envoi_attestations_serveur_reel')->where('workspace_id', $ws)->count());
 
         expect(Artisan::call('envoi:serveur-reel-attester', ['workspace' => $ws, 'geste' => 'atteste', '--auteur' => 'responsable']))->toBe(1);
         expect(Artisan::call('envoi:serveur-reel-attester', ['workspace' => $ws, 'geste' => 'atteste', '--motif' => 'Serveur installe, constat ecrit']))->toBe(1);
@@ -220,7 +220,7 @@ test('commande : écrit la ligne et le journal ; sans --motif, motif court ou av
 
         expect(Artisan::call('envoi:serveur-reel-attester', ['workspace' => $ws, 'geste' => 'atteste', '--auteur' => 'responsable', '--motif' => 'Serveur installe, constat ecrit']))->toBe(0);
         expect($n())->toBe(1)
-            ->and(xaSur('pgsql_owner', fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'attestation_serveur_reel')->count()))->toBe(1);
+            ->and(attSrSur('pgsql_owner', fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'attestation_serveur_reel')->count()))->toBe(1);
     });
 });
 
@@ -231,11 +231,11 @@ test('aucune route ne contient « attest »', function () {
 });
 
 test('« accordé » reste impossible tant que auto.separation_lettre_prospection est rouge, même attesté', function () {
-    xaScenario(function (Closure $espace): void {
+    attSrScenario(function (Closure $espace): void {
         $ws = $espace();
-        xaAttestation($ws, 'atteste', 10);
-        foreach (xaCodesServeur() as $c) {
-            xaPreuve($ws, $c, 5);
+        attSrAttestation($ws, 'atteste', 10);
+        foreach (attSrCodesServeur() as $c) {
+            attSrPreuve($ws, $c, 5);
         }
         $liste = app(ListeFeuVert::class);
         $sep = collect($liste->points($ws))->firstWhere('code', 'auto.separation_lettre_prospection');

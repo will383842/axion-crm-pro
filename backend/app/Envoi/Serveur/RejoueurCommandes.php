@@ -29,7 +29,7 @@ final class RejoueurCommandes
         foreach (DB::table('workspaces')->whereNull('deleted_at')->orderBy('id')->pluck('id') as $espace) {
             foreach ($this->journal->nonAcquittees((string) $espace, self::LIMITE_PAR_ESPACE) as $i) {
                 try {
-                    if ($this->commandeur->commander((string) $espace, $i['source'], $i['commande_id'], $i['commande'])) {
+                    if ($this->commandeur->commander((string) $espace, $i['source'], $i['commande_id'], $i['commande'], $i['commande'] === 'retrait' ? ($this->journal->cibles((string) $espace, $i['commande_id']) ?? []) : [])) {
                         $bilan['rejouees']++;
                     }
                 } catch (Throwable $e) {

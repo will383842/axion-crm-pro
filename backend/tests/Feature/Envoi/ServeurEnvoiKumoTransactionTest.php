@@ -22,7 +22,7 @@ test('injecter() est refusé dans une transaction ouverte : zéro connexion, rie
     $ws = '00000000-0000-4000-8000-000000000001';
     $s = new ServeurEnvoiKumo($ws, 's', $t, $t, $reg, new class implements CommandeurServeur
     {
-        public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+        public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
         {
             return true;
         }

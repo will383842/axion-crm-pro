@@ -79,7 +79,7 @@ final class CommandeurEnregistreur implements CommandeurServeur
     /** @var list<string> */
     public array $commandes = [];
 
-    public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+    public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
     {
         $this->commandes[] = $commande;
 
@@ -211,7 +211,7 @@ test('la commande de pause en échec n’empêche ni la pause locale ni l’aler
     $ws = espaceSante();
     $cmd = new class implements CommandeurServeur
     {
-        public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+        public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
         {
             throw new ServeurEnvoiRefuse('injoignable');
         }

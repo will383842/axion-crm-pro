@@ -120,7 +120,7 @@ function e5Kumo(FauxTransportKumo $t, RegistreMemoire $registre, DepotSocleDb $d
 
     return new ServeurEnvoiKumo($ws, 'src1', $t, $t, $registre, new class implements CommandeurServeur
     {
-        public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+        public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
         {
             return true;
         }

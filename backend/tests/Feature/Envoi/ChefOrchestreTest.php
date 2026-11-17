@@ -11,6 +11,7 @@ use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
+use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use App\Envoi\FeuVert\ListeFeuVert;
 use App\Envoi\FeuVert\PointFeuVert;
 use App\Envoi\Orchestration\ChefOrchestre;
@@ -168,6 +169,8 @@ test('la commande envoi:cycle, porte fermée, sort en succès sans rien faire', 
 
 test('reel_actif = true mais retrait des envois en file absent : rien n\'est fait (même prédicat que la passerelle)', function () {
     config(['envoi.reel_actif' => true]);
+    // C3-3 lie le retrait réel par défaut : l'intention du test (« absent => porte fermée ») est posée explicitement.
+    app()->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);
     $ws = orchEspace();
     [$chef, $releve] = orchChef(orchListe([$ws => 'accorde']));
 

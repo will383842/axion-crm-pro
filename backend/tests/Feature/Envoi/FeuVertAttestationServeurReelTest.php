@@ -104,6 +104,11 @@ function attSrScenario(Closure $f): void
             return $espaces[] = attSrEspace();
         });
     } finally {
+        // La commande écrit dans la transaction du test (connexion par défaut) : la terminer AVANT le nettoyage par le
+        // propriétaire, sinon ses verrous bloquent ALTER TABLE / DELETE (blocage sans fin).
+        while (DB::transactionLevel() > 0) {
+            DB::rollBack();
+        }
         attSrNettoyer($espaces);
     }
 }
@@ -209,7 +214,7 @@ test('erreur de lecture de l’attestation ⇒ exception, jamais « fait » (éc
 test('commande : écrit la ligne et le journal ; sans --motif, motif court ou avec @ ⇒ échec, rien écrit', function () {
     attSrScenario(function (Closure $espace): void {
         $ws = $espace();
-        $n = fn () => attSrSur('pgsql_owner', fn () => DB::table('envoi_attestations_serveur_reel')->where('workspace_id', $ws)->count());
+        $n = fn () => DB::table('envoi_attestations_serveur_reel')->where('workspace_id', $ws)->count(); // même transaction que la commande
 
         expect(Artisan::call('envoi:serveur-reel-attester', ['workspace' => $ws, 'geste' => 'atteste', '--auteur' => 'responsable']))->toBe(1);
         expect(Artisan::call('envoi:serveur-reel-attester', ['workspace' => $ws, 'geste' => 'atteste', '--motif' => 'Serveur installe, constat ecrit']))->toBe(1);
@@ -220,7 +225,7 @@ test('commande : écrit la ligne et le journal ; sans --motif, motif court ou av
 
         expect(Artisan::call('envoi:serveur-reel-attester', ['workspace' => $ws, 'geste' => 'atteste', '--auteur' => 'responsable', '--motif' => 'Serveur installe, constat ecrit']))->toBe(0);
         expect($n())->toBe(1)
-            ->and(attSrSur('pgsql_owner', fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'attestation_serveur_reel')->count()))->toBe(1);
+            ->and(DB::table('envoi_journal_commandes')->where('workspace_id', $ws)->where('commande', 'attestation_serveur_reel')->count())->toBe(1);
     });
 });
 

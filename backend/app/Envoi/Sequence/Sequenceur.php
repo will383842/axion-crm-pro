@@ -70,6 +70,9 @@ final class Sequenceur
 
     public const MOTIF_REPORTS_EPUISES = 'reports_epuises';
 
+    /** B3-B : jours calendaires sans verdict avant l'alerte (aucun arrêt). */
+    public const VERDICT_ABSENT_ALERTE_JOURS = 7;
+
     /**
      * Une ligne « reserve » sans issue depuis ce délai (horloge injectée) est REPRISE par le chemin de rejeu (même clé,
      * même Message-ID) : plantage entre la réservation et l'appel, ou entre l'appel et la conclusion. La passerelle dit
@@ -310,14 +313,30 @@ final class Sequenceur
         if ($fiche->exclusion !== null) {
             return $this->refuserSaufDejaParti($ins, $rang, $fiche->exclusion, $reprise, $maintenant);
         }
-        $verdict = EnvoiAutorise::verifier($this->demande($ws, $fiche, $rang, (string) $ins->empreinte_adresse), $maintenant);
+        $demande = $this->demande($ws, $fiche, $rang, (string) $ins->empreinte_adresse);
+        $verdict = EnvoiAutorise::verifier($demande, $maintenant);
         if (! $verdict->autorise()) {
             $motif = (string) $verdict->refus;
+            $empreinte = trim((string) $ins->empreinte_adresse);
             // Refus PASSAGER (DNS du jour non vérifié, verdict d'adresse périmé) : on reporte, on n'arrête pas.
-            if ($this->passager($ws, $motif, $fiche->email)) {
+            if ($this->passager($ws, $motif, $empreinte)) {
                 $parti = $reprise ? $this->dejaParti($ins, $rang, $maintenant) : false;
 
                 return $parti ? $this->avancerSiActive($ins, $rang, $version, $messageId, $references, $fenetre, $maintenant) : $this->reporterAvecPlafond($ins, $rang, $motif, $fenetre, $maintenant);
+            }
+            // B3-B : adresse PAS ENCORE vérifiée (aucun verdict, ou « inconnu ») : l'opposition prime (arrêt définitif) ; sinon
+            // report SANS compteur, le rafraîchissement des verdicts finit par la vérifier. Rien ne part sans verdict « valide ».
+            if ($motif === EnvoiAutorise::VERDICT_ABSENT && $this->pasEncoreVerifiee($ws, $empreinte)) {
+                $opposition = EnvoiAutorise::oppositionSeule($demande);
+                if ($opposition !== null) {
+                    return $this->refuserSaufDejaParti($ins, $rang, $opposition, $reprise, $maintenant);
+                }
+                if ($reprise && $this->dejaParti($ins, $rang, $maintenant)) {
+                    return $this->avancerSiActive($ins, $rang, $version, $messageId, $references, $fenetre, $maintenant);
+                }
+                $this->alerterVerdictAbsentPersistant($ins, $rang, $maintenant);
+
+                return $this->reporter($ins, $rang, $motif, $fenetre, $maintenant);
             }
 
             return $this->refuserSaufDejaParti($ins, $rang, $motif, $reprise, $maintenant);
@@ -418,22 +437,41 @@ final class Sequenceur
 
     /**
      * Refus qui se lève sans qu'une personne ait rien décidé, ou réglage d'espace : voir `RefusSequenceur` (table
-     * explicite). Cas particulier : `VERDICT_ABSENT` n'est reporté que si le DERNIER verdict de l'adresse est
-     * « valide » (donc périmé ou daté du futur) ; un verdict « invalide » ou jamais posé est DÉFINITIF.
+     * explicite). Cas particulier : `VERDICT_ABSENT` n'est reporté AVEC plafond que si le DERNIER verdict de l'adresse est
+     * « valide » (donc périmé ou daté du futur) ; un verdict « invalide » ou « risque » est DÉFINITIF ; l'absence de verdict
+     * (ou « inconnu ») est reportée sans compteur par `pasEncoreVerifiee` (B3-B).
      */
-    private function passager(string $ws, string $motif, string $email): bool
+    private function passager(string $ws, string $motif, string $empreinte): bool
     {
         if (RefusSequenceur::temporaire($motif)) {
             return true;
         }
-        if ($motif !== EnvoiAutorise::VERDICT_ABSENT) {
-            return false;
-        }
+
+        return $motif === EnvoiAutorise::VERDICT_ABSENT && $this->dernierVerdict($ws, $empreinte) === 'valide';
+    }
+
+    /** Aucun verdict pour cette adresse dans CET espace, ou le dernier est « inconnu » (vérification pas encore concluante). */
+    private function pasEncoreVerifiee(string $ws, string $empreinte): bool
+    {
+        return in_array($this->dernierVerdict($ws, $empreinte), [null, 'inconnu'], true);
+    }
+
+    private function dernierVerdict(string $ws, string $empreinte): ?string
+    {
         $dernier = DB::table('envoi_verdicts_adresse')->where('workspace_id', $ws)
-            ->where('empreinte_adresse', ListeSuppression::empreinte(mb_strtolower(trim($email))))
+            ->where('empreinte_adresse', $empreinte)
             ->orderByDesc('verifie_le')->value('verdict');
 
-        return $dernier === 'valide';
+        return $dernier === null ? null : (string) $dernier;
+    }
+
+    /** Alerte bornée : message « reporté » faute de verdict depuis 7 jours ou plus. Journal sans adresse ; aucun arrêt. */
+    private function alerterVerdictAbsentPersistant(\stdClass $ins, int $rang, DateTimeImmutable $maintenant): void
+    {
+        $cree = DB::table('envoi_messages')->where('inscription_id', $ins->id)->where('etape', $rang)->value('cree_le');
+        if ($cree !== null && $maintenant->getTimestamp() - (new DateTimeImmutable((string) $cree))->getTimestamp() >= self::VERDICT_ABSENT_ALERTE_JOURS * 86400) {
+            Log::warning('envoi.verdict_absent_persistant', ['workspace_id' => $ins->workspace_id, 'inscription_id' => $ins->id]);
+        }
     }
 
     /** Une ligne « reserve » ou autre non reprenable : l'inscription n'est pas retraitée avant une heure. */

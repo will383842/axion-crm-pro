@@ -12,6 +12,7 @@
  * l'adresse est morte n'en sort jamais.
  */
 import { useId, useState, type ChangeEvent } from 'react';
+import { isAxiosError } from 'axios';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
@@ -29,6 +30,8 @@ import {
 import { api } from '@/lib/api';
 import { useAntiRebond } from '@/hooks/useAntiRebond';
 import { FERMEES_INCLURE } from '@/features/companies/fermees';
+import { useReseauxOrigine } from '@/features/envoi/creation/api';
+import { libelleReseau } from '@/features/origines/libelles';
 import { BadgeOpposee } from './BadgeOpposee';
 import { ConsoleGate, ConsoleListSkeleton } from './ConsoleGate';
 import {
@@ -40,6 +43,9 @@ import {
   type PersonnesCounts,
 } from './types';
 
+/** PO-L : `reseaux` n'est rendu que porte ouverte (clé absente sinon). */
+type LignePersonne = PersonneRow & { reseaux?: string[] };
+
 const SELECT_CLS =
   'h-11 rounded-lg bg-white px-3 text-xs text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 dark:bg-slate-900 dark:text-white dark:ring-slate-700';
 
@@ -48,11 +54,13 @@ interface Filtres {
   source: string;
   nature: string;
   rattachee: string;
+  /** PO-LE : jeton de réseau ; envoyé SEULEMENT si la lecture des origines est active. */
+  origine_reseau: string;
   /** '' = fiches fermées masquées (serveur) ; 'inclure' les remet — liste, pastilles et export. */
   fermees: string;
 }
 
-const FILTRES_VIDES: Filtres = { statut_lettre: '', source: '', nature: '', rattachee: '', fermees: '' };
+const FILTRES_VIDES: Filtres = { statut_lettre: '', source: '', nature: '', rattachee: '', origine_reseau: '', fermees: '' };
 
 function formatDate(value: string | null): string {
   if (value === null) return '—';
@@ -84,6 +92,10 @@ function PersonnesContent() {
   const rechercheDifferee = useAntiRebond(search);
   const [exporting, setExporting] = useState(false);
   const idf = useId();
+  // PO-LE : 404 / inactif / indisponible ⇒ ni colonne ni filtre, et jamais de paramètre.
+  const reseauxOrigine = useReseauxOrigine();
+  const reseauActif = reseauxOrigine.data?.etat === 'actif';
+  const reseauxChoix = reseauxOrigine.data?.etat === 'actif' ? reseauxOrigine.data.reseaux : [];
 
   const counts = useQuery<PersonnesCounts>({
     queryKey: ['crm', 'personnes', 'counts', filtres.fermees],
@@ -94,12 +106,12 @@ function PersonnesContent() {
     },
   });
 
-  const list = useQuery<CursorResponse<PersonneRow>>({
-    queryKey: ['crm', 'personnes', filtres, rechercheDifferee],
+  const list = useQuery<CursorResponse<LignePersonne>>({
+    queryKey: ['crm', 'personnes', filtres, rechercheDifferee, reseauActif],
     queryFn: async () => {
-      const params = parametres(filtres, rechercheDifferee);
+      const params = parametres(reseauActif ? filtres : { ...filtres, origine_reseau: '' }, rechercheDifferee);
       params.set('per_page', '50');
-      return (await api.get<CursorResponse<PersonneRow>>(`/crm/personnes?${params.toString()}`)).data;
+      return (await api.get<CursorResponse<LignePersonne>>(`/crm/personnes?${params.toString()}`)).data;
     },
     placeholderData: (previous) => previous,
   });
@@ -107,7 +119,7 @@ function PersonnesContent() {
   async function exporter() {
     setExporting(true);
     try {
-      const params = parametres(filtres, rechercheDifferee);
+      const params = parametres(reseauActif ? filtres : { ...filtres, origine_reseau: '' }, rechercheDifferee);
       const r = await api.get<Blob>(`/crm/personnes/export?${params.toString()}`, { responseType: 'blob' });
       const url = URL.createObjectURL(r.data);
       const a = document.createElement('a');
@@ -125,11 +137,16 @@ function PersonnesContent() {
     }
   }
 
-  const echec =
-    (list.error !== null && list.data === undefined) || (counts.error !== null && counts.data === undefined);
   const rows = list.data?.data ?? [];
   const c = counts.data;
   const sources = Object.keys(c?.by_source ?? {});
+  // Un 422 (filtre refusé) est affiché tel quel, même quand la liste précédente reste à l'écran.
+  const refus =
+    list.error !== null && isAxiosError(list.error) && list.error.response?.status === 422
+      ? ((list.error.response.data as { message?: string } | undefined)?.message ?? 'Filtre refusé.')
+      : null;
+  const echec =
+    (list.error !== null && list.data === undefined && refus === null) || (counts.error !== null && counts.data === undefined);
 
   const changer = (cle: keyof Filtres) => (e: ChangeEvent<HTMLSelectElement>) =>
     setFiltres((f) => ({ ...f, [cle]: e.target.value }));
@@ -204,6 +221,18 @@ function PersonnesContent() {
                     <option value="oui">Rattachées à une entreprise</option>
                   </select>
                 </Champ>
+                {reseauActif && (
+                  <Champ label="Réseau" htmlFor={`${idf}-reseau`}>
+                    <select value={filtres.origine_reseau} onChange={changer('origine_reseau')} id={`${idf}-reseau`} className={SELECT_CLS}>
+                      <option value="">Tous les réseaux</option>
+                      {reseauxChoix.map((r) => (
+                        <option key={r.reseau} value={r.reseau}>
+                          {libelleReseau(r.reseau) ?? r.reseau}
+                        </option>
+                      ))}
+                    </select>
+                  </Champ>
+                )}
                 <label className="flex items-center gap-2 self-end pb-3 text-xs text-slate-700 dark:text-slate-300">
                   <input
                     type="checkbox"
@@ -221,6 +250,12 @@ function PersonnesContent() {
               </Button>
             }
           />
+
+          {refus !== null && (
+            <p role="alert" className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              {refus}
+            </p>
+          )}
 
           <div className="mt-4">
             {list.isLoading || list.isPlaceholderData ? (
@@ -259,6 +294,11 @@ function PersonnesContent() {
                           </span>
                         )}
                       </div>
+                      {reseauActif && (
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          Réseau : <span data-testid="cellule-reseau">{(p.reseaux ?? []).map((r) => libelleReseau(r) ?? r).join(', ') || '—'}</span>
+                        </div>
+                      )}
                       <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         {p.email ?? '—'} · Dernière interaction : {formatDate(p.derniere_interaction_at)} · Conservée : aucune suppression automatique
                       </div>

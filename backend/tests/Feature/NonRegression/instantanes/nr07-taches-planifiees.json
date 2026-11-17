@@ -510,6 +510,16 @@
         "sauts": 1
     },
     {
+        "tache": "prospection-linkedin:releve",
+        "horaire": "0 7 * * *",
+        "fuseau": "Europe/Paris",
+        "verrou_minutes": 30,
+        "en_arriere_plan": false,
+        "un_seul_serveur": true,
+        "conditions": 0,
+        "sauts": 2
+    },
+    {
         "tache": "prospection:score-email-confidence",
         "horaire": "45 4 * * *",
         "fuseau": "Europe/Paris",

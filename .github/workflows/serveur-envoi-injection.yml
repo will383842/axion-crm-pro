@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: serveur-envoi-injection-${{ github.ref }}
+  # annule le run remplacé sur PR seulement ; jamais sur push main
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   tests:
     name: Tests de l'écouteur d'injection

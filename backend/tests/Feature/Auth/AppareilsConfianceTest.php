@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Auth\CodeCourriel\FauxCanalCodeConnexion;
 use Carbon\Carbon;
+use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -72,8 +73,13 @@ function g3cRetenirCookies(TestResponse $r): array
     $out = [];
     foreach ($r->baseResponse->headers->getCookies() as $c) {
         if ((string) $c->getValue() !== '') {
-            test()->withCookie($c->getName(), $c->getValue());
-            $out[$c->getName()] = $c->getValue();
+            $valeur = (string) $c->getValue();
+            // Le client de test chiffre lui-même ses cookies : au navigateur, on rend donc la valeur EN CLAIR.
+            if ($c->getName() === 'axion_appareil') {
+                $valeur = CookieValuePrefix::remove(app('encrypter')->decrypt($valeur, false));
+            }
+            test()->withCookie($c->getName(), $valeur);
+            $out[$c->getName()] = $valeur;
         }
     }
     app('auth')->forgetGuards();
@@ -135,7 +141,8 @@ test('1. confiance : cookie posé, une ligne ; reconnexion avec le cookie => auc
     $ligne = DB::table('appareils_confiance')->first();
     expect($ligne->user_id)->toBe((string) $u->id)
         ->and(strlen((string) $ligne->jeton_hash))->toBe(64)
-        ->and($cookie)->not->toContain((string) $ligne->jeton_hash);
+        ->and(strlen($cookie))->toBe(48)
+        ->and(hash('sha256', $cookie))->toBe((string) $ligne->jeton_hash);
 
     $codesAvant = DB::table('codes_connexion_courriel')->count();
     g3cNavigateur(['axion_appareil' => $cookie]);

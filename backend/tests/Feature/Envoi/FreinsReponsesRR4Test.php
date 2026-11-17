@@ -7,6 +7,8 @@
 
 use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Chauffe\Freins;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
+use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\RecepteurRetoursFreins;
 use App\Envoi\Imap\RetourDetecte;
@@ -53,13 +55,13 @@ function rr4bReponses(string $ws): int
     return app(DepotChauffe::class)->totaux7Jours($ws, JourEnvoi::de(now()->toDateTimeImmutable()), 'domaine')['reponses'];
 }
 
-/** Une réponse stockée dans la file (événement + réponse) ; rattachée ou non. Rend l'identifiant de la réponse. */
-function rr4bFile(string $ws, string $cle, bool $rattachee = true): int
+/** Une réponse stockée dans la file « à rattacher » (une ligne « rattache » exige un identifiant d'injection). Rend l'identifiant de la réponse. */
+function rr4bFile(string $ws, string $cle): int
 {
     $emp = hash('sha256', $cle);
     $evenement = WorkspaceContext::run($ws, fn () => DB::table('envoi_evenements')->insertGetId([
         'workspace_id' => $ws, 'boite' => 'b@zz-rr4b.example.test', 'uid_validity' => 1, 'uid' => random_int(1, 1_000_000),
-        'empreinte_message' => $emp, 'classe' => 'reponse_humaine', 'statut' => $rattachee ? 'rattache' : 'a_rattacher',
+        'empreinte_message' => $emp, 'classe' => 'reponse_humaine', 'statut' => 'a_rattacher',
         'empreinte_expediteur' => ListeSuppression::empreinte("{$cle}@zz-client.example.test"), 'recu_le' => now(),
     ]));
     app(StockerReponse::class)->enregistrer($ws, $emp, 'Objet', 'Bonjour', "{$cle}@zz-client.example.test", 'reponse_humaine');
@@ -80,6 +82,7 @@ beforeEach(function () {
     $this->a = F::espace('zz-rr4b-a');
     $this->b = F::espace('zz-rr4b-b');
     Cache::flush();
+    app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire);
 });
 
 afterEach(function () {
@@ -118,9 +121,9 @@ test('F3 15 réponses non classées = pause ; une classée = 14 = plus de pause 
         ->and(Freins::freinHumain($depot->reponsesEnAttente($this->a)))->toBe(Freins::RALENTI);
 });
 
-test('F3b « à rattacher » compte dans la file ; le journal garde son sens (le maximum des deux)', function () {
-    rr4bFile($this->a, 'f3b-1', false);
-    rr4bFile($this->a, 'f3b-2', true);
+test('F3b la file « à rattacher » compte ; le journal garde son sens (le maximum des deux)', function () {
+    rr4bFile($this->a, 'f3b-1');
+    rr4bFile($this->a, 'f3b-2');
     $depot = app(DepotChauffe::class);
     expect($depot->reponsesEnAttente($this->a))->toBe(2);
     foreach (range(1, 5) as $_) {

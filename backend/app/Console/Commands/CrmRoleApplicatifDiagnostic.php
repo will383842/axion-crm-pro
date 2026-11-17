@@ -80,7 +80,9 @@ class CrmRoleApplicatifDiagnostic extends Command
         );
 
         // Recopie (pas appel) de la requête de PentestSelfCheck : tables à
-        // workspace_id sans FORCE ROW LEVEL SECURITY.
+        // workspace_id sans FORCE ROW LEVEL SECURITY. La liste d'exclusion est
+        // la même que PentestSelfCheck::TABLES_HORS_RLS (tables volontairement
+        // hors RLS d'espace).
         $sansForce = DB::selectOne(
             "SELECT count(*) AS n
                FROM pg_class c
@@ -92,7 +94,8 @@ class CrmRoleApplicatifDiagnostic extends Command
               WHERE n.nspname = current_schema()
                 AND c.relkind = 'r'
                 AND NOT c.relispartition
-                AND NOT c.relforcerowsecurity",
+                AND NOT c.relforcerowsecurity
+                AND c.relname NOT IN ('sessions', 'user_workspaces', 'audit_logs', 'audit_logs_default')",
         );
 
         $appSuper = $app !== null && (bool) $app->rolsuper;

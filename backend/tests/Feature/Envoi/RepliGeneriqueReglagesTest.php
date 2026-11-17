@@ -27,6 +27,17 @@ function rglPoser(string $ws, string $cle, string $valeur): void
     WorkspaceContext::run($ws, fn () => DB::table('envoi_reglages')->updateOrInsert(['workspace_id' => $ws, 'cle' => $cle], ['valeur' => $valeur, 'auteur' => 'fondateur']));
 }
 
+function rglPoserBrut(string $ws, string $cle, string $valeur): void
+{
+    // Valeur hors des gardes L0a posée exprès : la LECTURE doit rester en échec fermé (défense en profondeur).
+    DB::statement('ALTER TABLE envoi_reglages DISABLE TRIGGER envoi_reglages_repli_generique');
+    try {
+        rglPoser($ws, $cle, $valeur);
+    } finally {
+        DB::statement('ALTER TABLE envoi_reglages ENABLE TRIGGER envoi_reglages_repli_generique');
+    }
+}
+
 /*
  * Valeur invalide : la garde en base (déclencheur de la migration L0a) la refuse à tous les rôles. L'écriture est jouée dans un point
  * de sauvegarde pour que la transaction du test survive au refus (sinon 25P02). Le déclencheur n'est jamais désactivé.
@@ -68,6 +79,14 @@ test('R0 : toute valeur autre que « true » / « false » est refusée par la b
     expect(RepliGenerique::ouvert($ws))->toBeTrue();
 });
 
+test('R0 : valeur illisible posée hors garde (déclencheur coupé dans la transaction du test) ⇒ lecteur éteint', function () {
+    $ws = rglEspace();
+    foreach (['1', 'TRUE', 'oui', '', ' true', 'true '] as $v) {
+        rglPoserBrut($ws, 'envoi.repli_generique', $v);
+        expect(RepliGenerique::ouvert($ws))->toBeFalse("valeur « $v »");
+    }
+});
+
 test('R0 : identifiant d’espace invalide ou erreur SQL de lecture ⇒ éteint (échec fermé)', function () {
     $ws = rglEspace();
     rglPoser($ws, 'envoi.repli_generique', 'true');
@@ -100,11 +119,15 @@ test('R0 : invisible par la RLS (rôle applicatif, autre espace) ⇒ éteint', f
     expect($vu)->toBeFalse();
 });
 
-test('R4 : plafond absent ⇒ 3 ; 0 à 5 respectés ; plafond de l’espace en borne', function () {
+test('R4 : plafond absent ⇒ 3 ; 0 à 5 respectés ; 9 ⇒ 5 ; plafond de l’espace en borne', function () {
     $ws = rglEspace();
     expect(RepliGenerique::plafondJour($ws, 20))->toBe(3);
     foreach (['0' => 0, '1' => 1, '4' => 4, '5' => 5] as $v => $attendu) {
         rglPoser($ws, 'envoi.repli_generique_plafond_jour', (string) $v);
+        expect(RepliGenerique::plafondJour($ws, 20))->toBe($attendu, "réglage $v");
+    }
+    foreach (['9' => 5, '300' => 5] as $v => $attendu) {
+        rglPoserBrut($ws, 'envoi.repli_generique_plafond_jour', (string) $v);
         expect(RepliGenerique::plafondJour($ws, 20))->toBe($attendu, "réglage $v");
     }
     rglPoser($ws, 'envoi.repli_generique_plafond_jour', '5');
@@ -122,6 +145,14 @@ test('R4 : tout plafond autre qu’un entier de 0 à 5 est refusé par la base ;
     rglPoser($ws, 'envoi.repli_generique_plafond_jour', '2');
     rglRefusee($ws, 'envoi.repli_generique_plafond_jour', '9');
     expect(RepliGenerique::plafondJour($ws, 20))->toBe(2);
+});
+
+test('R4 : valeur illisible posée hors garde ⇒ lecteur à 0', function () {
+    $ws = rglEspace();
+    foreach (['abc', '', '3.5', '-1', 'null', '[3]'] as $v) {
+        rglPoserBrut($ws, 'envoi.repli_generique_plafond_jour', $v);
+        expect(RepliGenerique::plafondJour($ws, 20))->toBe(0, "valeur « $v »");
+    }
 });
 
 test('R4 : espace invalide ⇒ 0 ; erreur SQL ⇒ 0', function () {

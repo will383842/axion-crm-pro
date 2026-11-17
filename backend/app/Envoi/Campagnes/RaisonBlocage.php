@@ -31,7 +31,7 @@ final class RaisonBlocage
     ];
 
     /** Prédicat UNIQUE (partagé avec `MaterialisationCampagne`) : boîtes non vides ou plafond du jour renseigné. */
-    public static function reglageNonApplique(object $c): bool
+    public static function reglageNonApplique(\stdClass $c): bool
     {
         $contenu = json_decode((string) $c->saisie, true)['contenu'] ?? [];
 

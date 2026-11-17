@@ -87,6 +87,9 @@ paths:
                   exclusions_evaluees:
                     type: boolean
                     description: Faux tant que les exclusions ne sont pas évaluées (alors `exclus` vaut 0, par défaut et non par mesure).
+                  complet:
+                    type: boolean
+                    description: Présent avec `exclusions_evaluees` vrai. Faux si l'échéance ou le plafond de lots est atteint ; `total` est alors le nombre de membres examinés et `restant` un minimum (« au moins »), jamais extrapolé.
                   total: { type: integer, minimum: 0 }
                   exclus: { type: integer, minimum: 0 }
                   restant: { type: integer, minimum: 0 }
@@ -604,7 +607,10 @@ components:
         reference: { type: string }
         libelle: { type: string }
         total: { type: integer, minimum: 0 }
-        joignables: { type: integer, minimum: 0 }
+        joignables:
+          type: [integer, 'null']
+          minimum: 0
+          description: Nul = non estimé (jamais égal à `total` par défaut) ; l'estimation vraie se lit par la route d'estimation.
     BoiteChoix:
       type: object
       required: [id, adresse, statut, quota_jour]

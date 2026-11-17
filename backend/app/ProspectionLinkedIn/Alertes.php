@@ -27,7 +27,11 @@ final class Alertes
 
     public function __construct(private readonly Alerte $alerte, private readonly JournalProspection $journal) {}
 
-    /** Tous les espaces non supprimés ; une erreur dans un espace n'empêche pas les suivants. */
+    /**
+     * Tous les espaces non supprimés ; une erreur dans un espace n'empêche pas les suivants.
+     *
+     * @return array{arrets: int, rappels: int, releves: int, erreurs: int}
+     */
     public function executer(CarbonImmutable $maintenant): array
     {
         $total = ['arrets' => 0, 'rappels' => 0, 'releves' => 0, 'erreurs' => 0];
@@ -83,11 +87,13 @@ final class Alertes
         }
 
         $motif = 'Acceptation sous ' . self::SEUIL_ACCEPTATION_POURCENT . ' % sur les ' . self::FENETRE_INVITATIONS . ' dernières invitations : arrêt automatique.';
-        DB::transaction(function () use ($ws, $exp, $motif, $dernieres): void {
+        $derniere = $dernieres->first();
+        $cleArret = 'arret-acceptation-' . $exp . '-' . (is_object($derniere) ? (string) $derniere->id : '0');
+        DB::transaction(function () use ($ws, $exp, $motif, $cleArret): void {
             WorkspaceContext::run($ws, static fn () => DB::table('pl_arret')->insert([
                 'workspace_id' => $ws, 'expediteur_user_id' => $exp, 'geste' => 'arret', 'motif' => $motif, 'auteur' => 'systeme', 'declencheur' => 'acceptation_basse',
             ]));
-            $this->journal->ecrire($ws, null, 'arret', 'systeme', 'alertes', 'arret-acceptation-' . $exp . '-' . $dernieres->first()->id, ['motif' => 'acceptation_basse']);
+            $this->journal->ecrire($ws, null, 'arret', 'systeme', 'alertes', $cleArret, ['motif' => 'acceptation_basse']);
         });
         $this->prevenir('LinkedIn : arrêt automatique', "Seulement {$acceptees} invitations acceptées sur " . self::FENETRE_INVITATIONS . ' (moins de '
             . self::SEUIL_ACCEPTATION_POURCENT . ' %). La prospection LinkedIn est arrêtée. Vous la reprenez vous-même, quand vous le décidez.', 'acceptation_basse');

@@ -116,3 +116,7 @@ e898999a17cfd512aeb81fffc5257856b771087f:backend/tests/Feature/Usine/PushAgregat
 
 # ─── Libellé du guide reçu : secret HMAC factice de test (« secret-de-test-lgr-… », rien de réel) ───
 5d9f0d76faa437999bd07170dcd70a38f179734d:backend/tests/Feature/Crm/LibelleGuideRecuTest.php:generic-api-key:11
+
+# ─── G1-E (PR #647) : secret factice de test « secret-de-test-g1e-… » (rien de réel) ───
+# Remplacé par une valeur construite à l'exécution dans 72d5e36 ; seul d503ad6 de l'historique de la branche le garde.
+d503ad6185be3afdd57c1b0de99916ccf9d3ede1:backend/tests/Feature/Crm/ContactsFicheGestesTest.php:generic-api-key:25

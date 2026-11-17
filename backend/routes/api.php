@@ -570,6 +570,11 @@ Route::prefix('v1')->group(function () {
             Route::post('/contacts/{contactId}/retirer', [ContactsGestesController::class, 'retirer'])->whereNumber('contactId')->middleware('permission:companies.delete');
             Route::post('/contacts/{contactId}/restaurer', [ContactsGestesController::class, 'restaurer'])->whereNumber('contactId')->middleware('permission:companies.delete');
             Route::patch('/contacts/{contactId}', [ContactsGestesController::class, 'modifier'])->whereNumber('contactId')->middleware('permission:companies.update');
+            // G1-E : appel, rappel (fiche personne) et export. `export` AVANT `/contacts/{contactId}`.
+            Route::post('/contacts/export', [ContactsGestesController::class, 'exporter'])
+                ->middleware(['throttle:origines-export', 'permission:data.export', 'permission:contacts.view_pii', 'delai-sql:300']);
+            Route::post('/persons/{personKey}/appels', [ContactsGestesController::class, 'appel'])->middleware('permission:companies.update');
+            Route::post('/persons/{personKey}/rappel', [ContactsGestesController::class, 'rappel'])->middleware('permission:companies.update');
             // N12 (03/10/2026) — provenance tiers d'une personne : rôle owner
             // SEULEMENT (contrôlé par le contrôleur, 403 pour tout autre rôle).
             Route::get('/contacts/{contactId}/provenances-tiers', [ProvenancesTiersController::class, 'index'])

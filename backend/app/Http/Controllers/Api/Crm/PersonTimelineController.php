@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Crm\Console\ConsoleAccess;
+use App\Crm\Opposition\StatutOpposition;
 use App\Support\MasquageCoordonnees;
 use App\Support\WorkspaceContext;
 use Illuminate\Http\JsonResponse;
@@ -72,7 +73,9 @@ class PersonTimelineController extends ConsoleController
             return self::instantDe($b) <=> self::instantDe($a);
         });
 
-        return $this->ok([
+        $fiche = $business === null ? null : $this->fiche($business, $personKey);
+
+        return $this->ok(($fiche === null ? [] : ['fiche' => $fiche]) + [
             'person_key' => $personKey,
             'universes' => [
                 'business' => [
@@ -97,6 +100,66 @@ class PersonTimelineController extends ConsoleController
                 array_slice($activities, 0, self::MAX_ACTIVITIES),
             ),
         ]);
+    }
+
+    /**
+     * G1-E — la fiche d'action de la personne (contact business), y compris RETIRÉ par la console (pour le restaurer).
+     * Absente si la personne a été mise à l'écart (RGPD) ou n'a aucun contact utilisable : aucun geste proposé.
+     * Aucune table `envoi_*` n'est lue (`envois` reste vide, à brancher par un lot Envoi).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function fiche(string $workspaceId, string $personKey): ?array
+    {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $personKey): ?array {
+            $ecart = DB::selectOne("SELECT 1 AS x FROM contacts WHERE workspace_id = ? AND person_key = ? AND metadata ?? 'mis_a_l_ecart_le' LIMIT 1", [$workspaceId, $personKey]);
+            if ($ecart !== null) {
+                return null;
+            }
+            $c = DB::selectOne(
+                "SELECT c.id, c.first_name, c.last_name, c.email::text AS email, c.role, c.discovery_source, c.deleted_at,
+                        e.denomination, e.siren, e.lifecycle_stage
+                 FROM contacts c LEFT JOIN companies e ON e.id = c.company_id AND e.workspace_id = c.workspace_id
+                 WHERE c.workspace_id = ? AND c.person_key = ? AND (c.deleted_at IS NULL OR c.metadata ?? 'retire_console_le')
+                 ORDER BY (c.deleted_at IS NOT NULL), c.id DESC LIMIT 1",
+                [$workspaceId, $personKey],
+            );
+            if ($c === null) {
+                return null;
+            }
+            $courriel = is_string($c->email) ? $c->email : null;
+            try {
+                $v = (new StatutOpposition)->pourLignes($workspaceId, [$c->id => ['email' => $courriel, 'siren' => is_string($c->siren) ? $c->siren : null]]);
+                $oppose = ($v[$c->id]['opposee'] ?? true) === true; // sans verdict : échec fermé
+            } catch (\Throwable) {
+                $oppose = true;
+            }
+            $rappel = DB::selectOne(
+                "SELECT to_char(due_at AT TIME ZONE 'Europe/Paris', 'YYYY-MM-DD') AS le, title FROM activities
+                 WHERE workspace_id = ? AND kind = 'task' AND done_at IS NULL AND subject_type = 'contact' AND subject_id = ?
+                   AND payload ->> 'surface' = 'fiche:rappel' AND due_at IS NOT NULL ORDER BY due_at, id LIMIT 1",
+                [$workspaceId, $c->id],
+            );
+            $retire = DB::selectOne("SELECT to_char(deleted_at AT TIME ZONE 'Europe/Paris', 'YYYY-MM-DD\"T\"HH24:MI:SS') AS le FROM contacts WHERE workspace_id = ? AND id = ? AND deleted_at IS NOT NULL", [$workspaceId, $c->id]);
+
+            return [
+                'contact_id' => (int) $c->id,
+                'first_name' => (string) ($c->first_name ?? ''),
+                'last_name' => (string) $c->last_name,
+                'email' => MasquageCoordonnees::requis() ? (string) MasquageCoordonnees::email($courriel) : (string) $courriel,
+                'fonction' => (string) ($c->role ?? ''),
+                'organisation' => (string) ($c->denomination ?? ''),
+                'etape' => (string) ($c->lifecycle_stage ?? 'nouveau'),
+                'provenance' => (string) ($c->discovery_source ?? ''),
+                'retire_le' => $retire?->le,
+                'droit_ecrire' => $oppose
+                    ? ['verdict' => 'non', 'raison' => 'opposition']
+                    : ['verdict' => 'prudence', 'raison' => 'verifier_avant_envoi'],
+                'envois' => [],
+                'rappel_le' => $rappel?->le,
+                'rappel_note' => $rappel?->title,
+            ];
+        });
     }
 
     /**

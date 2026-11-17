@@ -501,6 +501,10 @@ sans IP ⇒ comportement de `main` ; `noter` incrémente boîte ET IP ; recul de
 **Fichiers autorisés** : C `frontend/src/features/envoi/infrastructure/composants/AjoutBoite.tsx` ;
 M `frontend/src/features/envoi/infrastructure/BoitesPage.tsx` ; M `frontend/src/features/envoi/infrastructure/commandes.ts` ;
 C `frontend/src/features/envoi/infrastructure/composants/AjoutBoite.test.tsx` ; C `docs/envoi/lots/F3-B2.md`.
+Décision de pilotage (commentaire sur #680) : M `frontend/tests/non-regression/routes.test.ts`, seulement deux lignes
+ajoutées à `ECARTS_CONNUS` (`POST /envoi/boites`, `POST /envoi/boites/ajout/code`, routes servies par F3-B1, #705), avec
+leur justification, sur le modèle des écarts Envoi existants ; ni régénération de la photo, ni appel non littéral, ni
+autre entrée. Relecture : les deux routes existent côté serveur et le filet rougit toujours pour une route inconnue.
 
 **Comportement** : bouton visible pour le propriétaire seul ; formulaire en deux temps (« Recevoir un code » puis
 code + mot de passe) ; le mot de passe n'est jamais gardé dans l'état global, ni dans `localStorage`, ni dans l'URL,

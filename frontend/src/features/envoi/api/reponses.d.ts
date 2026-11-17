@@ -38,6 +38,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/reponses/{id}/annuler": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Annuler le classement humain d'une réponse
+         * @description Ajoute une ligne d'annulation : la réponse revient « à traiter ». Rien n'est effacé ni défait
+         *     (arrêts, tâches et opposition restent). Un STOP ne s'annule pas.
+         */
+        post: operations["annulerReponse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/reponses/{id}/classer": {
         parameters: {
             query?: never;
@@ -310,6 +331,40 @@ export interface operations {
             404: components["responses"]["Erreur"];
         };
     };
+    annulerReponse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Réponse revenue à traiter, avec un message de confirmation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReponseResume"] & {
+                        message: string;
+                    };
+                };
+            };
+            404: components["responses"]["Erreur"];
+            /** @description `pas_traitee` (rien à annuler) ou `stop_definitif` (un STOP ne s'annule pas). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
+                };
+            };
+        };
+    };
     classerReponse: {
         parameters: {
             query?: never;
@@ -335,6 +390,15 @@ export interface operations {
         };
         responses: {
             200: components["responses"]["Reponse"];
+            /** @description Le classement courant est un STOP (`stop_definitif`), qui ne se corrige pas. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
+                };
+            };
         };
     };
     creerFicheDepuisReponse: {

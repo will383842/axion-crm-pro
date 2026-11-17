@@ -34,6 +34,17 @@
     },
     {
         "methode": "POST",
+        "uri": "api/v1/envoi/reponses/{id}/annuler",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
         "uri": "api/v1/envoi/reponses/{id}/classer",
         "middlewares": [
             "api",

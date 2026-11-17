@@ -180,3 +180,60 @@ test('le journal ajout seul refuse UPDATE et DELETE', function () {
     [$id] = r12Reponse($this->ws);
     expect(fn () => WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_reponses')->where('id', $id)->delete()))->toThrow(QueryException::class);
 });
+
+/** Nombre de lignes HUMAINES (classement ou annulation) : la ligne de suggestion du classificateur n'en fait pas partie. */
+function rr6bLignes(Workspace $ws, int $id): int
+{
+    return (int) WorkspaceContext::run($ws->id, fn () => DB::table('envoi_reponses_classements')->where('reponse_id', $id)->where('auteur', 'humain')->count());
+}
+
+test('RR-6B annuler : 200 conforme au contrat, la réponse revient à traiter, rien d’effacé', function () {
+    [$id] = r12Reponse($this->ws);
+    $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/classer", ['classement' => 'refus'])->assertOk();
+    $r = $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/annuler")->assertOk();
+    expect(ContratOpenApiEnvoi::ecartsReponse('reponses.yaml', '/envoi/reponses/{id}/annuler', 'post', 200, $r->json()))->toBe([]);
+    expect($r->json('traitee'))->toBeFalse()->and($r->json('message'))->toContain('conservés');
+    expect(rr6bLignes($this->ws, $id))->toBe(2);
+});
+
+test('RR-6B annuler : administrateur et viewer 403, aucune écriture', function () {
+    [$id] = r12Reponse($this->ws);
+    $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/classer", ['classement' => 'refus'])->assertOk();
+    $avant = rr6bLignes($this->ws, $id);
+    $this->actingAs($this->admin)->postJson("/api/v1/envoi/reponses/{$id}/annuler")->assertForbidden();
+    $this->actingAs($this->compte($this->ws, 'viewer'))->postJson("/api/v1/envoi/reponses/{$id}/annuler")->assertForbidden();
+    expect(rr6bLignes($this->ws, $id))->toBe($avant);
+});
+
+test('RR-6B annuler : autre espace 404, identifiant non numérique 404, aucune écriture', function () {
+    $autre = $this->espace(true);
+    [$id] = r12Reponse($autre);
+    $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/annuler")->assertNotFound();
+    $this->actingAs($this->owner)->postJson('/api/v1/envoi/reponses/abc/annuler')->assertNotFound();
+    expect(rr6bLignes($autre, $id))->toBe(0);
+});
+
+test('RR-6B annuler une réponse non traitée : 409 pas_traitee, aucune écriture', function () {
+    [$id] = r12Reponse($this->ws);
+    $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/annuler")
+        ->assertStatus(409)->assertJsonPath('error', 'pas_traitee');
+    expect(rr6bLignes($this->ws, $id))->toBe(0);
+});
+
+test('RR-6B STOP définitif : annuler ET classer autre chose répondent 409, opposition intacte', function () {
+    [$id] = r12Reponse($this->ws);
+    $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/classer", ['classement' => 'stop'])->assertOk();
+    $avant = rr6bLignes($this->ws, $id);
+    $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/annuler")
+        ->assertStatus(409)->assertJsonPath('error', 'stop_definitif');
+    $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$id}/classer", ['classement' => 'interesse'])
+        ->assertStatus(409)->assertJsonPath('error', 'stop_definitif');
+    expect(rr6bLignes($this->ws, $id))->toBe($avant);
+    expect(WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_oppositions')->where('empreinte_adresse', ListeSuppression::empreinte(R12_ADRESSE))->count()))->toBe(1);
+});
+
+test('RR-6B le contrat décrit annuler et le 409 de classer', function () {
+    $y = file_get_contents(base_path('openapi/envoi/reponses.yaml'));
+    expect($y)->toContain('/envoi/reponses/{id}/annuler:')->and($y)->toContain('operationId: annulerReponse')
+        ->and($y)->toContain("'409'");
+});

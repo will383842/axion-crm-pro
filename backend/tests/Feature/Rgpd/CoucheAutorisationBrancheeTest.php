@@ -211,6 +211,10 @@ test('F36-001 — RECENSEMENT : toute ecriture authentifiee porte une permission
         // compte neuf, qui n'a pas encore franchi sa première connexion.
         'api/v1/auth/2fa/setup',
         'api/v1/auth/2fa/confirm',
+        // G3-B — franchir sa double authentification par code courriel : le compte
+        // n'a, avant ce geste, aucune permission exerçable (même raison que 2fa/verify).
+        'api/v1/auth/code-email/verifier',
+        'api/v1/auth/code-email/renvoyer',
         'api/v1/auth/logout',
         'api/v1/auth/onboarding/complete',
         // Son propre mot de passe (« Mon compte ») : tout compte doit pouvoir le

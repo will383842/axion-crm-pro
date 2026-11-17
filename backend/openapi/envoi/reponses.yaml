@@ -94,6 +94,38 @@ paths:
                   description: Pour « stop » — opposition étendue à toute l'organisation.
       responses:
         '200': { $ref: '#/components/responses/Reponse' }
+        '409':
+          description: Le classement courant est un STOP (`stop_definitif`), qui ne se corrige pas.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
+  /envoi/reponses/{id}/annuler:
+    post:
+      operationId: annulerReponse
+      summary: Annuler le classement humain d'une réponse
+      description: |
+        Ajoute une ligne d'annulation : la réponse revient « à traiter ». Rien n'est effacé ni défait
+        (arrêts, tâches et opposition restent). Un STOP ne s'annule pas.
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+      responses:
+        '200':
+          description: Réponse revenue à traiter, avec un message de confirmation.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: './commun.yaml#/components/schemas/ReponseResume'
+                  - type: object
+                    required: [message]
+                    properties:
+                      message: { type: string }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409':
+          description: "`pas_traitee` (rien à annuler) ou `stop_definitif` (un STOP ne s'annule pas)."
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
   /envoi/reponses/{id}/rattacher:
     post:
       operationId: rattacherReponse

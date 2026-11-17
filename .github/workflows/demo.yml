@@ -21,6 +21,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
     # Filtre conservateur (workflow NON exige par la protection de main) :
     # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou ce
@@ -42,6 +43,8 @@ concurrency:
 jobs:
   demo:
     name: Démo (build, gardes, e2e)
+    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

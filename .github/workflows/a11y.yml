@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
     # Filtre conservateur (workflow NON exige par la protection de main) :
     # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou ce
@@ -32,6 +33,8 @@ jobs:
   # Garde : backend/tests/Feature/Infra/WorkflowsBornesDeDureeTest.php
   axe-playwright:
     name: axe-core Playwright
+    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30  # F38-008 (navigateurs Playwright + parcours axe)
     steps:
@@ -121,7 +124,7 @@ jobs:
     name: Lighthouse CI
     runs-on: ubuntu-24.04
     timeout-minutes: 30  # F38-008
-    if: github.event_name == 'pull_request'
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v7

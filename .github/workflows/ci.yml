@@ -48,6 +48,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
   workflow_dispatch:
   # Appelé comme gate par deploy-direct-ssh.yml (push sur main).
@@ -83,6 +84,8 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   filet-non-regression:
     name: Filet de non-régression (24 gardes, instantanés)
+    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25  # objectif < 10 min ; plafond anti-gel (F38-008) posé au-dessus de la durée utile
     steps:
@@ -244,6 +247,8 @@ jobs:
   # inopérant sur `volumes` en août. Seule la fusion dit la vérité.
   gardes-infra:
     name: Gardes d'infra (ports 80/443, Caddyfile, scripts)
+    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35  # F38-008 — plafond anti-gel (somme des trois anciens jobs : 20 + 20 + 15 min)
     steps:
@@ -625,6 +630,8 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════════════
   backend:
     name: Pest part ${{ matrix.part }}/2
+    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     strategy:
       fail-fast: false
       matrix:
@@ -952,6 +959,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
+      # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
+      - name: Brouillon — contrôles non joués
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
+          exit 1
       - name: Télécharger les artefacts pest-part-*
         uses: actions/download-artifact@v4
         with:
@@ -1036,6 +1050,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30  # F38-008 — plafond anti-gel (install + typecheck + lint + Vitest + build)
     steps:
+      # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
+      # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
+      - name: Brouillon — contrôles non joués
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
+          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
@@ -1068,6 +1089,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45  # F38-008 — plafond anti-gel (téléchargement des navigateurs Playwright compris)
     steps:
+      # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
+      # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
+      - name: Brouillon — contrôles non joués
+        if: github.event.pull_request.draft == true
+        run: |
+          echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
+          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:

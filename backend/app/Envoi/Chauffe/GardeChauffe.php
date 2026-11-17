@@ -7,6 +7,7 @@ use App\Envoi\Depot\DepotSocle;
 use App\Envoi\JourEnvoi;
 use App\Socle\Alertes\Alerte;
 use DateTimeImmutable;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Chauffe + freins, branchés sur la passerelle locale (appelés SOUS son verrou du jour).
@@ -26,6 +27,11 @@ final class GardeChauffe
 
     public const EXPEDITEUR_INCONNU = 'expediteur_inconnu';
 
+    /** X6-B : domaine sur un vrai serveur sans IP d'inventaire (échec fermé : report). */
+    public const IP_INCONNUE = 'ip_inconnue';
+
+    public const QUOTA_IP_ATTEINT = 'quota_ip_atteint';
+
     public const HORS_FENETRE = 'hors_fenetre_envoi';
 
     public function __construct(
@@ -35,6 +41,7 @@ final class GardeChauffe
         private readonly ?Alerte $alerte = null,
         private readonly LecteurReports $reports = new AucunReportConnu,
         private readonly ?int $palierMax = null,
+        private readonly ?DepotIps $ips = null,
     ) {}
 
     /** Adresse expéditeur normalisée (casse, espaces) pour la retrouver dans `envoi_boites`. */
@@ -64,8 +71,8 @@ final class GardeChauffe
      * fenêtre), pauses, frein humain, expéditeur connu, quota de la boîte, quota du domaine.
      *
      * @param  ?string  $fournisseur  valeur déjà résolue par `preparer()` ; null = résolu ici (hors passerelle)
-     * @param  array{boite: int, domaine: int}  $enCours  réservations de la passerelle dont l'envoi n'est pas encore noté
-     *                                                    (en vol ou issue incertaine) : elles comptent dans les quotas, sinon deux workers dépasseraient le budget
+     * @param  array{boite: int, domaine: int, ip?: int}  $enCours  réservations de la passerelle dont l'envoi n'est pas encore noté
+     *                                                              (en vol ou issue incertaine) : elles comptent dans les quotas, sinon deux workers dépasseraient le budget
      */
     public function refus(MessageAEnvoyer $m, DateTimeImmutable $jour, DateTimeImmutable $maintenant, ?string $fournisseur = null, array $enCours = ['boite' => 0, 'domaine' => 0]): ?string
     {
@@ -74,11 +81,16 @@ final class GardeChauffe
             return $portes;
         }
         ['ws' => $ws, 'boite' => $boite, 'humain' => $humain, 's' => $s] = $portes;
+        $domaine = Fournisseur::domaine($m->expediteur);
+        // X6-B : l'IP vient de l'inventaire (domaine -> ip_id), jamais du transport. Domaine sur un vrai serveur sans IP = report.
+        $ip = $this->depotIps()->ipDuDomaine($ws, $domaine);
+        if ($ip === null && ! in_array($this->depot->adaptateurDuDomaine($ws, $domaine), [null, 'faux'], true)) {
+            return self::IP_INCONNUE;
+        }
         $quota = CourbeChauffe::quotaBoiteEtendu($this->jourDeChauffe($ws, $boite, $m->expediteur, $jour, $s['jour_effectif_part']));
         if ($humain === Freins::RALENTI) {
             $quota = (int) floor($quota * Seuils::HUMAIN_FACTEUR_RALENTI);
         }
-        $domaine = Fournisseur::domaine($m->expediteur);
         // Reculs posés à l'écran sur ce domaine : ils ne font jamais MONTER la limite (min), seulement la baisser.
         $plafond = $this->plafondDomaineAvecReculs($ws, $domaine, $jour, $s['jour_effectif_part']);
         $limiteBoite = $plafond === null ? $quota : min($quota, $plafond);
@@ -93,8 +105,33 @@ final class GardeChauffe
         if ($this->depot->envoyesDomaine($ws, $domaine, $jour) + $enCours['domaine'] >= $limiteDomaine) {
             return self::QUOTA_DOMAINE_ATTEINT;
         }
+        // Reculs d'IP : plafond cumulé de TOUS les domaines qui partagent l'IP ; jamais une montée (ce n'est qu'une porte de plus).
+        $plafondIp = $ip === null ? null : $this->plafondIpAvecReculs($ws, $ip, $jour, $s['jour_effectif_part']);
+        if ($ip !== null && $plafondIp !== null && $this->depot->envoyesIp($ws, $ip, $jour) + ($enCours['ip'] ?? 0) >= $plafondIp) {
+            return self::QUOTA_IP_ATTEINT;
+        }
 
         return null;
+    }
+
+    private function depotIps(): DepotIps
+    {
+        return $this->ips ?? new DepotIps;
+    }
+
+    /**
+     * Budget total de l'IP d'après ses reculs (table P1-P8, borné au palier maximal), ou null s'il n'a AUCUN recul daté
+     * d'au plus $jour (comportement strictement inchangé).
+     */
+    private function plafondIpAvecReculs(string $ws, string $ip, DateTimeImmutable $jour, float $part): ?int
+    {
+        $reculs = $this->depot->reculsDe($ws, BudgetChauffe::RESSOURCE_IP, $ip, $jour);
+        if ($reculs === []) {
+            return null;
+        }
+        $effectifs = BudgetChauffe::joursEffectifs($this->depot->volumesRessource($ws, BudgetChauffe::RESSOURCE_IP, $ip, $jour), $part, $reculs);
+
+        return CourbeChauffe::quotaRessourceEtendu($this->borner(CourbeChauffe::jourDeChauffeAvecReculs($effectifs, $reculs, $jour)));
     }
 
     /**
@@ -175,7 +212,15 @@ final class GardeChauffe
     {
         $boite = $this->depot->boiteId($m->workspaceId, $m->expediteur)
             ?? throw new \LogicException('envoi accepté pour un expéditeur qui n\'est pas une boîte d\'envoi');
-        $this->depot->incrementer($m->workspaceId, $boite, $jour, $fournisseur ?? $this->resolveur->fournisseurDe($m->destinataire, $m->workspaceId), 'envoyes');
+        $f = $fournisseur ?? $this->resolveur->fournisseurDe($m->destinataire, $m->workspaceId);
+        $ip = $this->depotIps()->ipDuDomaine($m->workspaceId, Fournisseur::domaine($m->expediteur));
+        // Boîte et IP dans la MÊME transaction : jamais l'un sans l'autre.
+        DB::transaction(function () use ($m, $boite, $jour, $f, $ip): void {
+            $this->depot->incrementer($m->workspaceId, $boite, $jour, $f, 'envoyes');
+            if ($ip !== null) {
+                $this->depot->incrementer($m->workspaceId, $ip, $jour, $f, 'envoyes', 1, BudgetChauffe::RESSOURCE_IP);
+            }
+        });
     }
 
     /** Un message est arrivé en indésirables chez un témoin : pause vers CE fournisseur seulement. */

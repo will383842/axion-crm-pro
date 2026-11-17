@@ -187,6 +187,22 @@ final class DepotChauffe
             ->where('jour', $jour->format('Y-m-d'))->sum('envoyes'));
     }
 
+    /** Messages envoyés ce jour-là par UNE IP d'envoi (compteur `ip:<ref>`), tous les domaines qui la partagent. */
+    public function envoyesIp(string $ws, string $ref, DateTimeImmutable $jour): int
+    {
+        return (int) WorkspaceContext::run($ws, fn () => $this->lignesChauffe(BudgetChauffe::RESSOURCE_IP)
+            ->where('workspace_id', $ws)->where('boite', self::cleRessource(BudgetChauffe::RESSOURCE_IP, $ref))
+            ->where('jour', $jour->format('Y-m-d'))->sum('envoyes'));
+    }
+
+    /** Adaptateur (`faux`, `kumo`, `smtp`) du domaine d'envoi dans cet espace, ou null si le domaine n'est pas inscrit. */
+    public function adaptateurDuDomaine(string $ws, string $domaine): ?string
+    {
+        $a = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->where('nom', $domaine)->value('adaptateur'));
+
+        return is_string($a) ? $a : null;
+    }
+
     public function incrementer(string $ws, string $boite, DateTimeImmutable $jour, string $fournisseur, string $colonne, int $n = 1, string $ressourceType = BudgetChauffe::RESSOURCE_DOMAINE): void
     {
         if (! BudgetChauffe::typeValide($ressourceType)) {

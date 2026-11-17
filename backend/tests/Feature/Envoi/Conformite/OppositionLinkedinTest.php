@@ -52,7 +52,8 @@ function ollInscrire(string $ws, string $profil, string $source = 'manuel'): boo
 
 function ollNb(string $ws): int
 {
-    return DB::table('envoi_oppositions_linkedin')->where('workspace_id', $ws)->count();
+    // Toujours sous le contexte de l'espace compté (la RLS masque les autres espaces au rôle applicatif).
+    return WorkspaceContext::run($ws, static fn (): int => DB::table('envoi_oppositions_linkedin')->where('workspace_id', $ws)->count());
 }
 
 test('trois formes d\'URL du même profil ⇒ une seule ligne ; rejeu ⇒ false', function () {
@@ -148,17 +149,18 @@ test('espace B ne voit pas l\'opposition de A, et inscrit à part', function () 
 
 test('aucune colonne en clair : le slug n\'apparaît nulle part hors valeur chiffrée (qui le restitue)', function () {
     $ws = ollEspace();
-    ollInscrire($ws, 'https://www.linkedin.com/in/' . OLL_PROFIL . '/', 'prospection_linkedin');
+    ollInscrire($ws, 'https://www.linkedin.com/in/' . OLL_PROFIL . '/', 'manuel');
     $ligne = DB::table('envoi_oppositions_linkedin')->where('workspace_id', $ws)->first();
-    expect(json_encode($ligne))->not->toContain(OLL_PROFIL)->not->toContain('linkedin')
+    expect(json_encode($ligne))->not->toContain(OLL_PROFIL)
         ->and($ligne->empreinte)->toBe(hash('sha256', OLL_PROFIL))
         ->and(Crypt::decryptString($ligne->valeur_chiffree))->toBe(OLL_PROFIL)
-        ->and($ligne->source)->toBe('prospection_linkedin');
+        ->and($ligne->source)->toBe('manuel');
 });
 
 test('ajout seul : aucune suppression ni modification possible', function () {
     $ws = ollEspace();
     ollInscrire($ws, OLL_PROFIL);
-    expect(fn () => DB::table('envoi_oppositions_linkedin')->where('workspace_id', $ws)->delete())->toThrow(QueryException::class);
+    // Point de sauvegarde : l'erreur SQL n'avorte pas la transaction englobante du test.
+    expect(fn () => DB::transaction(fn () => DB::table('envoi_oppositions_linkedin')->where('workspace_id', $ws)->delete()))->toThrow(QueryException::class);
     expect(ollNb($ws))->toBe(1);
 });

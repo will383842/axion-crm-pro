@@ -167,6 +167,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_10_000100_envoi_campagnes_filtre_origine.php',
     // Filet modifié : pourquoi — envoi L6-0 : index partiel d'expression d'`envoi_evenements` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_09_000100_envoi_evenements_index_injection.php',
+    // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0A : colonne de filtre mots/guides ajoutée (ajout seul), down() inerte, up() rejouable (aucune donnée de campagne ne se perd).
+    '2026_12_09_000110_envoi_campagnes_filtre_origine_contenu.php',
+    // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0A : registre d'opposition LinkedIn en ajout seul (DELETE/UPDATE/TRUNCATE refusés) ; le retirer effacerait des oppositions ; down() inerte, up() rejouable.
+    '2026_12_09_000120_envoi_oppositions_linkedin.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

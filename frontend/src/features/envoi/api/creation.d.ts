@@ -1026,6 +1026,8 @@ export interface operations {
     listerCibles: {
         parameters: {
             query?: {
+                /** @description Identifiant d'une audience (chiffres, moins de 18 caractères) ; proposée en tête même hors des 50 premières. Ignorée si elle n'est pas de l'espace, supprimée ou inactive. */
+                audience?: string;
                 /** @description Identifiant d'une entreprise du CRM (ajoute sa cible « carnet »). */
                 entreprise?: string;
                 /** @description Recherche texte (insensible à la casse et aux accents). */
@@ -1066,6 +1068,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Ce que l'envoi sait appliquer, lu des refus du serveur (faux = refusé à la préparation). */
+                        capacites: {
+                            /** @description Test A/B de l'objet (objet_b). */
+                            ab: boolean;
+                            /** @description Boîtes d'envoi choisies par campagne. */
+                            boites: boolean;
+                            /** @description Plafond par jour choisi par campagne. */
+                            plafond: boolean;
+                        };
                         /** @example Europe/Paris */
                         fuseau: string;
                         maintenant: components["schemas"]["Horodatage"];

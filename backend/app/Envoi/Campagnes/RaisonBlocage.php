@@ -18,6 +18,12 @@ final class RaisonBlocage
 {
     public const STATUTS = ['programmee', 'en_cours', 'en_pause'];
 
+    /**
+     * Le transport applique-t-il les boîtes et le plafond du jour choisis par campagne ? Faux : refusés (`reglage_non_applique`).
+     * Lue par `reglageNonApplique` (donc par la matérialisation) ET par `GET /envoi/creation/contexte` (capacités de l'assistant).
+     */
+    public const REGLAGES_APPLIQUES = false;
+
     private const MESSAGES_MOTIF = [
         'cible_introuvable' => 'La cible de la campagne est introuvable : choisissez une autre cible.',
         'cible_non_supportee' => 'Ce type de cible n’est pas pris en charge pour l’envoi.',
@@ -33,6 +39,9 @@ final class RaisonBlocage
     /** Prédicat UNIQUE (partagé avec `MaterialisationCampagne`) : boîtes non vides ou plafond du jour renseigné. */
     public static function reglageNonApplique(\stdClass $c): bool
     {
+        if (self::REGLAGES_APPLIQUES) {
+            return false;
+        }
         $contenu = json_decode((string) $c->saisie, true)['contenu'] ?? [];
 
         return trim((string) $c->boites, '{}') !== '' || (is_array($contenu) && ($contenu['plafond_jour'] ?? null) !== null);

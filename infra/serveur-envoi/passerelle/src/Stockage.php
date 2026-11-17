@@ -139,6 +139,15 @@ CREATE TRIGGER IF NOT EXISTS retraits_no_update BEFORE UPDATE ON retraits
   BEGIN SELECT RAISE(ABORT, 'retraits en ajout seul'); END;
 CREATE TRIGGER IF NOT EXISTS retraits_no_delete BEFORE DELETE ON retraits
   BEGIN SELECT RAISE(ABORT, 'retraits en ajout seul'); END;
+CREATE TABLE IF NOT EXISTS suspensions (
+  workspace_id TEXT NOT NULL, id_kumo TEXT NOT NULL, note_le INTEGER NOT NULL, levee_le INTEGER,
+  PRIMARY KEY (workspace_id, id_kumo)) WITHOUT ROWID;
+CREATE TRIGGER IF NOT EXISTS suspensions_no_delete BEFORE DELETE ON suspensions
+  BEGIN SELECT RAISE(ABORT, 'suspensions en ajout seul'); END;
+CREATE TRIGGER IF NOT EXISTS suspensions_levee_seule BEFORE UPDATE ON suspensions
+  WHEN OLD.levee_le IS NOT NULL OR NEW.levee_le IS NULL OR NEW.workspace_id <> OLD.workspace_id
+    OR NEW.id_kumo <> OLD.id_kumo OR NEW.note_le <> OLD.note_le
+  BEGIN SELECT RAISE(ABORT, 'une suspension se leve une fois, rien d autre'); END;
 CREATE TABLE IF NOT EXISTS purge_etat (ouverte INTEGER NOT NULL);
 INSERT INTO purge_etat SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM purge_etat);
 CREATE TRIGGER IF NOT EXISTS evenements_no_update BEFORE UPDATE ON evenements
@@ -320,6 +329,36 @@ SQL);
             foreach ($ids as $id) {
                 $st->execute([$ws, $id, $this->now()]);
             }
+
+            return null;
+        });
+    }
+
+    /** Note l'identifiant de suspension rendu par KumoMTA pour CET espace (C4-A). */
+    public function noterSuspension(string $ws, string $idKumo): void
+    {
+        $this->transaction(function () use ($ws, $idKumo): null {
+            $this->pdo->prepare('INSERT OR IGNORE INTO suspensions (workspace_id, id_kumo, note_le) VALUES (?,?,?)')
+                ->execute([$ws, $idKumo, $this->now()]);
+
+            return null;
+        });
+    }
+
+    /** @return list<string> suspensions notées et non levées de CET espace, jamais celles d'un autre */
+    public function suspensionsActives(string $ws): array
+    {
+        $st = $this->pdo->prepare('SELECT id_kumo FROM suspensions WHERE workspace_id=? AND levee_le IS NULL ORDER BY note_le, id_kumo');
+        $st->execute([$ws]);
+
+        return array_map('strval', $st->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    public function lever(string $ws, string $idKumo): void
+    {
+        $this->transaction(function () use ($ws, $idKumo): null {
+            $this->pdo->prepare('UPDATE suspensions SET levee_le=? WHERE workspace_id=? AND id_kumo=? AND levee_le IS NULL')
+                ->execute([$this->now(), $ws, $idKumo]);
 
             return null;
         });

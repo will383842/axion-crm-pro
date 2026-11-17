@@ -62,6 +62,26 @@ function vemlContacts(object $t, string $prefixe, int $n): void
 }
 
 /**
+ * Repart d'une fiche NEUVE et sans personne. Le décompte de verrous est celui
+ * des verrous de RELATION de la session, index compris : écrire dans `companies`
+ * en verrouille d'un coup une quarantaine (un par index). Or la fiche n'est
+ * réécrite par le recalcul de joignabilité QUE si son état change — donc selon
+ * l'état laissé par l'exécution précédente. Sans fiche neuve à chaque scénario,
+ * l'un des trois comptait ces index et pas l'autre : l'écart (183 contre 147 en
+ * CI) ne disait rien du verrouillage par lot. Avec elle, les trois scénarios
+ * écrivent exactement les mêmes tables.
+ */
+function vemlRepartirDeZero(object $t): void
+{
+    DB::table('contacts')->where('workspace_id', $t->espace)->delete();
+    DB::table('companies')->where('workspace_id', $t->espace)->delete();
+    $t->fiche = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $t->espace, 'siren' => (string) random_int(900000000, 999999999),
+        'denomination' => 'ZZ LOTS', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+}
+
+/**
  * @param  array<string, mixed>  $options
  * @return array{code: int, sortie: string, verrous: int, tx: int}
  */
@@ -79,11 +99,11 @@ test('les verrous tenus ne dependent ni du nombre de lots ni de leur taille', fu
     vemlContacts($this, 'a', 12);
     $petit = vemlVerifier(['--lot' => '4']);
 
-    DB::table('contacts')->where('workspace_id', $this->espace)->delete();
+    vemlRepartirDeZero($this);
     vemlContacts($this, 'b', 60);
     $grandsLots = vemlVerifier(['--lot' => '60']);
 
-    DB::table('contacts')->where('workspace_id', $this->espace)->delete();
+    vemlRepartirDeZero($this);
     vemlContacts($this, 'c', 60);
     $nombreuxLots = vemlVerifier(['--lot' => '4']);
 

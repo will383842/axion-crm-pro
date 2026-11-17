@@ -61,7 +61,11 @@ test.describe('Navigation smoke', () => {
 
   test('sidebar : dashboard link visible', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('link', { name: /Tableau de bord/i })).toBeVisible();
+    // Lot G2-D : la barre d'onglets du tableau de bord (Mes tâches, Affaires) porte aussi un lien « Tableau de
+    // bord » hors démo ; on cible la barre LATÉRALE, c'est ce que le test dit.
+    await expect(
+      page.getByRole('navigation', { name: 'Navigation principale' }).getByRole('link', { name: /Tableau de bord/i }),
+    ).toBeVisible();
   });
 
   // Lot 2 UX (2026-10-02) — la barre RÉORGANISÉE : le tableau de bord seul en

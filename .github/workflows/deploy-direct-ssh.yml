@@ -86,10 +86,46 @@ jobs:
     needs: [ci]
     if: ${{ needs.ci.result == 'success' }}
     runs-on: ubuntu-24.04
+    # Lecture des artefacts pour la mesure E1 (lecture seule).
+    permissions:
+      contents: read
+      actions: read
     environment:
       name: production-direct-ssh
       url: https://app.axion-crm-pro.com
     steps:
+      # Lot E1 « CI allégée » — OBSERVATION SEULE : n'influence ni `needs: [ci]`
+      # ni `if`, ne bloque jamais (continue-on-error), ne lit aucun secret.
+      # Retour arrière : retirer cette étape et le bloc `permissions` ci-dessus.
+      - name: Mesure E1 — la CI réutilisable pour cet arbre ? (observation)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -u
+          reponse="non"
+          detail="aucun artefact trouvé"
+          arbre="$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${SHA}" --jq '.tree.sha' 2>/dev/null || true)"
+          if [ -n "${arbre}" ]; then
+            detail="arbre ${arbre} : aucun artefact trouvé"
+            lignes="$(gh api -X GET "repos/${GITHUB_REPOSITORY}/actions/artifacts" -f name="ci-arbre-${arbre}" -f per_page=30 \
+              --jq '.artifacts[] | select(.expired == false) | .workflow_run.id' 2>/dev/null || true)"
+            for run_id in ${lignes}; do
+              ok="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq \
+                'select(.path == ".github/workflows/ci.yml" and .event == "pull_request" and .conclusion == "success" and .head_repository.full_name == "'"${GITHUB_REPOSITORY}"'") | .id' 2>/dev/null || true)"
+              if [ -n "${ok}" ]; then
+                reponse="oui"; detail="arbre ${arbre} : run ci.yml vert n°${ok}"; break
+              fi
+              detail="arbre ${arbre} : artefact trouvé mais run non conforme"
+            done
+          fi
+          echo "Mesure E1 : la CI aurait pu être réutilisée : ${reponse} (${detail})"
+          {
+            echo "### Mesure E1 (observation, rien n'est décidé ici)"
+            echo "la CI aurait pu être réutilisée : ${reponse} — ${detail}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Validate secrets present
         run: |
           set -e

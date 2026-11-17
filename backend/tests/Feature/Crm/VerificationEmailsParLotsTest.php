@@ -62,6 +62,22 @@ function vemlContacts(object $t, string $prefixe, int $n): void
 }
 
 /**
+ * Repart d'une fiche NEUVE et sans personne : les trois scenarios ecrivent ainsi
+ * les memes tables, sans dependre de l'etat laisse par le precedent. Ce n'est PAS
+ * ce qui rend le decompte stable (c'est le decompte de verrous DISTINCTS du code
+ * produit, cf. le test) : c'est une symetrie sans danger.
+ */
+function vemlRepartirDeZero(object $t): void
+{
+    DB::table('contacts')->where('workspace_id', $t->espace)->delete();
+    DB::table('companies')->where('workspace_id', $t->espace)->delete();
+    $t->fiche = (int) DB::table('companies')->insertGetId([
+        'workspace_id' => $t->espace, 'siren' => (string) random_int(900000000, 999999999),
+        'denomination' => 'ZZ LOTS', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+}
+
+/**
  * @param  array<string, mixed>  $options
  * @return array{code: int, sortie: string, verrous: int, tx: int}
  */
@@ -79,11 +95,17 @@ test('les verrous tenus ne dependent ni du nombre de lots ni de leur taille', fu
     vemlContacts($this, 'a', 12);
     $petit = vemlVerifier(['--lot' => '4']);
 
-    DB::table('contacts')->where('workspace_id', $this->espace)->delete();
+    vemlRepartirDeZero($this);
     vemlContacts($this, 'b', 60);
+    // Un ANALYZE (en CI : l'autovacuum) invalide les plans en cache de la session ;
+    // la requete re-planifiee verrouille alors chaque index de `companies` (un
+    // RowShareLock par index). Bruit sans rapport avec le verrouillage par lot,
+    // que le decompte de verrous DISTINCTS (code produit) neutralise : on le
+    // provoque ici a coup sur, il ne doit pas faire rougir le test.
+    DB::statement('ANALYZE companies');
     $grandsLots = vemlVerifier(['--lot' => '60']);
 
-    DB::table('contacts')->where('workspace_id', $this->espace)->delete();
+    vemlRepartirDeZero($this);
     vemlContacts($this, 'c', 60);
     $nombreuxLots = vemlVerifier(['--lot' => '4']);
 

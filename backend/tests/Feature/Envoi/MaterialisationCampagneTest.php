@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
+use Tests\Support\OriginesJeu;
 use Tests\TestCase;
 
 /*
@@ -549,4 +550,53 @@ test('X1-L4-B 15 dans une transaction englobante non tolérée : LogicException,
     MaterialisationCampagne::$niveauTolere = 0;
     expect(fn () => matService()->materialiser($ws, $p['id'], matLundi()))->toThrow(LogicException::class);
     expect(matComptes($ws)['sequences'])->toBe(0);
+});
+
+/** Pose un filtre « réseau d'origine » sur la campagne (écriture de la colonne en propriétaire, avant la liaison). */
+function matFiltrer(string $id, array $reseaux): void
+{
+    DB::table('envoi_campagnes')->where('id', $id)->update(['filtre_origine' => json_encode(['reseaux' => $reseaux]), 'version' => DB::raw('version + 1')]);
+}
+
+test('X1-L2b-C 14 campagne avec filtre et drapeau éteint : refus filtre_origine_inactif non réessayable, rien d\'écrit, campagne toujours programmée', function () {
+    foreach (MAT_MODES as $mode) {
+        $ws = matEspace();
+        $p = matProgrammee($ws, 2);
+        matFiltrer($p['id'], ['linkedin']);
+        config(['origines.lecture_enabled' => false]);
+        $e = null;
+        try {
+            matRun($mode, $ws, $p['id']);
+        } catch (MaterialisationRefusee $e) {
+            DB::statement('RESET ROLE');
+        }
+        // Comme `cible_non_supportee` : la séquence (en pause) et la ligne `en_cours` à curseur 0 existent déjà au moment de la sélection ; rien d'autre.
+        $apres = matComptes($ws);
+        expect($e?->motif)->toBe('filtre_origine_inactif', $mode)->and($e->reessayable)->toBeFalse()->and($apres['inscriptions'])->toBe(0)->and($apres['messages'])->toBe(0)
+            ->and(DB::table('envoi_campagnes')->where('id', $p['id'])->value('statut'))->toBe('programmee');
+        expect(matLigne($p['id']))->toMatchObject(['etat' => 'en_cours', 'curseur' => 0]);
+        expect(fn () => matRun($mode, $ws, $p['id']))->toThrow(MaterialisationRefusee::class); // reprise : même refus, aucun doublon
+        DB::statement('RESET ROLE');
+        expect(matComptes($ws))->toBe($apres);
+    }
+});
+
+test('X1-L2b-C 15 même campagne, drapeau allumé : seules les unités du réseau sont inscrites ; hors_reseau écrit dans les compteurs', function () {
+    foreach (MAT_MODES as $mode) {
+        $ws = matEspace();
+        $p = matProgrammee($ws, 4);
+        $entreprises = DB::table('contacts')->whereIn('id', $p['contacts'])->orderBy('id')->pluck('company_id')->all();
+        foreach (array_slice($entreprises, 0, 2) as $e) {
+            OriginesJeu::personne($ws, 'p' . $e . '@example.test', [OriginesJeu::entree(['reseau' => 'linkedin'])], ['company_id' => $e]);
+        }
+        OriginesJeu::allumer();
+        OriginesJeu::ouvrir($ws);
+        matFiltrer($p['id'], ['linkedin']);
+        $r = matRun($mode, $ws, $p['id']);
+        $mat = matLigne($p['id']);
+        $c = json_decode((string) $mat->compteurs, true);
+        expect($r->inscrits)->toBe(2, $mode)->and($c['hors_reseau'])->toBe(2)->and($c['retenus'])->toBe(2)
+            ->and(DB::table('envoi_inscriptions')->where('workspace_id', $ws)->orderBy('contact_id')->pluck('contact_id')->map(fn ($v) => (int) $v)->all())->toBe(array_slice($p['contacts'], 0, 2));
+        matInvariants($mat);
+    }
 });

@@ -7,6 +7,7 @@ use App\Crm\Campagnes\GardePresse;
 use App\Crm\Emails\QualificationEmail;
 use App\Crm\Opposition\FormesAdresse;
 use App\Crm\Opposition\StatutOpposition;
+use App\Crm\Origines\RequetesOrigines;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
@@ -35,7 +36,7 @@ final class SelectionDestinataires
     public const DELAI_SQL_MS = 3000;
 
     public const MOTIFS = ['opposition', 'rgpd_en_cours', 'presse', 'client_console', 'deja_en_sequence', 'doublon',
-        'sans_contact', 'sans_adresse', 'sans_entreprise', 'fiche_supprimee', 'generique_cible', 'entreprise_deja_couverte'];
+        'sans_contact', 'sans_adresse', 'sans_entreprise', 'fiche_supprimee', 'generique_cible', 'entreprise_deja_couverte', 'hors_reseau'];
 
     public const PRIORITE = ['opposition', 'rgpd_en_cours', 'presse', 'client_console', 'deja_en_sequence', 'doublon']; // ordre strict
 
@@ -70,7 +71,8 @@ final class SelectionDestinataires
         if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $campagneId) !== 1) {
             throw SelectionRefusee::campagneIntrouvable();
         }
-        $campagne = DB::selectOne('SELECT cible, saisie FROM envoi_campagnes WHERE workspace_id = ? AND id = ?', [$ws, $campagneId]);
+        // `to_jsonb(k) -> 'filtre_origine'` (NULLIF : un NULL SQL devient le JSON `null`) : colonne absente (code déployé avant la migration) => null => pas de filtre, ce qui est exact
+        $campagne = DB::selectOne("SELECT cible, saisie, NULLIF(to_jsonb(k) -> 'filtre_origine', 'null'::jsonb) AS filtre_origine FROM envoi_campagnes k WHERE k.workspace_id = ? AND k.id = ?", [$ws, $campagneId]);
         if ($campagne === null) {
             throw SelectionRefusee::campagneIntrouvable();
         }
@@ -81,11 +83,21 @@ final class SelectionDestinataires
             throw SelectionRefusee::cibleNonSupportee(); // la colonne `cible` n'en garde pas trace : on ne devine pas
         }
 
+        // Filtre « réseau d'origine » : il ne peut que RESTREINDRE. Forme invalide ou porte fermée = refus (jamais ignoré : ce serait élargir la cible).
+        try {
+            $filtre = FiltreOrigine::depuisColonne($campagne->filtre_origine);
+        } catch (\InvalidArgumentException) {
+            throw SelectionRefusee::filtreOrigineInactif();
+        }
+        if ($filtre !== null && ! FiltreOrigine::actif($ws)) {
+            throw SelectionRefusee::filtreOrigineInactif(); // AVANT toute lecture des membres
+        }
+
         $membres = $this->membres($ws, is_array($cible) ? $cible : [], $apres, $taille);
         $curseur = count($membres) === $taille ? (int) $membres[$taille - 1]->cle : null;
 
         $compteurs = array_fill_keys(self::MOTIFS, 0) + ['membres' => count($membres), 'retenus' => 0, 'sans_contact_generique_disponible' => 0];
-        $destinataires = $this->choisir($ws, $membres, $compteurs);
+        $destinataires = $this->choisir($ws, $membres, $compteurs, $filtre);
         $compteurs['retenus'] = count($destinataires);
 
         return new LotDestinataires($destinataires, $compteurs, $curseur);
@@ -172,7 +184,7 @@ final class SelectionDestinataires
      * @param  array<string, int>  $compteurs  modifié en place
      * @return list<Destinataire>
      */
-    private function choisir(string $ws, array $membres, array &$compteurs): array
+    private function choisir(string $ws, array $membres, array &$compteurs, ?FiltreOrigine $filtre = null): array
     {
         $idsCibles = [];
         $idsEntreprises = [];
@@ -199,6 +211,12 @@ final class SelectionDestinataires
             }
         }
 
+        // Filtre d'origine (seulement s'il y en a un) : UNE lecture ; une unité hors réseau est comptée puis sautée, sans lecture d'exclusion.
+        $opposes = [];
+        if ($filtre !== null) {
+            $opposes = $this->appliquerFiltre($ws, $unites, $compteurs, $filtre);
+        }
+
         // Exclusions : UNE lecture chacune pour tout le lot ; une exception annule le lot (fermé en cas d'erreur).
         $candidats = [];
         $sirens = [];
@@ -221,7 +239,7 @@ final class SelectionDestinataires
             $choisi = null;
             $motifs = [];
             foreach ($u['candidats'] as $c) {
-                $m = $this->motifPrioritaire($c, $u, $ex);
+                $m = $this->motifPrioritaire($c, $u, $ex, isset($opposes[$c['contact_id']]));
                 if ($m === null) {
                     $choisi = $choisi ?? $c; // candidats triés par contact_id : le premier sans motif est le plus petit
                 } else {
@@ -261,6 +279,54 @@ final class SelectionDestinataires
         }
 
         return $retenus;
+    }
+
+    /**
+     * Applique le filtre : marque `hors_reseau` (compteur) toute unité non tranchée qui n'est pas « du réseau » (R1/R2), en la remplaçant
+     * par `null` dans `$unites` (elle n'ira pas aux lectures d'exclusion). Rend les contacts rattachés à une personne opposée (O2).
+     * Toute exception de lecture => `lectureOrigineImpossible` (aucun destinataire) ; jamais « du réseau » par défaut.
+     *
+     * @param  list<array<string, mixed>|null>  $unites  modifié en place
+     * @param  array<string, int>  $compteurs  modifié en place
+     * @return array<int, true>
+     */
+    private function appliquerFiltre(string $ws, array &$unites, array &$compteurs, FiltreOrigine $filtre): array
+    {
+        $entreprises = [];
+        $contacts = [];
+        foreach ($unites as $u) {
+            if ($u === null || isset($u['motif_direct'])) {
+                continue;
+            }
+            $entreprises[] = (int) $u['entreprise_id'];
+            if ($u['ciblee']) {
+                $contacts[] = (int) $u['candidats'][0]['contact_id'];
+            }
+        }
+        if ($entreprises === []) {
+            return [];
+        }
+        try {
+            $reseau = RequetesOrigines::reseauxDesUnites($ws, array_values(array_unique($entreprises)), array_values(array_unique($contacts)), $filtre->reseaux);
+        } catch (QueryException $e) {
+            throw $e->getCode() === '57014' ? SelectionRefusee::lectureTropLongue() : SelectionRefusee::lectureOrigineImpossible($e);
+        } catch (\Throwable $e) {
+            throw SelectionRefusee::lectureOrigineImpossible($e);
+        }
+        foreach ($unites as $i => $u) {
+            if ($u === null || isset($u['motif_direct'])) {
+                continue;
+            }
+            $dansReseau = $u['ciblee']
+                ? isset($reseau['contacts'][(int) $u['candidats'][0]['contact_id']]) || isset($reseau['entreprises'][(int) $u['entreprise_id']])
+                : isset($reseau['entreprises'][(int) $u['entreprise_id']]);
+            if (! $dansReseau) {
+                $compteurs['hors_reseau']++;
+                $unites[$i] = null;
+            }
+        }
+
+        return $reseau['contacts_opposes'];
     }
 
     /**
@@ -324,13 +390,14 @@ final class SelectionDestinataires
      * @param  array<string, mixed>  $c
      * @param  array<string, mixed>  $u
      * @param  array<string, mixed>  $ex
+     * @param  bool  $personneOpposee  contact rattaché à une personne opposée (lecture des origines, chemin filtré seulement)
      */
-    private function motifPrioritaire(array $c, array $u, array $ex): ?string
+    private function motifPrioritaire(array $c, array $u, array $ex, bool $personneOpposee = false): ?string
     {
         $id = $c['contact_id'];
         $formes = FormesAdresse::variantes($c['email']);
         $drapeaux = [
-            'opposition' => $ex['opposee']['c' . $id] ?? true, // absent de la réponse : opposée
+            'opposition' => $personneOpposee || ($ex['opposee']['c' . $id] ?? true), // absent de la réponse : opposée
             'rgpd_en_cours' => array_intersect($formes, array_keys($ex['rgpd'])) !== [],
             'presse' => $c['presse'],
             'client_console' => isset($ex['console'][QualificationEmail::normaliser($c['email'])]),

@@ -220,6 +220,12 @@ test('F36-001 — RECENSEMENT : toute ecriture authentifiee porte une permission
         // Son propre mot de passe (« Mon compte ») : tout compte doit pouvoir le
         // changer, quel que soit son rôle — un `viewer` y compris.
         'api/v1/auth/password/change',
+        // G3-C : ses propres appareils de confiance et le code reçu pour un geste
+        // (« Mon compte et sécurité ») : actes sur SON compte, filtrés sur le user_id
+        // connecté (404 sur l'appareil d'un autre), sans permission d'espace : un
+        // `viewer` doit pouvoir retirer un appareil qui n'est plus le sien.
+        'api/v1/compte/appareils/{id}/retirer',
+        'api/v1/compte/code',
         // Ses propres notifications.
         'api/v1/notifications/read-all',
         'api/v1/notifications/{n}/read',

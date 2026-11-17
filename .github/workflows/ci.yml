@@ -248,18 +248,9 @@ jobs:
     timeout-minutes: 35  # F38-008 — plafond anti-gel (somme des trois anciens jobs : 20 + 20 + 15 min)
     steps:
       - uses: actions/checkout@v4
-
-      # Lot B (PLAN CI ALLÉGÉE, #680) : les trois anciens jobs `config-prod`, `caddyfile-valide`
-      # et `scripts-executables` sont TROIS ÉTAPES d'un seul job (−2 places de file par poussée).
-      # Commandes à l'identique : chaque ancien `run:` est un sous-shell `( … )` (ses `set`,
-      # variables et `exit` restent isolés ; `shell: bash {0}` = pas de `-e` implicite, comme
-      # l'ancien témoin Caddy). Étapes 2 et 3 en `if: always()` : chaque garde rend son verdict
-      # même si une autre est rouge ; le job est rouge dès qu'une des trois l'est.
-
-      - name: Garde 1/3 — La config de production ne publie que 80 et 443
-        shell: bash {0}
+      # ── Lot B (#680) : GARDE 1/3 = ancien job `config-prod` (étapes inchangées).
+      - name: Inventaire des ports publiés par la configuration FUSIONNÉE
         run: |
-          ( # étape d'origine : Inventaire des ports publiés par la configuration FUSIONNÉE
           set -euo pipefail
           # `config` exige un `.env` présent (env_file du service api).
           cp .env.example .env
@@ -406,21 +397,22 @@ jobs:
             fi
             echo "OK — « $nom » ne publie que 80 et 443."
           done
-          ) || exit 1
-          # ── TÉMOIN NÉGATIF : le contrôle ci-dessus sait-il seulement rougir ? ──
-          #
-          # Un « aucun port interdit » ne vaut que si l'on a prouvé que l'extracteur
-          # SAIT en trouver. On lui donne donc la combinaison FAUTIVE — celle qui
-          # oublie `docker-compose.prod.yml` — et on exige qu'elle publie bien
-          # 55432 et 56379. Deux choses en découlent :
-          #
-          #   - si ces ports apparaissent : l'extracteur fonctionne, ET le risque
-          #     P6-INFRA-003 est TOUJOURS RÉEL — la sécurité repose sur le fait de
-          #     ne jamais oublier un fichier ;
-          #   - s'ils n'apparaissent plus : quelqu'un a fermé les ports dans le
-          #     fichier de BASE. C'est une bonne nouvelle, et ce job le dit — il
-          #     faut alors retirer cet avertissement plutôt que le laisser mentir.
-          ( # étape d'origine : TÉMOIN NÉGATIF — la combinaison sans overlay prod expose bien la base
+
+      # ── TÉMOIN NÉGATIF : le contrôle ci-dessus sait-il seulement rougir ? ──
+      #
+      # Un « aucun port interdit » ne vaut que si l'on a prouvé que l'extracteur
+      # SAIT en trouver. On lui donne donc la combinaison FAUTIVE — celle qui
+      # oublie `docker-compose.prod.yml` — et on exige qu'elle publie bien
+      # 55432 et 56379. Deux choses en découlent :
+      #
+      #   - si ces ports apparaissent : l'extracteur fonctionne, ET le risque
+      #     P6-INFRA-003 est TOUJOURS RÉEL — la sécurité repose sur le fait de
+      #     ne jamais oublier un fichier ;
+      #   - s'ils n'apparaissent plus : quelqu'un a fermé les ports dans le
+      #     fichier de BASE. C'est une bonne nouvelle, et ce job le dit — il
+      #     faut alors retirer cet avertissement plutôt que le laisser mentir.
+      - name: TÉMOIN NÉGATIF — la combinaison sans overlay prod expose bien la base
+        run: |
           set -euo pipefail
           cp .env.example .env
           docker compose -f docker-compose.yml config > /tmp/base-seule.yml
@@ -454,26 +446,42 @@ jobs:
           echo "::warning::P6-INFRA-003 reste OUVERT À LA SOURCE : docker-compose.yml publie"
           echo "::warning::55432 et 56379 sur 0.0.0.0, et seul l'overlay prod les referme."
           echo "::warning::Toute commande qui oublie -f docker-compose.prod.yml rouvre la faille du 19/08."
-          ) || exit 1
 
-      - name: Garde 2/3 — Le Caddyfile est-il valide ?
+      # ── Lot B (#680) : GARDE 2/3 = ancien job `caddyfile-valide` (étapes inchangées).
+      # `if: always()` sur la première étape : la garde rend son verdict même si la 1 est rouge.
+
+      # 2026-10-01 — on valide avec le binaire QUI TOURNE, pas avec celui de
+      # `caddy:2-alpine` : les deux conteneurs (`app` et la bordure) portent
+      # désormais le Caddy RECOMPILÉ du stade `caddy-build` de
+      # Dockerfile.frontend. La cible `caddy-bordure` contient exactement ce
+      # binaire, sans le build Node : c’est l’image de validation.
+      - name: Construire le Caddy recompilé (cible caddy-bordure)
         if: always()
+        run: docker build -t axion-crm/caddy-ci:valide -f Dockerfile.frontend --target caddy-bordure .
+
+      # ── POURQUOI CE JOB EXISTE ────────────────────────────────────────────
+      # `infra/caddy/Caddyfile` est le SEUL point d'entrée du site : un unique
+      # processus tient 80 et 443. Depuis l'ajout de la préproduction
+      # (2026-08-19), ce même fichier sert AUSSI `staging.*` — donc on y touche
+      # plus souvent, et une faute de frappe n'y coûte plus « la préprod » mais
+      # **toute la production** : Caddy refuse de démarrer sur un fichier
+      # invalide, et plus rien ne répond.
+      #
+      # Jusqu'ici RIEN ne validait ce fichier. On s'en apercevait au
+      # redémarrage — c'est-à-dire trop tard.
+
+      - name: TÉMOIN — ce contrôle sait-il seulement échouer ?
+        # 🔴 `shell: bash` sans `-e`. GitHub Actions exécute par défaut
+        # `/usr/bin/bash -e {0}` : la moindre commande non nulle interrompt
+        # l'étape. Or CETTE étape lance délibérément une commande qui DOIT
+        # échouer — avec le défaut, elle mourait à l'affectation de `sortie`,
+        # avant même de pouvoir constater que le témoin avait bien fonctionné.
+        # Mesuré : la première version de ce job a rougi pour cette seule
+        # raison, sans afficher aucune de ses erreurs (le job échouait avant).
+        # Localement, hors `-e`, elle passait — l'écart d'environnement le plus
+        # classique, et le plus trompeur.
         shell: bash {0}
         run: |
-          ( # étape d'origine : Construire le Caddy recompilé (cible caddy-bordure)
-          docker build -t axion-crm/caddy-ci:valide -f Dockerfile.frontend --target caddy-bordure .
-          ) || exit 1
-          # ── POURQUOI CE JOB EXISTE ────────────────────────────────────────────
-          # `infra/caddy/Caddyfile` est le SEUL point d'entrée du site : un unique
-          # processus tient 80 et 443. Depuis l'ajout de la préproduction
-          # (2026-08-19), ce même fichier sert AUSSI `staging.*` — donc on y touche
-          # plus souvent, et une faute de frappe n'y coûte plus « la préprod » mais
-          # **toute la production** : Caddy refuse de démarrer sur un fichier
-          # invalide, et plus rien ne répond.
-          #
-          # Jusqu'ici RIEN ne validait ce fichier. On s'en apercevait au
-          # redémarrage — c'est-à-dire trop tard.
-          ( # étape d'origine : TÉMOIN — ce contrôle sait-il seulement échouer ?
           set -uo pipefail
           # Une garde jamais vue rouge ne garde rien (§28.3). Plutôt que de
           # l'avoir vue rouge UNE FOIS pendant son écriture, on lui fait la
@@ -511,45 +519,45 @@ jobs:
           fi
 
           echo "OK — le contrôle sait refuser un Caddyfile fautif, et pour la bonne raison."
-          ) || exit 1
-          ( # étape d'origine : Le Caddyfile du dépôt est-il valide ?
+
+      - name: Le Caddyfile du dépôt est-il valide ?
+        run: |
           set -euo pipefail
           docker run --rm -v "$PWD/infra/caddy:/etc/caddy:ro" axion-crm/caddy-ci:valide \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           echo "OK — le Caddyfile est valide, Caddy démarrera dessus."
-          ) || exit 1
-          # ── 🔴 CE FICHIER N'ÉTAIT COUVERT PAR RIEN (mesuré le 2026-08-23) ──────
-          # Ce job existe parce que « Caddy refuse de démarrer sur un fichier
-          # invalide, et plus rien ne répond ». C'était vrai — et le job ne
-          # regardait QU'UN des deux Caddyfile du dépôt.
-          #
-          # `frontend/Caddyfile.app` est CUIT DANS L'IMAGE du conteneur `app`
-          # (`Dockerfile.frontend:52`) et sert le SPA sur :5173. Une faute de
-          # frappe dedans produit exactement le symptôme que ce job veut prévenir
-          # — l'application ne démarre plus — et rien ne l'aurait attrapée avant
-          # le redémarrage en production.
-          #
-          # Découvert en y ajoutant les quatre redirections 301 du §8.2 de
-          # `10_NAVIGATION-CIBLE.md` : il a fallu constater que le gate ne les
-          # aurait pas protégées.
-          #
-          # ⚠️ Le fichier ne s'appelle pas `Caddyfile` : on le monte donc
-          # explicitement SOUS ce nom, sinon Caddy ne le trouve pas et l'étape
-          # passerait au vert sans avoir rien lu.
-          ( # étape d'origine : Le Caddyfile du conteneur `app` est-il valide ?
+
+      # ── 🔴 CE FICHIER N'ÉTAIT COUVERT PAR RIEN (mesuré le 2026-08-23) ──────
+      # Ce job existe parce que « Caddy refuse de démarrer sur un fichier
+      # invalide, et plus rien ne répond ». C'était vrai — et le job ne
+      # regardait QU'UN des deux Caddyfile du dépôt.
+      #
+      # `frontend/Caddyfile.app` est CUIT DANS L'IMAGE du conteneur `app`
+      # (`Dockerfile.frontend:52`) et sert le SPA sur :5173. Une faute de
+      # frappe dedans produit exactement le symptôme que ce job veut prévenir
+      # — l'application ne démarre plus — et rien ne l'aurait attrapée avant
+      # le redémarrage en production.
+      #
+      # Découvert en y ajoutant les quatre redirections 301 du §8.2 de
+      # `10_NAVIGATION-CIBLE.md` : il a fallu constater que le gate ne les
+      # aurait pas protégées.
+      #
+      # ⚠️ Le fichier ne s'appelle pas `Caddyfile` : on le monte donc
+      # explicitement SOUS ce nom, sinon Caddy ne le trouve pas et l'étape
+      # passerait au vert sans avoir rien lu.
+      - name: Le Caddyfile du conteneur `app` est-il valide ?
+        run: |
           set -euo pipefail
           test -f frontend/Caddyfile.app  # un fichier absent rendrait l'étape muette
           docker run --rm \
             -v "$PWD/frontend/Caddyfile.app:/etc/caddy/Caddyfile:ro" axion-crm/caddy-ci:valide \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           echo "OK — le SPA démarrera : son Caddy interne est valide."
-          ) || exit 1
 
-      - name: Garde 3/3 — Les scripts d'infra sont-ils exécutables ?
+      # ── Lot B (#680) : GARDE 3/3 = ancien job `scripts-executables` (étapes inchangées).
+      - name: Les scripts d'infra sont-ils exécutables ?
         if: always()
-        shell: bash {0}
         run: |
-          ( # étape d'origine : (sans nom)
           set -euo pipefail
           # `git ls-files -s` donne le mode ENREGISTRÉ, pas celui du disque —
           # c'est la seule mesure qui survive à un clone.
@@ -562,8 +570,8 @@ jobs:
             exit 1
           fi
           echo "Tous les scripts d'infra sont en 100755."
-          ) || exit 1
-          ( # étape d'origine : Serveur d'envoi K3 — tests statiques (pare-feu, WireGuard d'admin, installateur)
+      - name: Serveur d'envoi K3 — tests statiques (pare-feu, WireGuard d'admin, installateur)
+        run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends nftables
@@ -571,7 +579,6 @@ jobs:
           git fetch --no-tags --prune --unshallow origin 2>/dev/null || true
           git fetch --no-tags origin main:refs/remotes/origin/main
           bash infra/serveur-envoi/tests/lancer-tests.sh
-          ) || exit 1
 
   donnees-personnelles:
     name: Aucune donnée nominative dans ce dépôt public

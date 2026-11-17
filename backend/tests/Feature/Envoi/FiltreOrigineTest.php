@@ -17,6 +17,10 @@ uses(TestCase::class, RefreshDatabase::class);
 
 const FIO_MODES = ['app', 'proprio'];
 
+afterEach(function () {
+    WorkspaceContext::clear();
+});
+
 function fioEspace(): string
 {
     $id = (string) Str::uuid();
@@ -214,6 +218,39 @@ test('O1/O2 : une personne opposée ne fait jamais entrer une unité ; son conta
         expect($r['entreprises'])->toBe([]);
         expect($r['contacts'])->toBe([]);
         expect(array_keys($r['contacts_opposes']))->toBe([$c]);
+    }
+});
+
+test('O2 : le contact opposé d\'une entreprise ciblée seule est signalé ; opposé ET du réseau par l\'entreprise : jamais dans contacts', function () {
+    foreach (FIO_MODES as $mode) {
+        $ws = fioEspace();
+        $e = fioEntreprise($ws);
+        $c = fioContact($ws, $e);
+        fioPersonne($ws, ['linkedin'], ['contact_id' => $c, 'opposition_at' => now()]);
+        fioPersonne($ws, ['linkedin'], ['company_id' => $e]);
+
+        $seule = fioLire($mode, $ws, [$e], [], ['linkedin']);
+        expect(array_keys($seule['entreprises']))->toBe([$e]);
+        expect(array_keys($seule['contacts_opposes']))->toBe([$c]);
+
+        $r = fioLire($mode, $ws, [$e], [$c], ['linkedin']);
+        expect(array_keys($r['entreprises']))->toBe([$e]);
+        expect($r['contacts'])->toBe([]);
+        expect(array_keys($r['contacts_opposes']))->toBe([$c]);
+    }
+});
+
+test('cloisonnement R2 : un contact de l\'espace B ne devient pas du réseau de A', function () {
+    foreach (FIO_MODES as $mode) {
+        $a = fioEspace();
+        $b = fioEspace();
+        $ea = fioEntreprise($a);
+        fioPersonne($a, ['linkedin'], ['company_id' => $ea]);
+        $cb = fioContact($b, $ea);
+
+        $r = fioLire($mode, $a, [$ea], [$cb], ['linkedin']);
+        expect(array_keys($r['entreprises']))->toBe([$ea]);
+        expect($r['contacts'])->toBe([]);
     }
 });
 

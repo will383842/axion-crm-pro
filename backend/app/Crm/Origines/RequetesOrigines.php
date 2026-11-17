@@ -235,7 +235,7 @@ final class RequetesOrigines
 
     /**
      * Unités rattachées à au moins une personne NON OPPOSÉE venue d'un de ces réseaux (lot L2b-B, LECTURE SEULE),
-     * et contacts rattachés à une personne OPPOSÉE. Trois requêtes au plus, en bindings ; réutilise `entrees()`.
+     * et contacts rattachés à une personne OPPOSÉE, parmi les contacts demandés ET les contacts des entreprises demandées. Trois requêtes au plus, en bindings ; réutilise `entrees()`.
      * Une personne opposée ne fait jamais entrer une unité dans le réseau ; un contact signalé opposé n'y entre pas.
      *
      * @param  list<int>  $entreprises
@@ -316,10 +316,10 @@ final class RequetesOrigines
                 $parEntreprise[(int) $r->id] = true;
             }
         }
+        // O2 : TOUS les contacts lus rattachés à une personne opposée (cibles directes OU contacts des entreprises demandées).
+        $sortie['contacts_opposes'] = $opposes;
         foreach ($contacts as $c) {
-            if (isset($opposes[$c])) {
-                $sortie['contacts_opposes'][$c] = true;
-            } elseif (isset($contactsDirects[$c]) || isset($parEntreprise[$c])) {
+            if (! isset($opposes[$c]) && (isset($contactsDirects[$c]) || isset($parEntreprise[$c]))) {
                 $sortie['contacts'][$c] = true;
             }
         }

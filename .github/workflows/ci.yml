@@ -1084,8 +1084,57 @@ jobs:
           VITE_API_BASE_URL: https://api.localhost
         run: pnpm build
 
+  # LOT C (plan CI allégée, #680) — le contrôle exigé « Workers Node + Playwright »
+  # n'est JAMAIS sauté (`if: always()`) ; seules ses étapes lourdes sautent, et le
+  # job rend un vrai verdict, quand la PR ne touche ni `workers/`, ni `Dockerfile.worker`,
+  # ni ce workflow. JAMAIS de `paths:` sur ce fichier : un workflow non déclenché
+  # laisserait les 4 contrôles exigés « en attente » pour toujours. Hors PR (mise
+  # en ligne par `workflow_call`, push, manuel) la réponse est toujours « oui ».
+  # Sans checkout : liste des fichiers de la PR par l'API. Erreur, réponse vide ou
+  # 3000 fichiers ou plus : « oui, tout a changé ». Le frontend n'est PAS filtré
+  # (décision D1 du fondateur). Garde : backend/tests/Feature/Infra/CiWorkersSeulementSiWorkersChangentTest.php
+  changements:
+    name: Workers touchés ?
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5  # F38-008
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      workers: ${{ steps.liste.outputs.workers }}
+    steps:
+      - id: liste
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPOT: ${{ github.repository }}
+          EVENEMENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENEMENT" != "pull_request" ]; then
+            echo "workers=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! FICHIERS="$(gh api --paginate "repos/$DEPOT/pulls/$PR/files?per_page=100" --jq '.[].filename')"; then
+            echo "API en erreur : on joue les workers."; echo "workers=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$FICHIERS" ] || [ "$(printf '%s\n' "$FICHIERS" | wc -l)" -ge 3000 ]; then
+            echo "Liste vide ou trop longue : on joue les workers."; echo "workers=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # workers-pattern : workers/**, Dockerfile.worker, ci.yml, et le seul fichier hors de workers/ lu par leurs tests (LaunchZoneScrapingJob.php)
+          if printf '%s\n' "$FICHIERS" | grep -Eq '^workers/|^Dockerfile\.worker$|^\.github/workflows/ci\.yml$|^backend/app/Jobs/LaunchZoneScrapingJob\.php$'; then
+            echo "workers=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "workers=false" >> "$GITHUB_OUTPUT"
+          fi
+
   workers:
     name: Workers Node + Playwright
+    needs: changements
+    # Lot C (#680) — contrôle EXIGÉ : le job TOURNE toujours (jamais sauté, jamais « en attente »).
+    # `always()` : si `changements` est sauté (brouillon), échoué ou annulé, le job tourne quand même.
+    # Sans fichier workers sur la PR, ses étapes lourdes sont sautées : le job rend un vrai verdict vert.
+    if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 45  # F38-008 — plafond anti-gel (téléchargement des navigateurs Playwright compris)
     steps:
@@ -1097,15 +1146,19 @@ jobs:
           echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
           exit 1
       - uses: actions/checkout@v4
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
       - uses: pnpm/action-setup@v4
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         with:
           version: 9
       - uses: actions/setup-node@v7
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         with:
           node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: workers/pnpm-lock.yaml
       - name: Install (BLOQUANT — lockfile figé)
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm install --frozen-lockfile
 
@@ -1117,6 +1170,7 @@ jobs:
       # rien ne comparait les deux — et Dependabot remonte `playwright`
       # régulièrement, donc l'écart se recrée tout seul à chaque bump.
       - name: Le tag de l'image Playwright suit-il la bibliothèque ?
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         run: |
           set -euo pipefail
           # Version RÉELLEMENT installée (le lock fait foi, pas l'intervalle
@@ -1137,6 +1191,7 @@ jobs:
           echo "Versions alignées."
 
       - name: Typecheck
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm typecheck
 
@@ -1147,6 +1202,7 @@ jobs:
       # poste de développement, nulle part en CI. Config locale ajoutée, étape
       # branchée, BLOQUANTE.
       - name: Lint (BLOQUANT)
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm lint
 
@@ -1156,8 +1212,10 @@ jobs:
       # ce fichier, ce qui était exécuté dépendait de répertoires situés en
       # dehors du dépôt.
       - name: Test
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm test
       - name: Build
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm build

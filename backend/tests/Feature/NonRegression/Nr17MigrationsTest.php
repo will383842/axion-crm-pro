@@ -49,6 +49,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_11_13_000150_envoi_sante.php',
     // Filet modifié : pourquoi — envoi R17 : constats de réputation, ajout seul (trigger, REVOKE), down() inerte par conception (conservation indéfinie).
     '2026_12_02_000170_envoi_reputation_constats.php',
+    // Filet modifié : pourquoi — envoi RR-0 : élargit deux listes fermées (canal `releve`, geste `annulation`), contraintes NOT VALID, ajout seul ; down() inerte par conception (un retour arrière reposerait l'ancienne liste et échouerait dès qu'une ligne `releve` ou `annulation` existe).
+    '2026_12_11_000100_envoi_retours_reactions.php',
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
     '2026_11_10_000062_envoi_rattachements.php',

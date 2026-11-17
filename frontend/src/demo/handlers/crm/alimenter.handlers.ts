@@ -52,6 +52,7 @@ function personnesFiltrees(url: URL): PersonneDemo[] {
   const source = url.searchParams.get('source') ?? '';
   const nature = url.searchParams.get('nature') ?? '';
   const rattachee = url.searchParams.get('rattachee') ?? '';
+  const reseau = url.searchParams.get('origine_reseau') ?? '';
   return personnes()
     .filtrer((p) => {
       if (statut !== '' && (p.statut_lettre ?? 'aucun') !== statut) return false;
@@ -59,6 +60,7 @@ function personnesFiltrees(url: URL): PersonneDemo[] {
       if (nature !== '' && p.email_nature !== nature) return false;
       if (rattachee === 'oui' && !p.rattachee) return false;
       if (rattachee === 'non' && p.rattachee) return false;
+      if (reseau !== '' && !reseauxDemo(p).includes(reseau)) return false;
       return q === '' || normaliser(`${nomComplet(p)} ${p.email ?? ''}`).includes(q);
     })
     .sort((a, b) => (b.derniere_interaction_at ?? '').localeCompare(a.derniere_interaction_at ?? ''));
@@ -83,6 +85,16 @@ const oppositionDemo = (p: Pick<PersonneDemo, 'id'>): OppositionStatut =>
   Number(p.id) % 5 === 0 ? { opposee: true, motifs: Number(p.id) % 10 === 0 ? ['stop', 'art21'] : ['stop'] } : { opposee: false, motifs: [] };
 
 const sansAbonnement = ({ abonnement: _abonnement, ...ligne }: PersonneDemo) => ({ ...ligne, opposition: oppositionDemo(ligne) });
+
+// PO-LE (démo) : réseaux distincts et triés d'une personne, empruntés de façon déterministe aux origines d'exemple.
+function reseauxDemo(p: PersonneDemo): string[] {
+  const sources = origines();
+  const rang = [...personnes().tous()].findIndex((x) => x.id === p.id);
+  const choisie = sources[Math.max(0, rang) % sources.length];
+  const reseaux = new Set((choisie?.origines ?? []).map((x) => x.reseau).filter((r): r is string => r !== null));
+  return [...reseaux].sort();
+}
+const avecReseaux = (p: PersonneDemo) => ({ ...sansAbonnement(p), reseaux: reseauxDemo(p) });
 
 function entreeTache(t: TacheDemo): PersonneTimelineEntry {
   return { id: t.id, kind: 'tache', title: t.title, content: null, occurred_at: t.created_at, due_at: t.due_at, done_at: t.done_at, external_ref: null };
@@ -374,7 +386,7 @@ export const handlers: HttpHandler[] = [
     const force = await repondreEtatForce(request, { data: [], meta: curseurVide });
     if (force) return force;
     const liste = personnesFiltrees(new URL(request.url));
-    return HttpResponse.json({ data: liste.slice(0, 50).map(sansAbonnement), meta: { ...curseurVide, has_more: liste.length > 50 } });
+    return HttpResponse.json({ data: liste.slice(0, 50).map(avecReseaux), meta: { ...curseurVide, has_more: liste.length > 50 } });
   }),
 
   http.get(api('/crm/personnes/:id'), async ({ request, params }) => {

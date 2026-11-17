@@ -28,6 +28,7 @@ beforeEach(function () {
     $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.' . random_int(1, 254)]);
     $this->withHeader('Origin', 'https://' . $domaine);
     $this->withSession(['_token' => 'g3c-csrf'])->withHeader('X-CSRF-TOKEN', 'g3c-csrf');
+    $this->withCredentials(); // sans cela, le client n'envoie aucun cookie aux requêtes JSON
 });
 
 afterEach(function () {
@@ -72,14 +73,12 @@ function g3cRetenirCookies(TestResponse $r): array
 {
     $out = [];
     foreach ($r->baseResponse->headers->getCookies() as $c) {
-        if ((string) $c->getValue() !== '') {
-            $valeur = (string) $c->getValue();
-            // Le client de test chiffre lui-même ses cookies : au navigateur, on rend donc la valeur EN CLAIR.
-            if ($c->getName() === 'axion_appareil') {
-                $valeur = CookieValuePrefix::remove(app('encrypter')->decrypt($valeur, false));
-            }
-            test()->withCookie($c->getName(), $valeur);
-            $out[$c->getName()] = $valeur;
+        // Seul le cookie d'appareil est renvoyé au serveur : la session tient par le magasin partagé (comme en G3-B).
+        // Le client de test chiffre lui-même ses cookies : on lui rend donc la valeur EN CLAIR.
+        if ($c->getName() === 'axion_appareil' && (string) $c->getValue() !== '') {
+            $valeur = CookieValuePrefix::remove(app('encrypter')->decrypt((string) $c->getValue(), false));
+            test()->withCookie('axion_appareil', $valeur);
+            $out['axion_appareil'] = $valeur;
         }
     }
     app('auth')->forgetGuards();

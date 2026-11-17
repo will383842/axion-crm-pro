@@ -293,10 +293,15 @@ class TestMineurs(Base):
 
 
 class TestCI(unittest.TestCase):  # I2
-    def test_le_controle_exige_tourne_sur_toute_pull_request(self):
+    def test_le_filtre_de_chemins_pull_request_est_celui_du_push(self):
+        # « Tests du socle d'envoi » n'est pas un contrôle exigé par la protection de main : le filtre est permis,
+        # à condition d'être identique sur pull_request et sur push (même périmètre, aucun trou).
         txt = lire(RACINE, ".github", "workflows", "serveur-envoi-socle.yml")
-        pr = txt.split("pull_request:")[1].split("push:")[0]
-        self.assertNotIn("paths", pr, "un filtre paths laisse le contrôle exigé « en attente » sur les autres PR")
+        pr = txt.split("\n  pull_request:")[1].split("\n  push:")[0]
+        push = txt.split("\n  push:")[1].split("\npermissions:")[0]
+        chemins = lambda b: [l.strip() for l in b.splitlines() if l.strip().startswith("paths:")]
+        self.assertEqual(len(chemins(pr)), 1, "le filtre paths doit exister sur pull_request")
+        self.assertEqual(chemins(pr), chemins(push))
         self.assertIn("name: Tests du socle d'envoi", txt)
 
 

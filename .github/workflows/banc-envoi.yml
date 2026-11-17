@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: banc-envoi-${{ github.ref }}
+  # annule le run remplacé sur PR seulement ; jamais sur push main
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   banc:
     name: Banc d'envoi (isolation + sonde)

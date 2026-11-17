@@ -519,7 +519,8 @@ export interface components {
             type: components["schemas"]["TypeCible"];
         };
         CibleProposee: {
-            joignables: number;
+            /** @description Nul = non estimé (jamais égal à `total` par défaut) ; l'estimation vraie se lit par la route d'estimation. */
+            joignables: number | null;
             libelle: string;
             reference: string;
             total: number;
@@ -784,6 +785,8 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Présent avec `exclusions_evaluees` vrai. Faux si l'échéance ou le plafond de lots est atteint ; `total` est alors le nombre de membres examinés et `restant` un minimum (« au moins »), jamais extrapolé. */
+                        complet?: boolean;
                         /** @description Toujours vrai, c'est une estimation, pas un compte définitif. */
                         estimation?: boolean;
                         exclus: number;

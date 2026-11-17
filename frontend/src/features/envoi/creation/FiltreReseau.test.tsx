@@ -233,3 +233,41 @@ describe('FiltreReseau — mots et guides (PO-D)', () => {
     expect(await screen.findByText('Uniquement les personnes venues par le mot mot-a')).toBeVisible();
   });
 });
+
+describe('EtapeCible — branchement des mots et guides (PO-D)', () => {
+  it('16. les listes apparaissent dans l’assistant ; cocher un mot envoie le corps exact à l’étape 1', async () => {
+    const corps: unknown[] = [];
+    await ouvrir([origines(lignes('linkedin')), motsApi(['b', 'a']), guidesApi(['g1']), brouillon(), etape1(corps)]);
+    const user = userEvent.setup();
+    await user.click(await screen.findByText('Restreindre par réseau d’origine'));
+    await user.click(await screen.findByRole('checkbox', { name: 'b' }));
+    await user.click(screen.getByRole('checkbox', { name: 'a' }));
+    await user.click(screen.getByRole('checkbox', { name: 'g1' }));
+    await user.click(screen.getByRole('button', { name: /Continuer : message/ }));
+    await waitFor(() => { expect(corps).toHaveLength(1); });
+    expect((corps[0] as { cible: { origine: unknown } }).cible.origine).toEqual({ mots: ['a', 'b'], guides: ['g1'] });
+  });
+
+  it('17. interrupteur éteint (404 partout) : ni bloc ni liste, comme aujourd’hui', async () => {
+    const non = (c: string) => http.get(`*/crm/origines/${c}`, () => HttpResponse.json({ message: 'Introuvable' }, { status: 404 }));
+    await ouvrir([non('par-reseau'), non('par-mot'), non('par-guide'), brouillon()]);
+    await screen.findByRole('radio', { name: /salon-artisans-2026/ });
+    await attendre(100);
+    expect(screen.queryByText(/Restreindre par réseau d’origine/)).toBeNull();
+    expect(screen.queryByText(/Par mot/)).toBeNull();
+    expect(screen.queryByText(/Par guide/)).toBeNull();
+  });
+
+  it('18. 422 filtre_origine_inactif sur un mot : message affiché, aucun réessai', async () => {
+    const corps: unknown[] = [];
+    const motif = 'Le filtre par réseau d’origine est inactif dans cet espace : retirez-le ou attendez son ouverture.';
+    await ouvrir([origines(lignes('linkedin')), motsApi(['a']), guidesApi([]), brouillon(), etape1(corps, { statut: 422, message: motif })]);
+    const user = userEvent.setup();
+    await user.click(await screen.findByText('Restreindre par réseau d’origine'));
+    await user.click(await screen.findByRole('checkbox', { name: 'a' }));
+    await user.click(screen.getByRole('button', { name: /Continuer : message/ }));
+    expect(await screen.findByText(motif)).toBeVisible();
+    await attendre(1500);
+    expect(corps).toHaveLength(1);
+  });
+});

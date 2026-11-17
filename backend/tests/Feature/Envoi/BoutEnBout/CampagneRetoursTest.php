@@ -85,7 +85,8 @@ function bebrEtape2(BancCampagne $banc, string $mode): void
 test('bebr 1 S2 réponse humaine : A arrêtée (1 seul message à vie), étape 2 pour B seulement, réponse visible', function () {
     foreach (['app', 'proprio'] as $mode) {
         [$banc, , $a, $b, $adresse] = bebrMonter($mode);
-        BancCampagne::sous($mode, fn () => $banc->releve($banc->reponse($banc->messageId($a->id), $adresse)));
+        $mid = $banc->messageId($a->id);   // lu hors rôle applicatif : sans contexte d'espace, la RLS ne rend aucune ligne
+        BancCampagne::sous($mode, fn () => $banc->releve($banc->reponse($mid, $adresse)));
 
         $apres = bebrInscription($banc, $a);
         expect($apres->statut)->toBe('arretee')->and($apres->motif_arret)->toBe('reponse')
@@ -107,7 +108,8 @@ test('bebr 2 S3 STOP : opposition écrite, A arrêtée, 0 injection pour A, la f
         [$banc, , $a, , $adresse] = bebrMonter($mode);
         $contacts = DB::table('contacts')->where('workspace_id', $banc->ws)->count();
         $entreprises = DB::table('companies')->where('workspace_id', $banc->ws)->count();
-        BancCampagne::sous($mode, fn () => $banc->releve($banc->stop($banc->messageId($a->id), $adresse)));
+        $mid = $banc->messageId($a->id);
+        BancCampagne::sous($mode, fn () => $banc->releve($banc->stop($mid, $adresse)));
 
         $apres = bebrInscription($banc, $a);
         expect(DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte($adresse))->exists())->toBeTrue()
@@ -148,7 +150,8 @@ test('bebr 3 S4 rebond dur par VERP signé : A arrêtée, étape 2 jamais inject
 test('bebr 4 S5 rebond mou : aucun arrêt, étape 2 envoyée, rebonds_mous = 1 ; suivi d\'un dur : compté dur seulement', function () {
     foreach (['app', 'proprio'] as $mode) {
         [$banc, $id, $a, , $adresse] = bebrMonter($mode);
-        BancCampagne::sous($mode, fn () => $banc->releve($banc->rebondMou($banc->messageId($a->id), $adresse)));
+        $mid = $banc->messageId($a->id);
+        BancCampagne::sous($mode, fn () => $banc->releve($banc->rebondMou($mid, $adresse)));
         expect(DB::table('envoi_evenements')->where('workspace_id', $banc->ws)->where('classe', 'rebond_mou')->where('statut', 'rattache')->count())->toBe(1)
             ->and(bebrInscription($banc, $a)->statut)->toBe('active');
 

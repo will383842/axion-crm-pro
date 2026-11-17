@@ -21,6 +21,9 @@ export interface Saisie {
   reseaux: string[];
   /** Vrai dès que la personne a touché au filtre : sans cela, on ne renvoie pas la clé (le serveur garde la colonne). */
   reseauxModifies: boolean;
+  /** Mots et guides d'origine retenus (même filtre, même « une seule entrée d'origine ») ; vides = pas de restriction. */
+  mots: string[];
+  guides: string[];
   sequence: LigneSequence[];
   ab: boolean;
   objetB: string;
@@ -43,6 +46,8 @@ export const SAISIE_INITIALE: Saisie = {
   reverifier: true,
   reseaux: [],
   reseauxModifies: false,
+  mots: [],
+  guides: [],
   sequence: [{ message_id: 'msg-1', delai_jours: 0 }],
   ab: false,
   objetB: '',
@@ -68,13 +73,16 @@ export function reseauxNormalises(reseaux: readonly string[]): string[] {
 }
 
 /**
- * `undefined` : clé absente (colonne inchangée) ; `null` : retire le filtre ;
- * sinon `{ reseaux }`. Rien n'est renvoyé tant que la personne n'a pas touché au filtre.
+ * `undefined` : clé absente (colonnes inchangées) ; `null` : retire le filtre ;
+ * sinon `{ reseaux?, mots?, guides? }` (clés vides omises, listes triées). Rien n'est renvoyé tant que la personne n'a pas touché au filtre.
  */
-export function origineDeContrat(s: Saisie): { reseaux: string[] } | null | undefined {
+export function origineDeContrat(s: Saisie): { reseaux?: string[]; mots?: string[]; guides?: string[] } | null | undefined {
   if (!s.reseauxModifies) return undefined;
   const reseaux = reseauxNormalises(s.reseaux);
-  return reseaux.length > 0 ? { reseaux } : null;
+  const mots = reseauxNormalises(s.mots);
+  const guides = reseauxNormalises(s.guides);
+  if (reseaux.length + mots.length + guides.length === 0) return null;
+  return { ...(reseaux.length > 0 ? { reseaux } : {}), ...(mots.length > 0 ? { mots } : {}), ...(guides.length > 0 ? { guides } : {}) };
 }
 
 export function sequenceDeContrat(s: Saisie): EtapeSequence[] {
@@ -121,6 +129,8 @@ export function saisieDepuis(b: Brouillon): Saisie {
     s.exclusionsLibres = (c.cible.exclusions_libres ?? []).join(', ');
     s.reverifier = c.cible.reverifier_anciennes !== false;
     s.reseaux = reseauxNormalises(c.cible.origine?.reseaux ?? []);
+    s.mots = reseauxNormalises(c.cible.origine?.mots ?? []);
+    s.guides = reseauxNormalises(c.cible.origine?.guides ?? []);
   }
   if (c.sequence && c.sequence.length > 0) {
     s.sequence = c.sequence.map((e) => ({ message_id: e.message_id, delai_jours: e.delai_jours }));

@@ -156,6 +156,10 @@ X11-A (`GardeChauffe.php`, `Seuils.php`, 1 test), C4-A (`infra/…/passerelle/sr
   dans `FINI-M0B.md` (aucun `down()` n'est joué en production : le déploiement ne fait que `migrate --force`).
   Preuve : Nr17 entier vert, `MigrationsFiniTest` vert, suite complète verte en CI ; un autre fichier rouge ⇒ ESCALADE.
   Relecture : aucune exception par nom de fichier, aucun `CASCADE`, le témoin rougit vraiment.
+- **4e décision de pilotage (commentaire sur #680)** : le nouveau test témoin
+  (`Nr17MigrationsTest.php::NR-17 témoin : un retour réel reste bloqué par une clé étrangère OUBLIÉE`) est ajouté à la
+  liste figée lue par `ListeFigeeTest.php` (ou son fichier d'instantané) : ajout seul, aucune ligne retirée ni
+  modifiée, avec la ligne « Filet modifié : pourquoi » (ajout de garde, pas un affaiblissement).
 
 **Comportement**
 - `000120` : `envoi_attestations_serveur_reel` : `id`, `workspace_id`, `geste TEXT CHECK (geste IN ('atteste','retire'))`,

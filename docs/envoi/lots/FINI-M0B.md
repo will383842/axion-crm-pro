@@ -25,8 +25,9 @@ Horodatages `2026_12_07_000120`, `000130`, `000140` : libres sur `main` et sur l
 - déclencheur « boîte figée » neutralisé ⇒ 2 échecs (test « inscription », applicatif et propriétaire) ; annulée.
 - `CHECK` du « @ » retiré ⇒ 2 échecs (test « attestation ») ; annulée.
 
-## ESCALADE (filets hors liste autorisée)
-Les trois migrations font rougir, en local, des filets qui ne sont PAS dans les fichiers autorisés :
-1. `NonRegression/Nr17MigrationsTest.php` : la liste `NR17_RETOUR_INERTE_VOULU` doit recevoir les 3 fichiers (`down()` inerte voulu). Fichier aussi touché par la PR ouverte #675 ⇒ non modifié ici. De plus, son aller-retour d'une ancienne migration (`DROP TABLE envoi_boites`) est bloqué par la clé composite de `000130` voulue par le cahier.
-2. `EtancheiteParTableTest` / `Support/SemeurTablesScopees.php` : les deux nouvelles tables à `workspace_id` doivent être semées (`ORDRE` + charge utile).
-Demande : décision du relecteur (étendre la liste autorisée, ou lot « filets » dédié après #675).
+## Filet modifié : pourquoi
+`Nr17MigrationsTest.php` : les 3 migrations sont inscrites à `NR17_RETOUR_INERTE_VOULU` (retour inerte voulu, ajout seul) ; un test témoin est ajouté (un retour réel reste bloqué par une clé étrangère OUBLIÉE, SQLSTATE 2BP01, sans `CASCADE`) ; après la boucle, la clé `envoi_inscriptions_boite_workspace_fk` doit exister. Aucune exception par nom de fichier. Le `down()` de `000040` et de `000042` retire d'abord cette seule clé (sous garde `to_regclass`), la colonne et les lignes restent. Décision de pilotage sur #680 (3e ESCALADE).
+
+## Preuves
+- Avant correctif : « toute migration NOUVELLE… » rouge (2BP01). Après : Nr17, `MigrationsFiniTest`, `EtancheiteParTableTest` verts (26 tests).
+- Témoin : `DROP TABLE … CASCADE` à la place de la ligne ajoutée dans 000040 ⇒ le témoin rougit ; annulé.

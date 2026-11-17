@@ -42,6 +42,10 @@ return new class extends Migration
     public function down(): void
     {
         DB::statement('ALTER TABLE envoi_injections_smtp DROP CONSTRAINT IF EXISTS envoi_injections_smtp_boite_workspace_fk');
+        // Clé de 000130 ; la colonne et les lignes restent.
+        if (DB::selectOne("SELECT to_regclass('public.envoi_inscriptions') AS t")->t !== null) {
+            DB::statement('ALTER TABLE envoi_inscriptions DROP CONSTRAINT IF EXISTS envoi_inscriptions_boite_workspace_fk');
+        }
         DB::statement('ALTER TABLE envoi_boites DROP CONSTRAINT IF EXISTS envoi_boites_workspace_id_id_unique');
         DB::statement('ALTER TABLE envoi_boites DROP CONSTRAINT IF EXISTS envoi_boites_port_liste_blanche');
         DB::statement('ALTER TABLE envoi_boites DROP CONSTRAINT IF EXISTS envoi_boites_aucun_boucle_locale');

@@ -2,7 +2,7 @@
 
 /**
  * LOT C du plan « CI allégée » (#680) : sur PR, le job `workers` (contrôle exigé
- * « Workers Node + Playwright ») est SAUTÉ, donc vert, quand la PR ne touche ni
+ * « Workers Node + Playwright ») a ses étapes lourdes SAUTÉES (le job, lui, tourne et rend un vrai verdict) quand la PR ne touche ni
  * `workers/`, ni `Dockerfile.worker`, ni `ci.yml`. Le contrôle exigé garde son nom
  * et se termine toujours. Aucun filtre `paths:` ; en cas de doute, il tourne.
  * Le frontend n'est PAS filtré ici (décision D1 du fondateur).
@@ -34,15 +34,19 @@ function correspondWorkersLotC(string $fichier): bool
     return preg_match('#' . str_replace('#', '\#', motifWorkersLotC()) . '#', $fichier) === 1;
 }
 
-it('workers saute sur PR sans fichier workers, jamais ailleurs, et garde son nom', function () {
+it('workers TOURNE toujours (jamais sauté) ; seules ses étapes lourdes sautent sans fichier workers', function () {
     $job = ciLotC()['jobs']['workers'];
     expect($job['name'])->toBe('Workers Node + Playwright')
-        ->and($job['needs'])->toBe('changements');
-    $condition = (string) $job['if'];
-    expect($condition)->toContain('always()')
-        ->toContain("github.event_name != 'pull_request'")
-        ->toContain("needs.changements.result != 'success'")
-        ->toContain("needs.changements.outputs.workers == 'true'");
+        ->and($job['needs'])->toBe('changements')
+        ->and(trim((string) $job['if']))->toBe('always()');
+    $etapes = $job['steps'];
+    expect((string) $etapes[0]['if'])->toContain('github.event.pull_request.draft == true');
+    foreach (array_slice($etapes, 1) as $etape) {
+        $condition = (string) ($etape['if'] ?? '');
+        expect($condition)->toContain("needs.changements.result != 'success'")
+            ->toContain("needs.changements.outputs.workers == 'true'")
+            ->toContain("github.event_name != 'pull_request'");
+    }
 });
 
 it('le job changements répond « oui » hors PR et en cas de doute', function () {

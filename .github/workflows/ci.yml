@@ -955,12 +955,17 @@ jobs:
   backend-verdict:
     name: Backend Laravel (install + PHPStan + Pint + Pest)
     needs: [filet-non-regression, backend]
-    # Lot G (#680) : en brouillon le verdict est SAUTÉ (vert pour la protection) ;
-    # sinon `always()` : il tourne même si une garde rougit, et échoue alors.
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
+      # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
+      # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
+      - name: Brouillon — contrôles non joués
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        run: |
+          echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
+          exit 1
       - name: Télécharger les artefacts pest-part-*
         uses: actions/download-artifact@v4
         with:
@@ -1011,11 +1016,16 @@ jobs:
 
   frontend:
     name: Frontend React/Vite
-    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30  # F38-008 — plafond anti-gel (install + typecheck + lint + Vitest + build)
     steps:
+      # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
+      # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
+      - name: Brouillon — contrôles non joués
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        run: |
+          echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
+          exit 1
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
@@ -1090,22 +1100,34 @@ jobs:
   workers:
     name: Workers Node + Playwright
     needs: changements
-    # Lots G + C (#680) : sauté (donc vert) en brouillon, ou sur PR sans fichier workers ;
-    # `always()` : si `changements` échoue ou est annulé, on joue (jamais de saut par erreur).
-    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (github.event_name != 'pull_request' || needs.changements.result != 'success' || needs.changements.outputs.workers == 'true') }}
+    # Lot C (#680) — contrôle EXIGÉ : le job TOURNE toujours (jamais sauté, jamais « en attente »).
+    # `always()` : si `changements` est sauté (brouillon), échoué ou annulé, le job tourne quand même.
+    # Sans fichier workers sur la PR, ses étapes lourdes sont sautées : le job rend un vrai verdict vert.
+    if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 45  # F38-008 — plafond anti-gel (téléchargement des navigateurs Playwright compris)
     steps:
+      # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
+      # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
+      - name: Brouillon — contrôles non joués
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        run: |
+          echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
+          exit 1
       - uses: actions/checkout@v4
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
       - uses: pnpm/action-setup@v4
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         with:
           version: 9
       - uses: actions/setup-node@v7
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         with:
           node-version: '22'
           cache: 'pnpm'
           cache-dependency-path: workers/pnpm-lock.yaml
       - name: Install (BLOQUANT — lockfile figé)
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm install --frozen-lockfile
 
@@ -1117,6 +1139,7 @@ jobs:
       # rien ne comparait les deux — et Dependabot remonte `playwright`
       # régulièrement, donc l'écart se recrée tout seul à chaque bump.
       - name: Le tag de l'image Playwright suit-il la bibliothèque ?
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         run: |
           set -euo pipefail
           # Version RÉELLEMENT installée (le lock fait foi, pas l'intervalle
@@ -1137,6 +1160,7 @@ jobs:
           echo "Versions alignées."
 
       - name: Typecheck
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm typecheck
 
@@ -1147,6 +1171,7 @@ jobs:
       # poste de développement, nulle part en CI. Config locale ajoutée, étape
       # branchée, BLOQUANTE.
       - name: Lint (BLOQUANT)
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm lint
 
@@ -1156,8 +1181,10 @@ jobs:
       # ce fichier, ce qui était exécuté dépendait de répertoires situés en
       # dehors du dépôt.
       - name: Test
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm test
       - name: Build
+        if: ${{ needs.changements.result != 'success' || needs.changements.outputs.workers == 'true' || github.event_name != 'pull_request' }}
         working-directory: workers
         run: pnpm build

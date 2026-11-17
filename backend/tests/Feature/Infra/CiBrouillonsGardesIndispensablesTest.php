@@ -36,7 +36,7 @@ it('chaque workflow de PR écoute ready_for_review', function () {
 
 it('les jobs lourds sautent en brouillon, jamais hors PR', function () {
     $lourds = [
-        'ci' => ['filet-non-regression', 'gardes-infra', 'backend', 'backend-verdict', 'frontend', 'workers'],
+        'ci' => ['filet-non-regression', 'gardes-infra', 'backend'],
         'a11y' => ['axe-playwright', 'lighthouse'],
         'e2e' => ['suites-cablees'],
         'demo' => ['demo'],
@@ -86,4 +86,18 @@ it('le verdict backend reste rouge quand une garde échoue (non-draft)', functio
     expect((string) $verdict['if'])->toContain('always()');
     $script = (string) collect($verdict['steps'])->pluck('run')->filter()->implode("\n");
     expect($script)->toContain('!= "success"')->toContain('exit "$ko"');
+});
+
+it('les 4 contrôles exigés ne sautent JAMAIS : en brouillon ils échouent vite, ils ne passent pas au vert sans tourner', function () {
+    $jobs = workflowLotG('ci')['jobs'];
+    foreach (['backend-verdict', 'frontend', 'workers', 'donnees-personnelles'] as $nom) {
+        $condition = trim((string) ($jobs[$nom]['if'] ?? ''));
+        // Aucune condition de job ne peut sauter le contexte exigé (seul `always()` est admis).
+        expect($condition === '' || $condition === 'always()')->toBeTrue("$nom : condition de saut interdite ($condition)");
+    }
+    foreach (['backend-verdict', 'frontend', 'workers'] as $nom) {
+        $premiere = $jobs[$nom]['steps'][0];
+        expect((string) $premiere['if'])->toContain('github.event.pull_request.draft == true');
+        expect((string) $premiere['run'])->toContain('exit 1')->toContain('PR en brouillon');
+    }
 });

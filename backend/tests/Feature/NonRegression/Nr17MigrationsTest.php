@@ -167,6 +167,12 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_10_000100_envoi_campagnes_filtre_origine.php',
     // Filet modifié : pourquoi — envoi L6-0 : index partiel d'expression d'`envoi_evenements` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_09_000100_envoi_evenements_index_injection.php',
+    // Filet modifié : pourquoi — FINI-M0B : attestations du serveur réel, AJOUT SEUL (table, déclencheur, droits) ; la retirer effacerait les attestations ; down() inerte, up() rejouable.
+    '2026_12_07_000120_envoi_attestations_serveur_reel.php',
+    // Filet modifié : pourquoi — FINI-M0B : boîte figée par inscription (colonne nullable, clé composite), AJOUT SEUL ; la retirer effacerait la boîte posée ; down() inerte, up() rejouable.
+    '2026_12_07_000130_envoi_inscriptions_boite.php',
+    // Filet modifié : pourquoi — FINI-M0B : codes d'ajout de boîte, AJOUT SEUL (table, déclencheur, droits) ; la retirer effacerait les codes ; down() inerte, up() rejouable.
+    '2026_12_07_000140_envoi_boites_codes_ajout.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

@@ -1,0 +1,89 @@
+name: Diagnostic — rôle applicatif Postgres (prod, lecture seule)
+
+# Lot G4-0. LECTURE SEULE STRICTE : aucune écriture, aucun redémarrage.
+# Déclenché À LA MAIN seulement (workflow_dispatch) : jamais sur push ni sur PR.
+# Dépôt et journaux PUBLICS : seulement des booléens, des nombres et des noms de
+# rôles ; jamais une valeur de secret, une adresse ou un identifiant d'espace.
+# Mode d'emploi : docs/crm/lots/G4-0-diagnostic.md
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diag-role-applicatif
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    name: Diagnostic rôle applicatif sur prod
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Diagnostic via SSH (lecture seule)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+        run: |
+          set -euo pipefail
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$USER@$HOST" bash -s -- "$PROJECT_PATH" <<'REMOTE'
+          set -euo pipefail
+          cd "$1"
+          export COMPOSE_FILE="docker-compose.yml:docker-compose.prod.yml"
+
+          echo "## Commande de diagnostic dans chaque conteneur (chacun lit son environnement)"
+          for SVC in api horizon scheduler; do
+            echo "## service $SVC"
+            if docker compose exec -T "$SVC" php artisan crm:role-applicatif:diagnostic < /dev/null 2>&1 | sed "s/^/$SVC | /"; then
+              :
+            else
+              echo "$SVC | COMMANDE=en_echec"
+            fi
+          done
+
+          echo "## Fichier .env du serveur (jamais la valeur brute)"
+          LIGNE=$(grep -E '^CRM_DB_APP_ROLE_ENABLED=' .env | tail -1 || true)
+          if [ -z "$LIGNE" ]; then
+            echo "ENV_FICHIER_DRAPEAU=absent"
+          else
+            VAL=${LIGNE#*=}
+            VAL=${VAL%\"}; VAL=${VAL#\"}
+            case "$VAL" in
+              true|1|on|yes) echo "ENV_FICHIER_DRAPEAU=true" ;;
+              false|0|off|no) echo "ENV_FICHIER_DRAPEAU=false" ;;
+              *) echo "ENV_FICHIER_DRAPEAU=autre" ;;
+            esac
+          fi
+          if grep -qE '^DB_APP_PASSWORD=.+' .env; then
+            echo "ENV_FICHIER_MOT_DE_PASSE_APP=present"
+          else
+            echo "ENV_FICHIER_MOT_DE_PASSE_APP=absent"
+          fi
+
+          echo "## Dates (démarrage des conteneurs, modification du .env)"
+          echo ".env modifié : $(stat -c %y .env)"
+          for SVC in api horizon scheduler; do
+            ID=$(docker compose ps -q "$SVC" < /dev/null || true)
+            if [ -n "$ID" ]; then
+              echo "$SVC démarré : $(docker inspect -f '{{.State.StartedAt}}' "$ID" < /dev/null)"
+            else
+              echo "$SVC démarré : CONTENEUR ABSENT"
+            fi
+          done
+
+          echo "## Rôles réellement connectés à Postgres (session en lecture seule)"
+          docker compose exec -T -e PGOPTIONS=-cdefault_transaction_read_only=on postgres \
+            psql -U axion -d axion_crm -X -A -t -P pager=off -v ON_ERROR_STOP=1 \
+            -c "SELECT usename, count(*) FROM pg_stat_activity WHERE datname = current_database() GROUP BY 1 ORDER BY 1;" < /dev/null
+
+          echo "FIN DU DIAGNOSTIC — aucune écriture, aucun redémarrage."
+          exit 0
+          REMOTE

@@ -150,7 +150,11 @@ class EnvoiCampagnesMaterialiser extends Command
             ->orderBy('c.id')->pluck('c.id')->all())));
     }
 
-    /** @param  Closure(): DateTimeImmutable  $horloge */
+    /**
+     * @phpstan-impure
+     *
+     * @param  Closure(): DateTimeImmutable  $horloge
+     */
     private static function enRetard(Closure $horloge, int $debut): bool
     {
         return $horloge()->getTimestamp() - $debut >= self::BORNE_SECONDES;

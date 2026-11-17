@@ -31,3 +31,6 @@ Horodatages `2026_12_07_000120`, `000130`, `000140` : libres sur `main` et sur l
 ## Preuves
 - Avant correctif : « toute migration NOUVELLE… » rouge (2BP01). Après : Nr17, `MigrationsFiniTest`, `EtancheiteParTableTest` verts (26 tests).
 - Témoin : `DROP TABLE … CASCADE` à la place de la ligne ajoutée dans 000040 ⇒ le témoin rougit ; annulé.
+
+## Filet modifié : pourquoi (4e décision, liste figée)
+Nouveau fragment `backend/tests/Feature/NonRegression/LISTE.d/2026-11-fini-m0b.json` (ajout seul, `LISTE.json` et les autres fragments intacts) : le test témoin `NR-17 témoin : un retour réel reste bloqué par une clé étrangère OUBLIÉE` y est listé, car `ListeFigeeTest` exige que tout test d'un fichier de la garde soit listé. C'est un ajout de garde, pas un affaiblissement. Décision de pilotage sur #680 (4e ESCALADE).

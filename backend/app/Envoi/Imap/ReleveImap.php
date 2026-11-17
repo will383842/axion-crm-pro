@@ -6,6 +6,7 @@ use App\Envoi\Reponses\StockerReponse;
 use App\Socle\Alertes\Alerte;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
+use Closure;
 use DateTimeImmutable;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,12 @@ final class ReleveImap
 
     public const LIMITE_LOT = 200;
 
+    /** Un message reçu depuis moins que cela n'est pas encore relevé : le registre des envoyés peut ne pas être écrit (temps C). */
+    public const DELAI_GRACE_SECONDES = 180;
+
+    /** Une date de réception plus lointaine dans le futur (horloge IMAP déréglée) n'est PAS « récente » : pas de blocage sans fin. */
+    private const FUTUR_TOLERE_SECONDES = 86400;
+
     /** Échecs propres à un même message avant sa mise à l'écart (revue humaine). */
     public const MAX_TENTATIVES = 3;
 
@@ -74,7 +81,7 @@ final class ReleveImap
     /** Relève courante : uniquement ce qui suit le curseur. */
     public function relever(string $workspaceId, string $boite): BilanReleve
     {
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boite): BilanReleve {
+        return WorkspaceContext::run($workspaceId, fn (): BilanReleve => $this->sousVerrou($workspaceId, $boite, function () use ($workspaceId, $boite): BilanReleve {
             $this->domainesEnCache = []; // un seul SELECT par relève et par espace
             $lecteur = $this->lecteurs->fabrique($boite); // un lecteur PAR boîte
             $validite = $lecteur->uidValidity($boite);
@@ -89,15 +96,58 @@ final class ReleveImap
 
             $lot = $lecteur->lire($boite, $uidApres, null, self::LIMITE_LOT);
             $bilan->lotPlein = $lot->suite;
-            $premierEchec = $this->traiter($workspaceId, $boite, $validite, $lot->messages, $bilan, false);
+            // Délai de grâce : les messages trop récents (et ceux qui les suivent) sont relus au passage suivant.
+            $messages = $lot->messages;
+            $curseurCible = $lot->dernierUid;
+            foreach ($messages as $i => $m) {
+                if (self::tropRecent($m->recuLe)) {
+                    $messages = array_slice($messages, 0, $i);
+                    $curseurCible = max($uidApres, $m->uid - 1);
+                    break;
+                }
+            }
+            $premierEchec = $this->traiter($workspaceId, $boite, $validite, $messages, $bilan, false);
             // Le curseur ne dépasse jamais le premier message en échec : il sera relu.
-            $this->poserCurseur($workspaceId, $boite, $validite, $premierEchec !== null ? max($uidApres, $premierEchec - 1) : $lot->dernierUid);
+            $this->poserCurseur($workspaceId, $boite, $validite, $premierEchec !== null ? max($uidApres, $premierEchec - 1) : $curseurCible);
             if ($premierEchec !== null) {
                 throw new ReleveIncomplete($bilan);
             }
 
             return $bilan;
-        });
+        }));
+    }
+
+    /** Reçu depuis moins de DELAI_GRACE_SECONDES (ou dans un futur proche) : à relire plus tard. */
+    private static function tropRecent(DateTimeImmutable $recuLe): bool
+    {
+        $t = $recuLe->getTimestamp();
+        $maintenant = now()->getTimestamp();
+
+        return $t > $maintenant - self::DELAI_GRACE_SECONDES && $t <= $maintenant + self::FUTUR_TOLERE_SECONDES;
+    }
+
+    /**
+     * Verrou de SESSION par boîte (une relève courante et un rattrapage manuel ne tournent jamais ensemble sur la même
+     * boîte). Hors transaction englobante : jamais `pg_advisory_xact_lock`. Libéré dans un `finally`.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $f
+     * @return T
+     *
+     * @throws BoiteOccupee
+     */
+    private function sousVerrou(string $workspaceId, string $boite, Closure $f): mixed
+    {
+        $cle = 'envoi:releve:' . $workspaceId . ':' . $boite;
+        if (! (bool) DB::selectOne('SELECT pg_try_advisory_lock(hashtextextended(?, 0)) AS ok', [$cle])->ok) {
+            throw new BoiteOccupee;
+        }
+        try {
+            return $f();
+        } finally {
+            DB::select('SELECT pg_advisory_unlock(hashtextextended(?, 0))', [$cle]);
+        }
     }
 
     /**
@@ -111,7 +161,7 @@ final class ReleveImap
      */
     public function rattraper(string $workspaceId, string $boite, DateTimeImmutable $sauvegardeLe): BilanReleve
     {
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $boite, $sauvegardeLe): BilanReleve {
+        return WorkspaceContext::run($workspaceId, fn (): BilanReleve => $this->sousVerrou($workspaceId, $boite, function () use ($workspaceId, $boite, $sauvegardeLe): BilanReleve {
             $lecteur = $this->lecteurs->fabrique($boite);
             $validite = $lecteur->uidValidity($boite);
             $depuis = $sauvegardeLe->modify('-' . self::FENETRE_RATTRAPAGE_JOURS . ' days');
@@ -130,7 +180,7 @@ final class ReleveImap
             }
 
             return $bilan;
-        });
+        }));
     }
 
     /**

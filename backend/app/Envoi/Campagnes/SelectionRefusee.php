@@ -37,6 +37,16 @@ final class SelectionRefusee extends \RuntimeException
         return new self('lecture_trop_longue', true, 'La lecture a pris trop de temps : réessayez avec un lot plus petit.');
     }
 
+    public static function filtreOrigineInactif(): self
+    {
+        return new self('filtre_origine_inactif', false, 'Le filtre par réseau d\'origine est inactif dans cet espace : rien n\'est sélectionné.');
+    }
+
+    public static function lectureOrigineImpossible(\Throwable $prev): self
+    {
+        return new self('lecture_origine_impossible', true, 'Les origines n\'ont pas pu être lues : aucun destinataire n\'est rendu.', $prev);
+    }
+
     public static function campagneIntrouvable(): self
     {
         return new self('campagne_introuvable', false, 'Campagne introuvable.');

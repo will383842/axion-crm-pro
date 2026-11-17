@@ -8,10 +8,18 @@ use PDO;
 
 final class CommandesTest extends PasserelleTestCase
 {
+    /** Contrat v3 (C3-1) : un retrait porte ses cibles ; sans elles il est refusé (voir RetraitTest). */
+    private function retraitAvecCibles(?string $id = null): \Passerelle\Requete
+    {
+        $corps = json_encode(['commande_id' => $id ?? self::ID_1, 'commande' => 'retrait', 'cibles' => ['aaaaaaaa-0000-4000-8000-000000000001']], JSON_THROW_ON_ERROR);
+
+        return $this->signer('POST', '/v1/commandes/retrait', $corps);
+    }
+
     public function test_noms_k1_et_corps_sans_workspace_id(): void
     {
         foreach (['pause', 'reprise', 'retrait'] as $i => $nom) {
-            $rep = $this->envoyer($this->commande($nom, self::uuid()));
+            $rep = $this->envoyer($nom === 'retrait' ? $this->retraitAvecCibles(self::uuid()) : $this->commande($nom, self::uuid()));
             $this->assertSame(200, $rep->statut, $nom);
             $this->assertSame(self::WS_A, json_decode($rep->corps, true)['workspace_id']);
             $this->assertSame($nom, $this->kumo->appels[$i]['operation']);
@@ -47,7 +55,7 @@ final class CommandesTest extends PasserelleTestCase
     public function test_meme_commande_id_autre_commande_donne_409(): void
     {
         $this->envoyer($this->commande('pause'));
-        $this->assertSame(409, $this->envoyer($this->commande('retrait'))->statut);
+        $this->assertSame(409, $this->envoyer($this->retraitAvecCibles())->statut);
         $this->assertCount(1, $this->kumo->appels);
     }
 
@@ -170,7 +178,7 @@ final class CommandesTest extends PasserelleTestCase
     {
         $this->kumo->echec = true;
         $this->envoyer($this->commande('pause'));
-        $this->assertSame(409, $this->envoyer($this->commande('retrait'))->statut);
+        $this->assertSame(409, $this->envoyer($this->retraitAvecCibles())->statut);
     }
 
     public function test_erreur_inattendue_de_kumo_libere_la_reservation(): void

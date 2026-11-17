@@ -233,6 +233,100 @@ final class RequetesOrigines
         return $sortie;
     }
 
+    /**
+     * Unités rattachées à au moins une personne NON OPPOSÉE venue d'un de ces réseaux (lot L2b-B, LECTURE SEULE),
+     * et contacts rattachés à une personne OPPOSÉE, parmi les contacts demandés ET les contacts des entreprises demandées. Trois requêtes au plus, en bindings ; réutilise `entrees()`.
+     * Une personne opposée ne fait jamais entrer une unité dans le réseau ; un contact signalé opposé n'y entre pas.
+     *
+     * @param  list<int>  $entreprises
+     * @param  list<int>  $contacts
+     * @param  list<string>  $reseaux
+     * @return array{entreprises: array<int, true>, contacts: array<int, true>, contacts_opposes: array<int, true>}
+     */
+    public static function reseauxDesUnites(string $espace, array $entreprises, array $contacts, array $reseaux): array
+    {
+        $vide = ['entreprises' => [], 'contacts' => [], 'contacts_opposes' => []];
+        $entreprises = array_values(array_unique(array_map('intval', $entreprises)));
+        $contacts = array_values(array_unique(array_map('intval', $contacts)));
+        // Un jeton hors forme ne correspond à rien (et ne peut pas casser le littéral de tableau).
+        $reseaux = array_values(array_filter($reseaux, static fn (string $r): bool => preg_match(self::JETON, $r) === 1 && ! str_contains($r, "\n")));
+        if ($reseaux === [] || ($entreprises === [] && $contacts === [])) {
+            return $vide;
+        }
+        $litteral = static fn (array $ids): string => '{' . implode(',', $ids) . '}';
+
+        $personnes = DB::select(
+            'SELECT p.id, p.company_id, p.contact_id, k.company_id AS entreprise_du_contact, (p.opposition_at IS NOT NULL) AS opposee
+               FROM personnes p
+               LEFT JOIN contacts k ON k.id = p.contact_id AND k.workspace_id = p.workspace_id
+              WHERE p.workspace_id = ?::uuid
+                AND (p.company_id = ANY(?::bigint[])
+                     OR p.contact_id = ANY(?::bigint[])
+                     OR p.contact_id IN (SELECT c.id FROM contacts c WHERE c.workspace_id = ?::uuid AND c.company_id = ANY(?::bigint[])))',
+            [$espace, $litteral($entreprises), $litteral($contacts), $espace, $litteral($entreprises)],
+        );
+
+        $opposes = [];
+        $libres = [];
+        foreach ($personnes as $p) {
+            if ($p->opposee) {
+                if ($p->contact_id !== null) {
+                    $opposes[(int) $p->contact_id] = true;
+                }
+            } else {
+                $libres[(int) $p->id] = $p;
+            }
+        }
+
+        $retenues = [];
+        if ($libres !== []) {
+            [$entrees, $be] = self::entrees($espace, array_keys($libres));
+            $rows = DB::select(
+                "WITH x AS ({$entrees}) SELECT DISTINCT x.personne_id FROM x WHERE x.o ->> 'reseau' = ANY(?::text[])",
+                array_merge($be, ['{' . implode(',', $reseaux) . '}']),
+            );
+            foreach ($rows as $r) {
+                $retenues[] = $libres[(int) $r->personne_id];
+            }
+        }
+
+        $demandeesE = array_fill_keys($entreprises, true);
+        $demandeesC = array_fill_keys($contacts, true);
+        $sortie = $vide;
+        $contactsDirects = [];
+        foreach ($retenues as $p) {
+            foreach ([$p->company_id, $p->entreprise_du_contact] as $e) {
+                if ($e !== null && isset($demandeesE[(int) $e])) {
+                    $sortie['entreprises'][(int) $e] = true;
+                }
+            }
+            if ($p->contact_id !== null && isset($demandeesC[(int) $p->contact_id])) {
+                $contactsDirects[(int) $p->contact_id] = true;
+            }
+        }
+
+        // R2 : le contact hérite du réseau de son entreprise (une requête, seulement si utile).
+        $parEntreprise = [];
+        if ($contacts !== [] && $sortie['entreprises'] !== []) {
+            $rows = DB::select(
+                'SELECT id, company_id FROM contacts WHERE workspace_id = ?::uuid AND id = ANY(?::bigint[]) AND company_id = ANY(?::bigint[])',
+                [$espace, $litteral($contacts), $litteral(array_keys($sortie['entreprises']))],
+            );
+            foreach ($rows as $r) {
+                $parEntreprise[(int) $r->id] = true;
+            }
+        }
+        // O2 : TOUS les contacts lus rattachés à une personne opposée (cibles directes OU contacts des entreprises demandées).
+        $sortie['contacts_opposes'] = $opposes;
+        foreach ($contacts as $c) {
+            if (! isset($opposes[$c]) && (isset($contactsDirects[$c]) || isset($parEntreprise[$c]))) {
+                $sortie['contacts'][$c] = true;
+            }
+        }
+
+        return $sortie;
+    }
+
     /** Longueur maximale (octets) d'une date dans un curseur ; le contrôleur borne le curseur en conséquence. */
     public const DATE_MAX = 255;
 

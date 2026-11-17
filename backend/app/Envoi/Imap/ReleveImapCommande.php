@@ -24,6 +24,9 @@ final class ReleveImapCommande extends Command
 
     private const DELAI_RELOG_SECONDES = 3600;
 
+    /** La tâche tourne chaque minute : au-delà, aucune nouvelle boîte n'est commencée (reprise au passage suivant). */
+    public const BORNE_SECONDES = 45;
+
     protected $signature = self::SIGNATURE_PLANIFIEE;
 
     protected $description = 'Envoi : relève IMAP des retours (rebonds, plaintes, réponses) de chaque boîte, même en pause';
@@ -36,13 +39,25 @@ final class ReleveImapCommande extends Command
             return self::SUCCESS;
         }
         $echecs = 0;
+        $occupees = 0;
+        $horsBorne = 0;
+        $limite = now()->addSeconds(self::BORNE_SECONDES);
         foreach (DB::table('workspaces')->whereNull('deleted_at')->pluck('id') as $ws) {
             $boites = WorkspaceContext::run((string) $ws, fn () => DB::table('envoi_boites')
                 ->where('workspace_id', $ws)->orderBy('id')->pluck('id'));
             foreach ($boites as $boite) {
+                if (now()->greaterThanOrEqualTo($limite)) {
+                    $horsBorne++;
+
+                    continue;
+                }
                 try {
                     app(ReleveImap::class)->relever((string) $ws, (string) $boite);
                     $this->journaliserRetablie((string) $boite);
+                } catch (BoiteOccupee) {
+                    // Une relève manuelle en cours n'est pas une panne : comptée, jamais en échec.
+                    $occupees++;
+                    Log::info('[ENVOI] relève IMAP : boîte déjà occupée, passée.', ['boite' => (string) $boite]);
                 } catch (Throwable $e) {
                     $echecs++;
                     $this->journaliserPanne((string) $boite, $e);
@@ -55,6 +70,8 @@ final class ReleveImapCommande extends Command
                 }
             }
         }
+
+        $this->info("Relève terminée : occupee={$occupees} hors_borne={$horsBorne} echecs={$echecs}");
 
         return $echecs > 0 ? self::FAILURE : self::SUCCESS;
     }

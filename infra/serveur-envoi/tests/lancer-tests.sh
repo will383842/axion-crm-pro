@@ -294,13 +294,14 @@ out="$(bash "$GP" "$branche_courante" "$D" 2>&1)"; rc=$?
 if [[ $rc == 0 ]]; then ok "perimetre/ci.yml ($out)"; else bad "perimetre : $out"; fi
 # Test REEL de la garde : depot temporaire (origin/main + branche), 4 cas.
 perim() { # perim <branche> <fichier a modifier> [ligne-a-retirer-de-ci.yml]
-  local r="$tmpd/pr$RANDOM"; mkdir -p "$r"
+  local r; r="$(mktemp -d "$tmpd/pr.XXXXXX")" || return 97
   ( export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.test
     cd "$r" && git init -q --bare origin.git && git clone -q origin.git w 2>/dev/null && cd w \
     && git checkout -q -b main \
     && mkdir -p infra/serveur-envoi .github/workflows && echo a >infra/serveur-envoi/a && printf 'ligne1\nligne2\n' >.github/workflows/ci.yml && echo x >hors.txt \
-    && git add -A && git commit -q -m base && git push -q origin main 2>/dev/null && git checkout -q -b "$1" \
-    && echo b >>"$2" && if [[ -n "${3:-}" ]]; then sed -i "/$3/d" .github/workflows/ci.yml; fi && git add -A && git commit -q -m chg ) >/dev/null 2>&1
+    && git add -A && git commit -q -m base && git push -q origin main 2>/dev/null && { [[ "$1" == main ]] || git checkout -q -b "$1"; } \
+    && echo b >>"$2" && if [[ -n "${3:-}" ]]; then sed -i "/$3/d" .github/workflows/ci.yml; fi && git add -A && git commit -q -m chg ) >/dev/null 2>&1 \
+    || { echo "perim: preparation du depot echouee"; return 98; }
   bash "$GP" "$1" "$r/w" 2>&1; }
 out="$(perim feat/autre-chose hors.txt)"; rc=$?
 [[ $rc == 0 ]] && ok "M-N1 PR etrangere touchant un fichier hors perimetre : garde sautee (vert)" || bad "M-N1 PR etrangere rougit : $out"
@@ -313,6 +314,7 @@ out="$(perim feat/envoi-k3-serveur infra/serveur-envoi/a ligne2)"; rc=$?
 out="$(perim main hors.txt)"; rc=$?
 [[ $rc == 0 ]] && ok "M-N1 main / hors branche K3 : sautee" || bad "M-N1 main rougit : $out"
 nochk "M-N1 lancer-tests.sh n'a plus de garde de perimetre inline" grep -q 'git -C "\$D" diff --name-only' "$T/lancer-tests.sh"
+nochk "M-N1 dossier temporaire unique : plus de pr\$RANDOM (mktemp)" grep -q 'pr[$]RANDOM' "$T/lancer-tests.sh"
 # K5 : DKIM cote serveur (cle generee dans un dossier temporaire).
 chk "K5: tests DKIM serveur" bash "$D/dkim/tests-dkim.sh"
 # K16 : reconstruction du serveur (refus sans marqueurs remplaces, a blanc, idempotence, shellcheck).

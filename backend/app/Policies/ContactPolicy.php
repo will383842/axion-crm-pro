@@ -29,4 +29,10 @@ class ContactPolicy extends BasePolicy
     {
         return $user->hasPermissionTo('companies.create');
     }
+
+    /** Exporter des contacts : `data.export` ET `contacts.view_pii` (comme l'export des origines). */
+    public function exporter(User $user): bool
+    {
+        return $user->hasPermissionTo('data.export') && $user->hasPermissionTo('contacts.view_pii');
+    }
 }

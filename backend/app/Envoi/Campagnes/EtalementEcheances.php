@@ -118,6 +118,11 @@ final class EtalementEcheances
     {
         $secondes = (int) floor(($fenetre->debut * 3600) + ($fenetre->fin - $fenetre->debut) * 3600 * ($k + $u) / $p);
 
+        // Jamais pile sur l'heure ronde (cahier X1-L4-P2 : « jamais à l'ouverture pile », aucune échéance à HH:00:00).
+        if ($secondes % 3600 === 0) {
+            $secondes += 1;
+        }
+
         // Heure locale (jamais d'addition de secondes absolues) : les changements d'heure ont lieu la nuit.
         return $jour->setTime(intdiv($secondes, 3600), intdiv($secondes % 3600, 60), $secondes % 60);
     }

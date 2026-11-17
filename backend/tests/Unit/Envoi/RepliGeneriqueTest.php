@@ -12,7 +12,7 @@ test('R1 : adresses générales admises', function (string $email) {
 })->with([
     'contact@x.example.test', 'info2@x.example.test', 'accueil.paris@x.example.test', 'infos@x.example.test', 'bonjour@x.example.test',
     'hello@x.example.test', 'secretariat@x.example.test', 'office@x.example.test', 'courrier@x.example.test', 'standard@x.example.test',
-    'Contact@X.Example.Test', '  info@x.example.test ', 'contact_paris@x.example.test', 'info-sud@x.example.test', 'contact7@x.example.test',
+    'contact.paris@x.example.test', 'accueil-lyon@x.example.test', 'Contact@X.Example.Test', '  info@x.example.test ', 'contact_paris@x.example.test', 'info-sud@x.example.test', 'contact7@x.example.test',
 ]);
 
 test('R1 : tout autre générique, étiquette +, mot collé ou nominatif est refusé', function (string $email) {
@@ -24,6 +24,9 @@ test('R1 : tout autre générique, étiquette +, mot collé ou nominatif est ref
     'marketing@x.example.test', 'newsletter@x.example.test', 'admin@x.example.test', 'direction@x.example.test',
     'adherent@x.example.test', 'adherents@x.example.test', 'formation@x.example.test', 'noreply@x.example.test', 'postmaster@x.example.test',
     'contact+crm@x.example.test', 'contacts@x.example.test', 'informatique@x.example.test', 'jean.contact@x.example.test',
+    'contact.x+crm@x.example.test', 'contact_1+tri@x.example.test', 'contact.presse@x.example.test', 'info-presse@x.example.test',
+    'accueil.rh@x.example.test', 'contact.support@x.example.test', 'info.juridique@x.example.test', 'hello_sales@x.example.test',
+    'contact2.admin@x.example.test', 'office-direction@x.example.test', 'contact.paris.formation@x.example.test', 'info.adherents@x.example.test',
     'jean.dupont@x.example.test', 'dupont@x.example.test', 'x.example.test', '', '@x.example.test',
 ]);
 

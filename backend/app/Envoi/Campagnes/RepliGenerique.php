@@ -29,6 +29,9 @@ final class RepliGenerique
     /** Liste blanche R1, dans l'ordre de préférence. */
     public const MOTS = ['contact', 'info', 'infos', 'accueil', 'bonjour', 'hello', 'secretariat', 'office', 'courrier', 'standard'];
 
+    /** Termes exclus par R1 : refusés même quand ils suivent un mot de la liste blanche (`contact.presse`, `info-rh`…). */
+    public const EXCLUS = ['presse', 'press', 'media', 'juridique', 'legal', 'rh', 'hr', 'jobs', 'careers', 'compta', 'finance', 'billing', 'support', 'help', 'feedback', 'complaints', 'sales', 'marketing', 'newsletter', 'admin', 'direction', 'adherent', 'adherents', 'formation'];
+
     /** @return array{0: int, 1: string}|null [rang du mot dans MOTS, mot], null si refusée */
     private static function rang(string $email): ?array
     {
@@ -38,8 +41,19 @@ final class RepliGenerique
             return null;
         }
         $local = substr($email, 0, $at);
+        if (str_contains($local, '+')) {
+            return null;
+        }
         foreach (self::MOTS as $rang => $mot) {
-            if ($local === $mot || (str_starts_with($local, $mot) && preg_match('/^[0-9._-]/', substr($local, strlen($mot))) === 1)) {
+            if ($local === $mot) {
+                return [$rang, $mot];
+            }
+            if (str_starts_with($local, $mot) && preg_match('/^[0-9._-]/', substr($local, strlen($mot))) === 1) {
+                $suffixe = preg_split('/[0-9._-]+/', substr($local, strlen($mot)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                if (array_intersect($suffixe, self::EXCLUS) !== []) {
+                    return null;
+                }
+
                 return [$rang, $mot];
             }
         }

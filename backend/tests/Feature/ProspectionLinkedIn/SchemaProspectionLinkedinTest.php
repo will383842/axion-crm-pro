@@ -205,6 +205,7 @@ test('7 plafonds et arrêt : bornes, ajout seul, dernière ligne fait foi', func
             ->and(spliSqlstate(spliCode($mode, $ws, fn () => DB::table('pl_arret')->insert(['motif' => 'écrit à a@example.test ok'] + $arret))))->toBe('23514', "{$mode} motif @")
             ->and(spliSqlstate(spliCode($mode, $ws, fn () => DB::table('pl_arret')->insert(['declencheur' => 'autre'] + $arret))))->toBe('23514', "{$mode} déclencheur");
         DB::table('pl_plafonds')->insert($base);
+        DB::table('pl_arret')->insert($arret);
         expect(spliCode($mode, $ws, fn () => DB::table('pl_plafonds')->where('workspace_id', $ws)->update(['messages_jour' => 1])))->not->toBeNull("{$mode} UPDATE plafonds")
             ->and(spliCode($mode, $ws, fn () => DB::table('pl_arret')->where('workspace_id', $ws)->update(['geste' => 'reprise'])))->not->toBeNull("{$mode} UPDATE arret");
         if ($mode === 'proprio') {

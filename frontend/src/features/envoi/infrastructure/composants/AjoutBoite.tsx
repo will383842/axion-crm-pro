@@ -90,7 +90,7 @@ function Formulaire({ fermer }: { fermer: () => void }) {
   }
 
   return (
-    <form className="space-y-3" onSubmit={etape === 1 ? recevoirCode : creer} autoComplete="off">
+    <form className="space-y-3" onSubmit={(e) => { void (etape === 1 ? recevoirCode(e) : creer(e)); }} autoComplete="off">
       <ChampTexte label="Adresse de la boîte" type="email" value={adresse} onChange={(e) => setAdresse(e.target.value)} disabled={etape === 2} autoComplete="off" />
       <ChampTexte label="Serveur de courrier (hôte)" value={hote} onChange={(e) => setHote(e.target.value)} disabled={etape === 2} autoComplete="off" />
       <div className="grid grid-cols-2 gap-3">

@@ -154,6 +154,10 @@ const ECARTS_CONNUS: string[] = [
   // F-LN — import des listes de refus : appel littéral dans ImportListeRefus.tsx ; la route serveur est la PR #573 (P1-LN-B).
   // Filet modifié : pourquoi — un nouvel appel littéral à une route absente du filet d'origine, servi par le faux serveur de la démo.
   'POST /api/v1/envoi/opposition/import',
+  // F3-B2 — ajout d'une boîte (code puis mot de passe) : appels littéraux dans AjoutBoite.tsx ; routes servies par F3-B1 (#705).
+  // Filet modifié : pourquoi — écart décidé par le pilotage (escalade de #680, tranchée par le fondateur), deux entrées seulement.
+  'POST /api/v1/envoi/boites',
+  'POST /api/v1/envoi/boites/ajout/code',
 ];
 
 function fichiers(dossier: string): string[] {

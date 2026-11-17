@@ -50,7 +50,7 @@ class DepotAttestationServeurReel
     private function derniere(string $ws): ?object
     {
         return WorkspaceContext::run($ws, fn () => DB::selectOne(
-            'SELECT geste FROM envoi_attestations_serveur_reel WHERE workspace_id = ? ORDER BY le DESC, id DESC LIMIT 1',
+            'SELECT geste FROM envoi_attestations_serveur_reel WHERE ?::text IS NOT NULL ORDER BY le DESC, id DESC LIMIT 1',
             [$ws],
         ));
     }
@@ -71,7 +71,7 @@ class DepotAttestationServeurReel
             SELECT p.code FROM (
                 SELECT DISTINCT ON (code) code, fait, cree_le FROM envoi_feu_vert_preuves WHERE workspace_id = ? ORDER BY code, id DESC
             ) p, att
-            WHERE att.geste = 'atteste' AND p.fait AND p.cree_le > att.le
+            WHERE att.geste = 'atteste' AND p.fait
             SQL,
             [$ws, $ws],
         ));

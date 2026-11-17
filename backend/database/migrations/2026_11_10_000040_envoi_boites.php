@@ -80,6 +80,10 @@ return new class extends Migration
             DB::statement('ALTER TABLE envoi_injections_smtp DROP CONSTRAINT IF EXISTS envoi_injections_smtp_boite_workspace_fk');
             DB::statement('ALTER TABLE envoi_injections_smtp DROP CONSTRAINT IF EXISTS envoi_injections_smtp_boite_id_fkey');
         }
+        // Clé de 000130 ; la colonne et les lignes restent.
+        if (DB::selectOne("SELECT to_regclass('public.envoi_inscriptions') AS t")->t !== null) {
+            DB::statement('ALTER TABLE envoi_inscriptions DROP CONSTRAINT IF EXISTS envoi_inscriptions_boite_workspace_fk');
+        }
         DB::statement('DROP TABLE IF EXISTS envoi_boites');
         DB::statement('DROP FUNCTION IF EXISTS envoi_boites_aucun_effacement()');
     }

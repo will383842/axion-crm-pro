@@ -4,6 +4,7 @@ namespace Tests\Feature\Envoi\Routes;
 
 use App\Envoi\Boites\AjoutBoite;
 use App\Envoi\Creation\ErreurCreation;
+use App\Envoi\Smtp\ResolveurHote;
 use App\Http\Middleware\AuditHashChainLogger;
 use App\Socle\Alertes\CourrielTransactionnel;
 use App\Support\WorkspaceContext;
@@ -24,6 +25,14 @@ const BA_CLE = 'cle-de-test-f3-b1-seulement-0123456789abcdef';
 const BA_MDP = 'mdp-fictif-f3b1';
 
 beforeEach(function () {
+    // Aucun DNS réel : l'hôte d'exemple « résout » vers une adresse publique (la garde SSRF refuse les plages privées et documentaires).
+    app()->instance(ResolveurHote::class, new class implements ResolveurHote
+    {
+        public function resoudre(string $hote): array
+        {
+            return ['1.1.1.1'];
+        }
+    });
     config(['envoi.cles_codes_campagne' => ['1' => BA_CLE], 'envoi.cle_codes_campagne_version' => 1]);
 });
 
@@ -38,7 +47,7 @@ afterEach(function () {
 /** @return array<string, mixed> */
 function baCorps(string $domaine, array $plus = []): array
 {
-    return array_merge(['adresse' => "contact@$domaine", 'hote' => '127.0.0.1', 'port' => 587, 'chiffrement' => 'tls', 'utilisateur' => 'contact'], $plus);
+    return array_merge(['adresse' => "contact@$domaine", 'hote' => 'smtp.example.test', 'port' => 587, 'chiffrement' => 'tls', 'utilisateur' => 'contact'], $plus);
 }
 
 function baDomaine($t, string $wsId, string $nom): void

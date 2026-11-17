@@ -182,6 +182,22 @@ test('moins de 50 invitations ⇒ aucun jugement ; seules les 50 dernières comp
     }
 });
 
+test('anciennes invitations toutes acceptées : elles ne masquent pas une mauvaise série récente', function () {
+    foreach (ALE_MODES as $mode) {
+        $ws = aleEspace();
+        $b = aleExpediteur();
+        aleSous($mode, $ws, function () use ($ws, $b) {
+            // 20 anciennes toutes acceptées, puis 50 récentes dont 9 acceptées (18 %) : seules les 50 dernières comptent ⇒ arrêt.
+            aleInvitations($ws, $b, 20, 20, '2026-09-01 09:00:00');
+            aleInvitations($ws, $b, 50, 9, '2026-10-20 09:00:00');
+
+            $r = aleAlertes()->executerEspace($ws, CarbonImmutable::parse('2026-11-19 08:00:00', 'Europe/Paris'));
+
+            expect($r['arrets'])->toBe(1)->and(aleArrets($ws))->toHaveCount(1);
+        });
+    }
+});
+
 test('un arrêt déjà actif n’est pas posé une seconde fois (relance sans effet)', function () {
     foreach (ALE_MODES as $mode) {
         $ws = aleEspace();

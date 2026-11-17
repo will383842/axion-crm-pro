@@ -18,6 +18,7 @@
  * Aucune donnée de personne n’est touchée : base jetable, transaction annulée.
  */
 
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Feature\NonRegression\Instantane;
@@ -51,6 +52,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000170_envoi_reputation_constats.php',
     // Filet modifié : pourquoi — envoi RR-0 : élargit deux listes fermées (canal `releve`, geste `annulation`), contraintes NOT VALID, ajout seul ; down() inerte par conception (un retour arrière reposerait l'ancienne liste et échouerait dès qu'une ligne `releve` ou `annulation` existe).
     '2026_12_11_000100_envoi_retours_reactions.php',
+    // Filet modifié : pourquoi — G3-0 : double authentification par courriel, ajout seul ; down() inerte (un retour arrière désactiverait la double authentification par courriel et effacerait des données de sécurité).
+    '2026_12_08_000200_double_auth_courriel.php',
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
     '2026_11_10_000062_envoi_rattachements.php',
@@ -165,6 +168,16 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_10_000100_envoi_campagnes_filtre_origine.php',
     // Filet modifié : pourquoi — envoi L6-0 : index partiel d'expression d'`envoi_evenements` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_09_000100_envoi_evenements_index_injection.php',
+    // Filet modifié : pourquoi — FINI-M0B : attestations du serveur réel, AJOUT SEUL (table, déclencheur, droits) ; la retirer effacerait les attestations ; down() inerte, up() rejouable.
+    '2026_12_07_000120_envoi_attestations_serveur_reel.php',
+    // Filet modifié : pourquoi — FINI-M0B : boîte figée par inscription (colonne nullable, clé composite), AJOUT SEUL ; la retirer effacerait la boîte posée ; down() inerte, up() rejouable.
+    '2026_12_07_000130_envoi_inscriptions_boite.php',
+    // Filet modifié : pourquoi — FINI-M0B : codes d'ajout de boîte, AJOUT SEUL (table, déclencheur, droits) ; la retirer effacerait les codes ; down() inerte, up() rejouable.
+    '2026_12_07_000140_envoi_boites_codes_ajout.php',
+    // Filet modifié : pourquoi — FINI-M0A : inventaire des IP d'envoi, AJOUT SEUL (table, déclencheurs, droits) ; la retirer effacerait l'inventaire ; down() inerte, up() rejouable.
+    '2026_12_07_000100_envoi_ips.php',
+    // Filet modifié : pourquoi — FINI-M0A : rattachement domaine → IP (colonne nullable, FK NOT VALID, fonction), AJOUT SEUL ; le retirer effacerait les rattachements posés ; down() inerte, up() rejouable.
+    '2026_12_07_000110_envoi_domaines_ip.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */
@@ -271,6 +284,9 @@ test('NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, al
         nr17AllerRetourAller($fichier);
     }
 
+    // La clé de 000130, retirée puis reposée par les retours/allers, doit exister de nouveau.
+    expect(DB::selectOne("select count(*) as n from pg_constraint where conname = 'envoi_inscriptions_boite_workspace_fk'")->n)->toBe(1);
+
     expect(true)->toBeTrue(); // aucune migration nouvelle à ce jour : le test garde l’avenir
 });
 
@@ -287,6 +303,27 @@ test('NR-17 témoin : l’instrument aller-retour-aller joue sur une migration a
     expect(DB::selectOne('select to_regclass(?) as t', [$table])->t)->not->toBeNull();
     nr17AllerRetourAller($fichier);
     expect(DB::selectOne('select to_regclass(?) as t', [$table])->t)->not->toBeNull();
+});
+
+test('NR-17 témoin : un retour réel reste bloqué par une clé étrangère OUBLIÉE', function () {
+    DB::statement('CREATE TABLE nr17_temoin_oubli (workspace_id uuid, boite_id uuid, FOREIGN KEY (workspace_id, boite_id) REFERENCES envoi_boites (workspace_id, id))');
+
+    try {
+        foreach (['2026_11_10_000040_envoi_boites.php', '2026_11_10_000042_envoi_boites_durcissement_ssrf_fk_composite.php'] as $fichier) {
+            $migration = require database_path('migrations/' . $fichier);
+            $sqlstate = null;
+            try {
+                DB::transaction(fn () => $migration->down());
+            } catch (QueryException $e) {
+                $sqlstate = $e->errorInfo[0] ?? null;
+            }
+            expect($sqlstate)->toBe('2BP01');
+            expect(DB::selectOne("select to_regclass('public.envoi_boites') as t")->t)->not->toBeNull();
+            expect((string) file_get_contents(database_path('migrations/' . $fichier)))->not->toContain('CASCADE');
+        }
+    } finally {
+        DB::statement('DROP TABLE IF EXISTS nr17_temoin_oubli');
+    }
 });
 
 test('NR-17 la liste des retours inertes voulus est fermée : fichiers existants, nouveaux, jamais réels', function () {

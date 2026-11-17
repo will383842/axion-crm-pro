@@ -14,6 +14,7 @@ Plan : `docs/envoi/PLAN-FIN-ENVOI.md`, fiche T-CHAUFFE, décision D5. `ENVOI_REE
 - `jours_max` de P8 (palier sans fin) vaut `jours_min`.
 
 - **F07b (lot X6, fait pour les DOMAINES)** : `GardeChauffe::refus()` lit `reculsDe` du domaine d'envoi ; sans recul, comportement strictement inchangé. Avec reculs, le budget du domaine est rejoué sur la table P1-P8 (`plafondDomaineAvecReculs`) : limite du domaine = min(3 x quota de boîte, budget avec reculs), limite de la boîte = min(quota, budget avec reculs) (le recul d'un domaine porte sur toutes ses boîtes). Les deux `min` empêchent toute montée : un recul ne peut qu'abaisser. `DepotChauffe::volumesRessource` est la source unique des volumes (recul, écran, garde). `jourDeChauffe()` et la règle « palier tenu après plainte » ne changent pas.
+- **X11-A (fait)** : la garde lit la MÊME table que l'écran et le budget (`PALIERS_ETENDUS`, avec les reculs du domaine pour le jour de chauffe de la boîte), bornée à `Seuils::PALIER_MAX` (3) : P1 10, P2 18, P3 25 sans fin, donc aucune montée. Passer à 8 = ESCALADE E1 (décision écrite du fondateur). La règle « palier tenu après plainte » s'applique au jour borné. `DOMAINE_FACTEUR` non touché (ESCALADE E2).
 - **Hors lot X6 (ESCALADES, non faites)** :
   - Reculs d'IP : aucun lien message -> IP dans la garde ; il faut que le transport fournisse l'IP d'envoi.
   - Montée P4-P8 : elle ferait MONTER les quotas appliqués ; valeurs « hypothèses à confirmer en banc ».

@@ -519,7 +519,8 @@ export interface components {
             type: components["schemas"]["TypeCible"];
         };
         CibleProposee: {
-            joignables: number;
+            /** @description Nul = non estimé (jamais égal à `total` par défaut) ; l'estimation vraie se lit par la route d'estimation. */
+            joignables: number | null;
             libelle: string;
             reference: string;
             total: number;
@@ -784,6 +785,8 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Présent avec `exclusions_evaluees` vrai. Faux si l'échéance ou le plafond de lots est atteint ; `total` est alors le nombre de membres examinés et `restant` un minimum (« au moins »), jamais extrapolé. */
+                        complet?: boolean;
                         /** @description Toujours vrai, c'est une estimation, pas un compte définitif. */
                         estimation?: boolean;
                         exclus: number;
@@ -1023,6 +1026,8 @@ export interface operations {
     listerCibles: {
         parameters: {
             query?: {
+                /** @description Identifiant d'une audience (chiffres, moins de 18 caractères) ; proposée en tête même hors des 50 premières. Ignorée si elle n'est pas de l'espace, supprimée ou inactive. */
+                audience?: string;
                 /** @description Identifiant d'une entreprise du CRM (ajoute sa cible « carnet »). */
                 entreprise?: string;
                 /** @description Recherche texte (insensible à la casse et aux accents). */
@@ -1063,6 +1068,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
+                        /** @description Ce que l'envoi sait appliquer, lu des refus du serveur (faux = refusé à la préparation). */
+                        capacites: {
+                            /** @description Test A/B de l'objet (objet_b). */
+                            ab: boolean;
+                            /** @description Boîtes d'envoi choisies par campagne. */
+                            boites: boolean;
+                            /** @description Plafond par jour choisi par campagne. */
+                            plafond: boolean;
+                        };
                         /** @example Europe/Paris */
                         fuseau: string;
                         maintenant: components["schemas"]["Horodatage"];

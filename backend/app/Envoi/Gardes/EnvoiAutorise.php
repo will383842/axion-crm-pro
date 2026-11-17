@@ -201,6 +201,20 @@ final class EnvoiAutorise
     }
 
     /**
+     * B3-B : les SEULS contrôles d'opposition (registre manuel R13, puis art. 21 / STOP / liste de refus), dans l'ordre de
+     * `verifier`, sans les autres gardes. Sert au séquenceur à arrêter une personne opposée AVANT de reporter faute de
+     * verdict d'adresse. Fermée en cas d'erreur : aucune exception attrapée.
+     */
+    public static function oppositionSeule(DemandeEnvoi $d): ?string
+    {
+        if (RegistreOppositionManuel::refuse($d->workspaceId, $d->email, $d->siren)) {
+            return self::OPPOSITION_REGISTRE;
+        }
+
+        return self::garderOppositions($d);
+    }
+
+    /**
      * Relit, AU DÉPART, ce que le filtre de création de campagne lit déjà (`StatutOpposition`, lecture seule) : demande
      * d'opposition art. 21 en cours, STOP, liste de refus. Le contexte d'espace est posé ICI : sous le rôle applicatif, la
      * RLS cache `rgpd_requests` et le reste sans lui. Aucune exception attrapée : une erreur de lecture fait échouer

@@ -87,6 +87,9 @@ paths:
                   exclusions_evaluees:
                     type: boolean
                     description: Faux tant que les exclusions ne sont pas évaluées (alors `exclus` vaut 0, par défaut et non par mesure).
+                  complet:
+                    type: boolean
+                    description: Présent avec `exclusions_evaluees` vrai. Faux si l'échéance ou le plafond de lots est atteint ; `total` est alors le nombre de membres examinés et `restant` un minimum (« au moins »), jamais extrapolé.
                   total: { type: integer, minimum: 0 }
                   exclus: { type: integer, minimum: 0 }
                   restant: { type: integer, minimum: 0 }
@@ -308,10 +311,18 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [maintenant, fuseau]
+                required: [maintenant, fuseau, capacites]
                 properties:
                   maintenant: { $ref: './commun.yaml#/components/schemas/Horodatage' }
                   fuseau: { type: string, examples: [Europe/Paris] }
+                  capacites:
+                    type: object
+                    description: Ce que l'envoi sait appliquer, lu des refus du serveur (faux = refusé à la préparation).
+                    required: [ab, boites, plafond]
+                    properties:
+                      ab: { type: boolean, description: "Test A/B de l'objet (objet_b)." }
+                      boites: { type: boolean, description: "Boîtes d'envoi choisies par campagne." }
+                      plafond: { type: boolean, description: 'Plafond par jour choisi par campagne.' }
   /envoi/creation/cibles:
     get:
       operationId: listerCibles
@@ -322,6 +333,11 @@ paths:
           in: query
           required: false
           description: Identifiant d'une entreprise du CRM (ajoute sa cible « carnet »).
+          schema: { type: string }
+        - name: audience
+          in: query
+          required: false
+          description: Identifiant d'une audience (chiffres, moins de 18 caractères) ; proposée en tête même hors des 50 premières. Ignorée si elle n'est pas de l'espace, supprimée ou inactive.
           schema: { type: string }
       responses:
         '200':
@@ -604,7 +620,10 @@ components:
         reference: { type: string }
         libelle: { type: string }
         total: { type: integer, minimum: 0 }
-        joignables: { type: integer, minimum: 0 }
+        joignables:
+          type: [integer, 'null']
+          minimum: 0
+          description: Nul = non estimé (jamais égal à `total` par défaut) ; l'estimation vraie se lit par la route d'estimation.
     BoiteChoix:
       type: object
       required: [id, adresse, statut, quota_jour]

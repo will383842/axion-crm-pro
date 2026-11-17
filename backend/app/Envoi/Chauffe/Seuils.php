@@ -9,6 +9,13 @@ namespace App\Envoi\Chauffe;
  */
 final class Seuils
 {
+    /**
+     * Dernier palier de la table étendue (CourbeChauffe::PALIERS_ETENDUS) que la GARDE laisse atteindre.
+     * 3 = P1 10, P2 18, P3 25 sans fin : aucune montée par rapport à la table vivante.
+     * ESCALADE E1 : passer à 8 = décision écrite du fondateur.
+     */
+    public const PALIER_MAX = 3;
+
     /** Rebonds durs : pause GLOBALE si taux > 2 % sur 7 jours glissants, à partir de 100 envois sur ces 7 jours. */
     public const REBONDS_DURS_TAUX_MAX = 0.02;
 

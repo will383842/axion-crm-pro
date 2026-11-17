@@ -59,7 +59,7 @@ final class CreationController extends Controller
         return $this->garde(function () use ($r, $id, $cible): JsonResponse {
             $this->assistant->lire($this->ws($r), $id);
 
-            return response()->json($this->assistant->estimer($this->ws($r), $cible));
+            return response()->json($this->assistant->estimer($this->ws($r), $cible, $id));
         });
     }
 
@@ -123,7 +123,7 @@ final class CreationController extends Controller
 
     public function cibles(Request $r): JsonResponse
     {
-        return response()->json(['data' => $this->assistant->cibles($this->ws($r), $r->query('q') ? (string) $r->query('q') : null, $r->query('entreprise') ? (string) $r->query('entreprise') : null)]);
+        return response()->json(['data' => $this->assistant->cibles($this->ws($r), $r->query('q') ? (string) $r->query('q') : null, $r->query('entreprise') ? (string) $r->query('entreprise') : null, is_string($r->query('audience')) ? $r->query('audience') : null)]);
     }
 
     public function boites(Request $r): JsonResponse

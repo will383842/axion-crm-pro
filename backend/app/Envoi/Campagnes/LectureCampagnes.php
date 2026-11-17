@@ -37,9 +37,10 @@ final class LectureCampagnes
             $filtre = $statut === null ? $total : $parStatut[$statut];
 
             $compteurs = (new CompteursCampagne)->pourListe($ws, array_values(array_map(static fn (\stdClass $l): string => (string) $l->id, $lignes->all())));
+            $blocages = (new RaisonBlocage)->pour($ws, array_values($lignes->all()));
 
             return [
-                'data' => array_values($lignes->map(fn ($c) => self::exposer($c, $compteurs[$c->id] ?? null))->all()),
+                'data' => array_values($lignes->map(fn ($c) => self::exposer($c, $compteurs[$c->id] ?? null, $blocages[$c->id] ?? null))->all()),
                 'meta' => ['page' => $page, 'par_page' => $parPage, 'total' => $filtre, 'pages' => (int) ceil($filtre / $parPage)],
                 'par_statut' => $parStatut,
             ];
@@ -68,6 +69,7 @@ final class LectureCampagnes
         return WorkspaceContext::run($ws, function () use ($ws, $id): array {
             $c = DB::table('envoi_campagnes')->where('workspace_id', $ws)->where('id', $id)->first() ?? throw CampagneRefusee::introuvable();
             $n = (new CompteursCampagne)->pour($ws, $id);
+            $blocage = (new RaisonBlocage)->pour($ws, [$c])[$c->id] ?? null;
             $ids = self::boites($c->boites);
             $adresses = $ids === [] ? [] : DB::table('envoi_boites')->where('workspace_id', $ws)->whereIn('id', $ids)->pluck('adresse', 'id')->all();
             $parBoite = [];
@@ -79,7 +81,7 @@ final class LectureCampagnes
 
             return [
                 'maintenant' => CarbonImmutable::now()->toIso8601ZuluString(),
-                'campagne' => self::exposer($c, $n),
+                'campagne' => self::exposer($c, $n, $blocage),
                 'sequence' => [],
                 'derniers_evenements' => [],
                 'compteurs' => self::compteurs($n),
@@ -120,9 +122,10 @@ final class LectureCampagnes
 
     /**
      * @param  array<string, mixed>|null  $compteurs  sortie de `CompteursCampagne` ; absente = zéros (les gestes rendent toujours la forme)
+     * @param  array{code: string, message: string}|null  $blocage  sortie de `RaisonBlocage` (B8-A) ; absent = null (les gestes ne le calculent pas)
      * @return array<string, mixed> forme `CampagneSuivi` du contrat
      */
-    public static function exposer(\stdClass $c, ?array $compteurs = null): array
+    public static function exposer(\stdClass $c, ?array $compteurs = null, ?array $blocage = null): array
     {
         $cible = (array) json_decode($c->cible, true);
 
@@ -133,7 +136,7 @@ final class LectureCampagnes
             'prochain_envoi_le' => $c->envoi_prevu_le === null ? null : CarbonImmutable::parse($c->envoi_prevu_le)->utc()->toIso8601ZuluString(),
             'cree_le' => CarbonImmutable::parse($c->cree_le)->utc()->toIso8601ZuluString(),
             'boites' => self::boites($c->boites), 'etapes' => (int) $c->nb_etapes,
-            'envoi_ferme' => ! (bool) config('envoi.reel_actif'), 'version' => (int) $c->version,
+            'envoi_ferme' => ! (bool) config('envoi.reel_actif'), 'version' => (int) $c->version, 'blocage' => $blocage,
         ];
     }
 

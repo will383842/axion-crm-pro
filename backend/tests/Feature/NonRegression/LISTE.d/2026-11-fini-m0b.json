@@ -1,0 +1,12 @@
+{
+  "gardes": [
+    {
+      "id": "NR-17-FINI-M0B",
+      "nouveaux": {
+        "Nr17MigrationsTest.php": [
+          "NR-17 témoin : un retour réel reste bloqué par une clé étrangère OUBLIÉE"
+        ]
+      }
+    }
+  ]
+}

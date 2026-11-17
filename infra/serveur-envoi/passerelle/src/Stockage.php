@@ -16,6 +16,9 @@ final class Stockage
 
     public const RETENTION_NONCES = 600;
 
+    /** Durée pendant laquelle un retrait (C3-1) refuse l'injection de l'identifiant ; la ligne, elle, n'est jamais effacée. */
+    public const RETENTION_RETRAITS = 30 * 86400;
+
     /** Une réservation « en cours » plus vieille que cela est considérée abandonnée (processus disparu). */
     public const DELAI_RESERVATION = 60;
 
@@ -129,6 +132,13 @@ CREATE TABLE IF NOT EXISTS injections (
   PRIMARY KEY (workspace_id, id_injection)) WITHOUT ROWID;
 CREATE TRIGGER IF NOT EXISTS injections_no_delete BEFORE DELETE ON injections
   BEGIN SELECT RAISE(ABORT, 'injections en ajout seul'); END;
+CREATE TABLE IF NOT EXISTS retraits (
+  workspace_id TEXT NOT NULL, id_injection TEXT NOT NULL, retire_le INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, id_injection)) WITHOUT ROWID;
+CREATE TRIGGER IF NOT EXISTS retraits_no_update BEFORE UPDATE ON retraits
+  BEGIN SELECT RAISE(ABORT, 'retraits en ajout seul'); END;
+CREATE TRIGGER IF NOT EXISTS retraits_no_delete BEFORE DELETE ON retraits
+  BEGIN SELECT RAISE(ABORT, 'retraits en ajout seul'); END;
 CREATE TABLE IF NOT EXISTS purge_etat (ouverte INTEGER NOT NULL);
 INSERT INTO purge_etat SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM purge_etat);
 CREATE TRIGGER IF NOT EXISTS evenements_no_update BEFORE UPDATE ON evenements
@@ -297,9 +307,39 @@ SQL);
             ->execute([$ws, $id]);
     }
 
+    /**
+     * Liste de retrait (C3-1) : inscrit les identifiants de CET espace, en ajout seul et en une transaction (tout ou rien).
+     * Un identifiant déjà inscrit garde sa date d'origine. Aucune adresse, aucun message.
+     *
+     * @param list<string> $ids
+     */
+    public function inscrireRetraits(string $ws, array $ids): void
+    {
+        $this->transaction(function () use ($ws, $ids): null {
+            $st = $this->pdo->prepare('INSERT OR IGNORE INTO retraits (workspace_id, id_injection, retire_le) VALUES (?,?,?)');
+            foreach ($ids as $id) {
+                $st->execute([$ws, $id, $this->now()]);
+            }
+
+            return null;
+        });
+    }
+
+    /** Vrai si l'identifiant a été retiré dans cet espace depuis moins de RETENTION_RETRAITS. Jamais lu dans un autre espace. */
+    public function estRetire(string $ws, string $id): bool
+    {
+        $st = $this->pdo->prepare('SELECT 1 FROM retraits WHERE workspace_id=? AND id_injection=? AND retire_le > ?');
+        $st->execute([$ws, $id, $this->now() - self::RETENTION_RETRAITS]);
+
+        return $st->fetchColumn() !== false;
+    }
+
     /** État public d'une injection de CET espace ; ligne absente ou simple réservation : `inconnu` (jamais d'indice sur un autre espace). */
     public function etatInjection(string $ws, string $id): string
     {
+        if ($this->estRetire($ws, $id)) {
+            return 'retire'; // le retrait prime sur tout état gardé : échec fermé
+        }
         $st = $this->pdo->prepare('SELECT etat FROM injections WHERE workspace_id=? AND id_injection=?');
         $st->execute([$ws, $id]);
         $etat = $st->fetchColumn();

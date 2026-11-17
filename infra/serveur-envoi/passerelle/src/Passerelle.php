@@ -18,6 +18,9 @@ final class Passerelle
 
     public const LIMITE_EVENEMENTS = 500;
 
+    /** Cibles d'un retrait (contrat v3) : 1 à CIBLES_MAX identifiants d'injection distincts. */
+    public const CIBLES_MAX = 100;
+
     /** Commandes autorisées : les noms de K1 (ClientServeurEnvoiHmac::COMMANDES_AUTORISEES). Le reste est refusé. */
     private const OPERATIONS = ['pause', 'reprise', 'retrait'];
 
@@ -80,9 +83,20 @@ final class Passerelle
         return $this->stockage ??= ($this->base instanceof \Closure ? ($this->base)() : $this->base);
     }
 
-    public static function empreinte(string $operation, string $commandeId): string
+    /**
+     * Empreinte d'une commande. Pour un retrait (v3), les cibles TRIÉES en font partie : même commande_id avec d'autres
+     * cibles = autre corps (409), mêmes cibles dans un autre ordre = même corps.
+     *
+     * @param list<string> $cibles
+     */
+    public static function empreinte(string $operation, string $commandeId, array $cibles = []): string
     {
-        return hash('sha256', $operation."\n".$commandeId);
+        if ($operation !== 'retrait') {
+            return hash('sha256', $operation."\n".$commandeId);
+        }
+        sort($cibles, SORT_STRING);
+
+        return hash('sha256', $operation."\n".$commandeId."\n".implode(',', $cibles));
     }
 
     public function traiter(Requete $r): Reponse
@@ -231,15 +245,35 @@ final class Passerelle
         if (strlen($corps) > self::TAILLE_MAX_CORPS) {
             return Reponse::erreur(413, 'trop_gros');
         }
-        // Corps K1 : exactement {commande_id, commande}. L'espace vient de la signature, jamais du corps.
+        // Corps K1 : exactement {commande_id, commande} ; un retrait (v3) y ajoute `cibles`. L'espace vient de la signature.
         $d = json_decode($corps, true, 4);
-        if (! is_array($d) || array_keys($d) === [] || array_diff(array_keys($d), ['commande_id', 'commande']) !== []
+        $cles = $operation === 'retrait' ? ['commande_id', 'commande', 'cibles'] : ['commande_id', 'commande'];
+        if (! is_array($d) || array_keys($d) === [] || array_diff(array_keys($d), $cles) !== []
             || ! isset($d['commande_id'], $d['commande']) || ! is_string($d['commande_id']) || ! is_string($d['commande'])
             || ! Signature::estUuid($d['commande_id']) || $d['commande'] !== $operation) {
             return Reponse::erreur(400, 'corps');
         }
         $id = $d['commande_id'];
-        $empreinte = self::empreinte($operation, $id);
+        $cibles = [];
+        if ($operation === 'retrait') {
+            if (! array_key_exists('cibles', $d)) {
+                return Reponse::erreur(400, 'cibles_exigees'); // un retrait sans cible n'a aucun sens sûr
+            }
+            $cibles = $d['cibles'];
+            if (! is_array($cibles) || ! array_is_list($cibles) || $cibles === [] || count($cibles) > self::CIBLES_MAX) {
+                return Reponse::erreur(400, 'cibles');
+            }
+            foreach ($cibles as $c) {
+                if (! is_string($c) || ! Signature::estUuid($c)) {
+                    return Reponse::erreur(400, 'cibles');
+                }
+            }
+            if (count(array_unique($cibles)) !== count($cibles)) {
+                return Reponse::erreur(400, 'cibles');
+            }
+            sort($cibles, SORT_STRING);
+        }
+        $empreinte = self::empreinte($operation, $id, $cibles);
 
         // Réservation AVANT l'appel Kumo : une seule requête exécute ; les concurrentes attendent puis rejouent la réponse.
         for ($essai = 0; ; $essai++) {
@@ -259,15 +293,27 @@ final class Passerelle
             ($this->dormir)(self::PAUSE_MS);
         }
 
+        // Retrait : la liste est inscrite AVANT l'appel du moteur. Un moteur en panne n'empêche pas de refuser les injections à venir.
+        if ($operation === 'retrait') {
+            try {
+                $this->stockage()->inscrireRetraits($ws, $cibles);
+            } catch (\Throwable $e) {
+                $this->stockage()->echouerCommande($ws, $id);
+                throw $e;
+            }
+        }
         // Les opérations sont idempotentes côté KumoMTA : une réservation abandonnée se refait sans effet nouveau.
         try {
-            $resultat = $this->kumo->executer($ws, $operation, []);
+            $resultat = $this->kumo->executer($ws, $operation, $operation === 'retrait' ? ['cibles' => $cibles] : []);
         } catch (\RuntimeException) {
             $this->stockage()->echouerCommande($ws, $id); // le commande_id reste utilisable : K1 rejoue
             return Reponse::json(502, ['commande_id' => $id, 'statut' => 'echec']);
         } catch (\Throwable $e) {
             $this->stockage()->echouerCommande($ws, $id);
             throw $e;
+        }
+        if ($operation === 'retrait') {
+            $resultat = ['retirees' => count($cibles)] + $resultat;
         }
         $rep = Reponse::json(200, ['workspace_id' => $ws, 'commande_id' => $id, 'statut' => 'ok', 'resultat' => $resultat]);
         $this->stockage()->terminerCommande($ws, $id, $operation, $rep->statut, $rep->corps);
@@ -287,6 +333,10 @@ final class Passerelle
             return Reponse::erreur($e->getCode(), $e->getMessage());
         }
         $id = $d['id_injection'];
+        if ($this->stockage()->estRetire($ws, $id)) {
+            // Liste de retrait (C3-1) : refus AVANT toute réservation et tout appel du moteur, même pour un rejeu.
+            return Reponse::erreur(409, 'retire');
+        }
         $empreinte = hash('sha256', $corps);
 
         for ($essai = 0; ; $essai++) {

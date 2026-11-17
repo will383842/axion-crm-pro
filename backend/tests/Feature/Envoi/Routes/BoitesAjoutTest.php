@@ -21,7 +21,7 @@ use Tests\Support\ContratOpenApiEnvoi;
 uses(BaseRoutesEnvoi::class)->group('envoi');
 
 const BA_CLE = 'cle-de-test-f3-b1-seulement-0123456789abcdef';
-const BA_SECRET = 'MOT-DE-PASSE-SECRET-F3B1';
+const BA_MDP = 'mdp-fictif-f3b1';
 
 beforeEach(function () {
     config(['envoi.cles_codes_campagne' => ['1' => BA_CLE], 'envoi.cle_codes_campagne_version' => 1]);
@@ -67,7 +67,7 @@ test('administrateur ⇒ 403 sur les deux routes ; viewer aussi ; rien n\'est é
     foreach (['admin', 'viewer'] as $role) {
         $this->actingAs($this->compte($ws, $role), 'sanctum');
         $this->postJson('/api/v1/envoi/boites/ajout/code', baCorps('a.example.test'))->assertForbidden();
-        $this->postJson('/api/v1/envoi/boites', baCorps('a.example.test', ['secret' => BA_SECRET, 'code' => '123456']))->assertForbidden();
+        $this->postJson('/api/v1/envoi/boites', baCorps('a.example.test', ['secret' => BA_MDP, 'code' => '123456']))->assertForbidden();
     }
     expect(baNbBoites($ws->id))->toBe(0)->and(DB::table('envoi_boites_codes_ajout')->count())->toBe(0);
 });
@@ -76,9 +76,9 @@ test('propriétaire sans code ⇒ 409 code_invalide ; forme fausse ⇒ 422 ; tra
     $ws = $this->espace(true);
     baDomaine($this, $ws->id, 'a.example.test');
     $this->actingAs($this->compte($ws, 'owner'), 'sanctum');
-    $r = $this->postJson('/api/v1/envoi/boites', baCorps('a.example.test', ['secret' => BA_SECRET, 'code' => '123456']))->assertStatus(409);
+    $r = $this->postJson('/api/v1/envoi/boites', baCorps('a.example.test', ['secret' => BA_MDP, 'code' => '123456']))->assertStatus(409);
     expect($r->json('error'))->toBe('code_invalide');
-    $this->postJson('/api/v1/envoi/boites', baCorps('a.example.test', ['secret' => BA_SECRET, 'code' => 'abc']))->assertStatus(422);
+    $this->postJson('/api/v1/envoi/boites', baCorps('a.example.test', ['secret' => BA_MDP, 'code' => 'abc']))->assertStatus(422);
     $this->postJson('/api/v1/envoi/boites/ajout/code', ['adresse' => 'pas-une-adresse'])->assertStatus(422);
     $this->postJson('/api/v1/envoi/boites/ajout/code', baCorps('a.example.test', ['chiffrement' => 'aucun']))->assertStatus(422);
     config(['mail.mailers.journal-test' => ['transport' => 'log'], 'mail.auth_mailer' => 'journal-test']);
@@ -96,21 +96,21 @@ test('parcours complet : 202 puis 201, boîte en pause, réponse au contrat sans
     $r = $this->postJson('/api/v1/envoi/boites/ajout/code', $corps)->assertStatus(202);
     expect(ContratOpenApiEnvoi::ecartsReponse('infrastructure.yaml', '/envoi/boites/ajout/code', 'post', 202, $r->json()))->toBe([]);
     $code = baCodeEnvoye();
-    $complet = $corps + ['secret' => BA_SECRET, 'code' => $code];
+    $complet = $corps + ['secret' => BA_MDP, 'code' => $code];
     $r = $this->postJson('/api/v1/envoi/boites', $complet)->assertStatus(201);
     expect(ContratOpenApiEnvoi::ecartsReponse('infrastructure.yaml', '/envoi/boites', 'post', 201, $r->json()))->toBe([])
         ->and(array_keys($r->json()))->toEqualCanonicalizing(['id', 'etat', 'pause_motif'])
-        ->and($r->getContent())->not->toContain(BA_SECRET)->not->toMatch('/secret|identifiants/i');
+        ->and($r->getContent())->not->toContain(BA_MDP)->not->toMatch('/secret|identifiants/i');
     $l = WorkspaceContext::run($ws->id, fn () => DB::table('envoi_boites')->where('id', $r->json('id'))->first());
-    expect($l->etat)->toBe('en_pause')->and($l->pause_motif)->toBe('suspension_manuelle')->and($l->identifiants_chiffres)->not->toContain(BA_SECRET);
+    expect($l->etat)->toBe('en_pause')->and($l->pause_motif)->toBe('suspension_manuelle')->and($l->identifiants_chiffres)->not->toContain(BA_MDP);
     // Aucune ligne d'audit ne porte le secret, le code, ni l'empreinte du corps ; une ligne propre par appel, sans corps.
     $audit = DB::table('audit_logs')->get()->map(fn ($x) => json_encode($x))->implode("\n");
-    expect($audit)->not->toContain(BA_SECRET)->not->toContain($code)
+    expect($audit)->not->toContain(BA_MDP)->not->toContain($code)
         ->not->toContain(AuditHashChainLogger::empreinteDuCorps($complet))->not->toContain(AuditHashChainLogger::empreinteDuCorps($corps))
         ->toContain('api/v1/envoi/boites/ajout/code')->toContain('api/v1/envoi/boites');
     // Le secret n'est dans aucun journal applicatif.
-    Log::shouldNotHaveReceived('error', fn ($m, $c = []) => str_contains($m . json_encode($c), BA_SECRET));
-    Log::shouldNotHaveReceived('warning', fn ($m, $c = []) => str_contains($m . json_encode($c), BA_SECRET));
+    Log::shouldNotHaveReceived('error', fn ($m, $c = []) => str_contains($m . json_encode($c), BA_MDP));
+    Log::shouldNotHaveReceived('warning', fn ($m, $c = []) => str_contains($m . json_encode($c), BA_MDP));
     expect($this->resolutions)->toBe(0);   // aucune connexion SMTP : ServeurEnvoi jamais résolu, ENVOI_REEL_ACTIF intact
 });
 
@@ -183,10 +183,10 @@ test('code juste ⇒ boîte en pause ; le même code une seconde fois ⇒ 409', 
         $corps = baCorps('ba-a.example.test');
         baDemander($wsA, $uA, $corps);
         $code = baCodeEnvoye();
-        $r = app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_SECRET, $code);
+        $r = app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_MDP, $code);
         $l = WorkspaceContext::run($wsA, fn () => DB::table('envoi_boites')->where('workspace_id', $wsA)->where('id', $r['id'])->first());
         expect($r['etat'])->toBe('en_pause')->and($l->etat)->toBe('en_pause')->and($l->pause_motif)->toBe('suspension_manuelle');
-        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, baCorps('ba-a.example.test', ['adresse' => 'autre@ba-a.example.test']), BA_SECRET, $code)))->toBe('code_invalide:409');
+        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, baCorps('ba-a.example.test', ['adresse' => 'autre@ba-a.example.test']), BA_MDP, $code)))->toBe('code_invalide:409');
         expect(baNbBoites($wsA))->toBe(1);
     });
 })->with('connexions');
@@ -198,9 +198,9 @@ test('6e essai ⇒ 409 même avec le bon code (5 essais faux consomment le plafo
         $code = baCodeEnvoye();
         $faux = $code === '000000' ? '000001' : '000000';
         for ($i = 0; $i < 5; $i++) {
-            expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_SECRET, $faux)))->toBe('code_invalide:409');
+            expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_MDP, $faux)))->toBe('code_invalide:409');
         }
-        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_SECRET, $code)))->toBe('code_invalide:409')
+        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_MDP, $code)))->toBe('code_invalide:409')
             ->and(baNbBoites($wsA))->toBe(0);
     });
 })->with('connexions');
@@ -211,11 +211,11 @@ test('code demandé pour l\'adresse A, création de l\'adresse B ⇒ 409 ; la de
         baDemander($wsA, $uA, $a);
         $code = baCodeEnvoye();
         $b = baCorps('ba-a.example.test', ['adresse' => 'autre@ba-a.example.test']);
-        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $b, BA_SECRET, $code)))->toBe('code_invalide:409')
+        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $b, BA_MDP, $code)))->toBe('code_invalide:409')
             ->and(baNbBoites($wsA))->toBe(0);
         // même adresse, autre hôte : autre demande, refusée aussi
-        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, baCorps('ba-a.example.test', ['port' => 465]), BA_SECRET, $code)))->toBe('code_invalide:409');
-        app(AjoutBoite::class)->creer($wsA, $uA, $a, BA_SECRET, $code);
+        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, baCorps('ba-a.example.test', ['port' => 465]), BA_MDP, $code)))->toBe('code_invalide:409');
+        app(AjoutBoite::class)->creer($wsA, $uA, $a, BA_MDP, $code);
         expect(baNbBoites($wsA))->toBe(1);
     });
 })->with('connexions');
@@ -237,9 +237,9 @@ test('domaine d\'un autre espace ⇒ 409 ; un code de B ne crée rien dans A ; A
         baDemander($wsB, $uB, $corpsB);
         $codeB = baCodeEnvoye();
         // Même corps, mais le domaine est inconnu de A, et le code appartient à B : refus, rien créé.
-        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corpsB, BA_SECRET, $codeB)))->toBe('code_invalide:409')
+        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corpsB, BA_MDP, $codeB)))->toBe('code_invalide:409')
             ->and(baNbBoites($wsA))->toBe(0)->and(baNbBoites($wsB))->toBe(0);
-        app(AjoutBoite::class)->creer($wsB, $uB, $corpsB, BA_SECRET, $codeB);
+        app(AjoutBoite::class)->creer($wsB, $uB, $corpsB, BA_MDP, $codeB);
         expect(baNbBoites($wsB))->toBe(1)->and(baNbBoites($wsA))->toBe(0);
     });
 })->with('connexions');
@@ -249,9 +249,9 @@ test('adresse déjà présente ⇒ 409 boite_existante et le code n\'est pas con
         $corps = baCorps('ba-a.example.test');
         baDemander($wsA, $uA, $corps);
         $code = baCodeEnvoye();
-        app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_SECRET, $code);
+        app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_MDP, $code);
         baDemander($wsA, $uA, $corps);
-        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_SECRET, baCodeEnvoye())))->toBe('boite_existante:409')
+        expect(baRefus(fn () => app(AjoutBoite::class)->creer($wsA, $uA, $corps, BA_MDP, baCodeEnvoye())))->toBe('boite_existante:409')
             ->and(baNbBoites($wsA))->toBe(1);
     });
 })->with('connexions');

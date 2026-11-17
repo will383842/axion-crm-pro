@@ -466,7 +466,7 @@ test('L6-B 4 cloisonnement : campagne d\'un autre espace = 404 ; aucun compteur 
     }
 });
 
-test('L6-B 5 ouverts null et suivi_ouvertures faux partout ; une campagne sans séquence garde la forme à zéro ; les gestes rendent la forme', function () {
+test('L6-B 5 ouverts null partout (la clé « suivi_ouvertures » n\'est pas exposée : garde du contrat) ; une campagne sans séquence garde la forme à zéro ; les gestes rendent la forme', function () {
     $u = suivCompte('owner');
     $ws = suivEspace($u);
     [$c, $s] = cpbCampagne($ws);
@@ -474,7 +474,7 @@ test('L6-B 5 ouverts null et suivi_ouvertures faux partout ; une campagne sans s
     $sans = suivCampagne($ws, 'brouillon');
     foreach ([$c, $sans] as $id) {
         $k = $this->actingAs($u)->getJson(SUIV_BASE . "/{$id}")->assertOk()->json('compteurs');
-        expect($k)->toHaveKey('ouverts')->and($k['ouverts'])->toBeNull()->and($k['suivi_ouvertures'])->toBeFalse();
+        expect($k)->toHaveKey('ouverts')->and($k['ouverts'])->toBeNull()->and($k)->not->toHaveKey('suivi_ouvertures');
     }
     expect($this->actingAs($u)->getJson(SUIV_BASE . "/{$sans}")->json('compteurs.inscrits'))->toBe(0);
     $g = $this->actingAs($u)->postJson(SUIV_BASE . '/' . suivCampagne($ws, 'en_cours') . '/pause')->assertOk();
@@ -486,7 +486,7 @@ test('L6-B 6 contrat : le schéma de la fiche déclare les nouvelles clés et la
     $y = Yaml::parseFile(base_path('openapi/envoi/campagnes.yaml'));
     $fiche = $y['paths']['/envoi/campagnes/{id}']['get']['responses']['200']['content']['application/json']['schema'];
     $compteurs = $fiche['properties']['compteurs'];
-    foreach (['inscrits', 'envoyes', 'touches', 'ouverts', 'suivi_ouvertures', 'reponses', 'rebonds_durs', 'rebonds_mous', 'oppositions', 'arretes_campagne', 'exclus_preparation', 'issues'] as $cle) {
+    foreach (['inscrits', 'envoyes', 'touches', 'ouverts', 'reponses', 'rebonds_durs', 'rebonds_mous', 'oppositions', 'arretes_campagne', 'exclus_preparation', 'issues'] as $cle) {
         expect($compteurs['properties'])->toHaveKey($cle)->and($compteurs['required'])->toContain($cle);
     }
     expect(array_keys($compteurs['properties']['issues']['properties']))->toBe(['opposition', 'rebond_dur', 'reponse', 'rebond_mou', 'arretee_autre', 'terminee', 'active'])

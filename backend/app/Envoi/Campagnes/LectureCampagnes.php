@@ -95,7 +95,7 @@ final class LectureCampagnes
     /**
      * Forme `compteurs` du contrat : les clés historiques sont reliées aux définitions de L6-A (`partis` = touches, `ont_repondu` = reponses,
      * `desinscrits` = oppositions, `exclus` = exclus_preparation, `en_file` = actives) ; `en_pause_absence` reste 0 (l'état n'existe pas) ;
-     * `limite_refus` reste 0 (hors périmètre).
+     * `limite_refus` reste 0 (hors périmètre). `suivi_ouvertures` n'est PAS exposé : la garde `aucune-ouverture-envoi` interdit ce mot dans les contrats (ESCALADE, voir L6-B.md) ; `ouverts` nul suffit à dire « non suivi ».
      *
      * @param  array<string, mixed>  $n  sortie de `CompteursCampagne`
      * @return array<string, mixed>
@@ -106,7 +106,7 @@ final class LectureCampagnes
             'en_file' => $n['actives'], 'partis' => $n['touches'], 'refuses' => $n['refuses'], 'ont_repondu' => $n['reponses'], 'exclus' => $n['exclus_preparation'],
             'desinscrits' => $n['oppositions'], 'arretes_entreprise' => $n['arretes_entreprise'], 'en_pause_absence' => 0,
             'taux_refus' => $n['taux_refus'], 'limite_refus' => 0, 'taux_desinscription' => $n['taux_desinscription'],
-            'inscrits' => $n['inscrits'], 'envoyes' => $n['envoyes'], 'touches' => $n['touches'], 'ouverts' => $n['ouverts'], 'suivi_ouvertures' => $n['suivi_ouvertures'],
+            'inscrits' => $n['inscrits'], 'envoyes' => $n['envoyes'], 'touches' => $n['touches'], 'ouverts' => $n['ouverts'],
             'reponses' => $n['reponses'], 'rebonds_durs' => $n['rebonds_durs'], 'rebonds_mous' => $n['rebonds_mous'], 'oppositions' => $n['oppositions'],
             'arretes_campagne' => $n['arretes_campagne'], 'exclus_preparation' => $n['exclus_preparation'], 'issues' => $n['issues'],
         ];

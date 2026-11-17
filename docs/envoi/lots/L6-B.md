@@ -7,8 +7,15 @@ Cahier : `docs/envoi/lots/L5-L6-cahier.md` § 7 (PR #649). Préalables fusionné
 - `LectureCampagnes::fiche` : `compteurs` réels (une requête `pour`) et nouvelle clé `preparation` (`{etat, motif, inscrits, membres}` ou `null`).
 - `LectureCampagnes::exposer` reçoit les compteurs en paramètre optionnel : sans eux, zéros (les gestes rendent toujours la forme `CampagneSuivi`).
 - Clés historiques reliées : `partis` = `touches`, `ont_repondu` = `reponses`, `desinscrits` = `oppositions`, `exclus` = `exclus_preparation`, `en_file` = `actives` ; `en_pause_absence` = 0 (l'état n'existe pas) ; `limite_refus` = 0 (hors périmètre).
-- Nouvelles clés (contrat `campagnes.yaml` + `campagnes.d.ts` régénéré) : `inscrits`, `envoyes`, `touches`, `ouverts` (toujours `null`), `suivi_ouvertures` (toujours `false`), `reponses`, `rebonds_durs`, `rebonds_mous`, `oppositions`, `arretes_campagne`, `exclus_preparation`, `issues` (7 cases, somme = `inscrits`).
+- Nouvelles clés (contrat `campagnes.yaml` + `campagnes.d.ts` régénéré) : `inscrits`, `envoyes`, `touches`, `ouverts` (toujours `null`), `reponses`, `rebonds_durs`, `rebonds_mous`, `oppositions`, `arretes_campagne`, `exclus_preparation`, `issues` (7 cases, somme = `inscrits`).
 - Lecture seule, aucune migration, aucun drapeau lu ni écrit. Aucun nom ni adresse de personne : seulement des comptes.
+
+## ÉCART AU CAHIER — ESCALADE (décision du fondateur)
+Le cahier § 7.1 demande la clé `suivi_ouvertures` (booléen). La garde `frontend/tests/lib/aucune-ouverture-envoi.test.ts` interdit le mot « ouverture(s) » dans tout `backend/openapi/envoi/*.yaml`
+(sauf « suivi d'ouverture » et « ni d'ouverture » en description) : la CI frontend est rouge avec cette clé. Je n'affaiblis pas la garde (hors fichiers du lot, et règle du dépôt).
+Choix retenu pour rester vert : `suivi_ouvertures` n'est ni dans le contrat ni dans la réponse ; `ouverts: null` dit déjà « non suivi » (L6-C affichera « non suivi » sur `ouverts: null`).
+`CompteursCampagne` (L6-A) continue de produire `suivi_ouvertures` en interne ; non exposé ici.
+Décision demandée : (a) garder ainsi et corriger le cahier § 7.1 / § 9.2, ou (b) autoriser la clé par une exception écrite dans la garde, dans un lot qui peut toucher ce fichier de test. Rien d'autre n'est bloqué.
 
 ## Hors périmètre (inchangé)
 `EnvoiCampagnesController.php`, route `destinataires` (toujours vide), `calendrier.prevus` (0), `par_boite`, `par_jour`, `ab`, `fin_prevue_le`, `cible.total`, `reponses_interessees` (0), `DepotResultats.php`.
@@ -18,7 +25,7 @@ Cahier : `docs/envoi/lots/L5-L6-cahier.md` § 7 (PR #649). Préalables fusionné
 2. Liste de 25 campagnes : valeurs exactes ; nombre de requêtes identique pour 3 et 25 lignes, ≤ 4 (observé : 3).
 3. Préparation : `en_cours` (20 sur 30), `bloquee` avec motif, `terminee`, `null` sans matérialisation.
 4. Cloisonnement : campagne d'un autre espace = 404, aucun compteur de l'autre espace dans la liste ni la fiche (et l'autre espace voit bien les siens).
-5. `ouverts: null` et `suivi_ouvertures: false` ; campagne sans séquence = zéros ; les gestes rendent la forme.
+5. `ouverts: null` ; campagne sans séquence = zéros ; les gestes rendent la forme.
 6. Contrat : nouvelles clés déclarées et requises ; `LectureCampagnes.php` sans `->insert(`, `->update(`, `->delete(`.
 Le test « compteurs à 0 tant que `sequence_id` est nul » (fiche, brouillon) est inchangé et reste vrai.
 Mutations jouées (chacune rouge) : liste sans compteurs ⇒ 2, 4 ; une requête par ligne ⇒ 2 ; `total` = envoyés ⇒ 1, 2 ; `preparation` toujours nulle ⇒ 3 ; `ouverts` = 0 ⇒ 5 ; `partis` = envoyés ⇒ 1.

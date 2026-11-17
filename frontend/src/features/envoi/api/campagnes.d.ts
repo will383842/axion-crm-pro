@@ -437,7 +437,7 @@ export interface operations {
                             ont_repondu: number;
                             /** @description Personnes qui s'opposent ou se désinscrivent (= desinscrits). */
                             oppositions: number;
-                            /** @description Toujours nul : aucun suivi d'ouverture n'existe. */
+                            /** @description Toujours nul : aucun suivi d'ouverture n'existe ; l'écran affiche « non suivi », jamais 0. */
                             ouverts: number | null;
                             partis: number;
                             rebonds_durs: number;
@@ -446,8 +446,6 @@ export interface operations {
                             refuses: number;
                             /** @description Personnes ayant répondu (= ont_repondu). */
                             reponses: number;
-                            /** @description Faux : l'écran affiche « non suivi », jamais 0. */
-                            suivi_ouvertures: boolean;
                             taux_desinscription: number;
                             taux_refus: number;
                             /** @description Personnes ayant reçu au moins un message (= partis). */

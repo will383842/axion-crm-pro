@@ -116,7 +116,7 @@ paths:
                     required:
                       [en_file, partis, refuses, ont_repondu, exclus, desinscrits, arretes_entreprise,
                        en_pause_absence, taux_refus, limite_refus, taux_desinscription,
-                       inscrits, envoyes, touches, ouverts, suivi_ouvertures, reponses, rebonds_durs, rebonds_mous,
+                       inscrits, envoyes, touches, ouverts, reponses, rebonds_durs, rebonds_mous,
                        oppositions, arretes_campagne, exclus_preparation, issues]
                     properties:
                       en_file: { type: integer, minimum: 0 }
@@ -140,9 +140,8 @@ paths:
                       envoyes: { type: integer, minimum: 0, description: "Messages réellement envoyés (un par personne et par étape)." }
                       touches: { type: integer, minimum: 0, description: "Personnes ayant reçu au moins un message (= partis)." }
                       ouverts:
-                        description: "Toujours nul : aucun suivi d'ouverture n'existe."
+                        description: "Toujours nul : aucun suivi d'ouverture n'existe ; l'écran affiche « non suivi », jamais 0."
                         oneOf: [{ type: integer, minimum: 0 }, { type: 'null' }]
-                      suivi_ouvertures: { type: boolean, description: "Faux : l'écran affiche « non suivi », jamais 0." }
                       reponses: { type: integer, minimum: 0, description: "Personnes ayant répondu (= ont_repondu)." }
                       rebonds_durs: { type: integer, minimum: 0 }
                       rebonds_mous: { type: integer, minimum: 0, description: "Hors personnes déjà comptées en rebond dur." }

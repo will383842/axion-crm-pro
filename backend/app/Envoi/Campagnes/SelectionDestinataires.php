@@ -312,7 +312,7 @@ final class SelectionDestinataires
             $cts = array_values(array_unique($contacts));
             // Réseau seul : chemin L2b-C inchangé. Avec mot / guide : UNE lecture « même entrée » (PO-A) ; hors origine demandée = `hors_reseau`.
             $reseau = $contenu === null
-                ? RequetesOrigines::reseauxDesUnites($ws, $ents, $cts, $filtre?->reseaux ?? [])
+                ? RequetesOrigines::reseauxDesUnites($ws, $ents, $cts, $filtre->reseaux ?? [])
                 : RequetesOrigines::unitesParOrigine($ws, $ents, $cts, $filtre?->reseaux, $contenu->mots, $contenu->guides);
         } catch (QueryException $e) {
             throw $e->getCode() === '57014' ? SelectionRefusee::lectureTropLongue() : SelectionRefusee::lectureOrigineImpossible($e);

@@ -400,9 +400,19 @@ export const handlers: HttpHandler[] = [
     return erreur(501, 'non_disponible', 'Au palier 0, une boîte s’ajoute par commande locale sur le serveur.');
   }),
 
-  http.post(api('/envoi/boites'), async () => {
+  // F3-B0 : ajout d'une boîte par code de confirmation. En démo, seul le code « 123456 » est accepté.
+  http.post(api('/envoi/boites/ajout/code'), async () => {
     await delai();
-    return erreur(501, 'non_disponible', 'Au palier 0, une boîte s’ajoute par commande locale sur le serveur.');
+    return HttpResponse.json({ expire_le: new Date(Date.now() + 15 * 60_000).toISOString() }, { status: 202 });
+  }),
+
+  http.post(api('/envoi/boites'), async ({ request }) => {
+    await delai();
+    const corps = (await request.json().catch(() => null)) as { code?: unknown } | null;
+    // Corps sans code (ancien contrat du palier 0) : le 501 historique, gardé par tests/lib/demo-envoi-f03c.test.ts.
+    if (corps === null || !('code' in corps)) return erreur(501, 'non_disponible', 'Au palier 0, une boîte s’ajoute par commande locale sur le serveur.');
+    if (corps.code !== '123456') return erreur(409, 'code_invalide', 'Ce code est faux, expiré ou déjà utilisé.');
+    return HttpResponse.json({ id: crypto.randomUUID(), etat: 'en_pause', pause_motif: 'suspension_manuelle' }, { status: 201 });
   }),
 
   http.get(api('/envoi/boites/:id'), async ({ request, params }) => {

@@ -598,12 +598,23 @@ components:
           description: Adresses, organisations ou domaines à exclure en plus (saisie libre).
           items: { type: string }
         origine:
-          description: Filtre « réseau d'origine » (restreint la cible, ne l'élargit jamais). Écrit à l'étape 1 ; rendu depuis la colonne de la campagne. `null` le retire.
+          description: Filtre d'origine (réseau, mot, guide ; restreint la cible, ne l'élargit jamais). Écrit à l'étape 1 ; rendu depuis les colonnes de la campagne. `null` le retire. Au moins une clé ; une même entrée d'origine doit satisfaire toutes les clés posées.
           oneOf:
             - type: object
-              required: [reseaux]
+              minProperties: 1
+              additionalProperties: false
               properties:
                 reseaux:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$' }
+                mots:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$' }
+                guides:
                   type: array
                   minItems: 1
                   maxItems: 10

@@ -38,6 +38,9 @@ class ListeFeuVert
     /** Point qui décrit le drapeau d'exploitation : ne bloque jamais « accorde », absent de l'empreinte (D12). */
     public const POINT_EXPLOITATION = 'auto.reel_actif_faux';
 
+    /** X5-C : âge maximal des contrôles DNS et listes pour accorder (15 minutes). */
+    public const BATTERIE_FRAICHEUR_SECONDES = 900;
+
     public function __construct(private readonly DepotPreuves $preuves, private readonly DepotSante $sante) {}
 
     /** @return list<PointFeuVert> */
@@ -73,6 +76,7 @@ class ListeFeuVert
             $this->essaiABlancRecent($ws),
             $this->buteeEnBase(),
             $this->adaptateursDomaines($ws),
+            $this->batterieFraiche($ws),
         ];
 
         $preuves = $this->preuves->dernieres($ws);
@@ -303,6 +307,30 @@ class ListeFeuVert
         $ok = $presente !== null && (bool) $presente->p;
 
         return self::pointAuto('auto.plafond_butee_base', $ok, $ok ? 'La butée de plafond est présente en base.' : 'La butée de plafond est absente de la base.');
+    }
+
+    /**
+     * X5-C : la batterie (dernière ligne DNS de chaque domaine, dernière ligne de liste de chaque ressource) doit dater de moins de
+     * 15 minutes, horloge de la BASE (`now()`), jamais celle de PHP. Au moins une ligne de chaque table, sinon rouge. Lecture seule,
+     * aucun appel réseau. Échec fermé : toute erreur de lecture rend le point faux.
+     */
+    private function batterieFraiche(string $ws): PointFeuVert
+    {
+        $code = 'auto.batterie_fraiche';
+        try {
+            $r = WorkspaceContext::run($ws, fn () => DB::selectOne(
+                'SELECT (d.dns > x.limite AND l.listes > x.limite) AS frais FROM
+                    (SELECT now() - make_interval(secs => ?) AS limite) x,
+                    (SELECT min(d.controle_le) AS dns FROM (SELECT DISTINCT ON (domaine) domaine, controle_le FROM envoi_controles_dns WHERE workspace_id = ? ORDER BY domaine, controle_le DESC, id DESC) d) d,
+                    (SELECT min(l.controle_le) AS listes FROM (SELECT DISTINCT ON (type, ressource) type, ressource, controle_le FROM envoi_controles_listes WHERE workspace_id = ? ORDER BY type, ressource, id DESC) l) l',
+                [self::BATTERIE_FRAICHEUR_SECONDES, $ws, $ws],
+            ));
+        } catch (\Throwable) {
+            return self::pointAuto($code, false, 'Lecture des contrôles impossible : relancer les contrôles DNS et listes (moins de 15 min) avant d’accorder.');
+        }
+        $fait = $r !== null && $r->frais === true; // NULL (aucune ligne) ⇒ faux
+
+        return self::pointAuto($code, $fait, $fait ? 'Contrôles DNS et listes de moins de 15 minutes.' : 'Relancer les contrôles DNS et listes (moins de 15 min) avant d’accorder.');
     }
 
     /** Chaque domaine dont l'adaptateur n'est pas `faux` (D11) a un dernier contrôle DNS prêt, hors pause, daté d'aujourd'hui. */

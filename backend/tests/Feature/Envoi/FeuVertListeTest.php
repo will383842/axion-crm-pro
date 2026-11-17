@@ -159,7 +159,7 @@ test('catalogue versionné unique : codes uniques, préfixe obligatoire, 64 cara
     }
     $manuels = CatalogueManuels::codesManuels();
     expect($manuels)->toHaveCount(29)->and($manuels[0])->toBe('manuel.port25')->and($manuels)->not->toContain('manuel.inscriptions')->not->toContain('m8_13_inscriptions');
-    expect(count($manuels))->toBe(29)->and(count($codes) - 29)->toBe(19);
+    expect(count($manuels))->toBe(29)->and(count($codes) - 29)->toBe(20);
     foreach ($codes as $c) {
         if (str_starts_with($c, 'auto.')) {
             expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $c, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
@@ -173,7 +173,7 @@ test('chaque point expose groupe, nature, état et source ; un manuel qui exige 
     app(DepotPreuves::class)->ajouter($ws, 'manuel.port25', 'Preuve de test, réf. exemple-01', 'auteur');
     app(DepotPreuves::class)->ajouter($ws, 'manuel.capacite_reponses', 'Preuve de test, réf. exemple-01', 'auteur');
     $liste = app(ListeFeuVert::class)->points($ws);
-    expect($liste)->toHaveCount(48);
+    expect($liste)->toHaveCount(49);
     foreach ($liste as $p) {
         expect(CatalogueManuels::GROUPES)->toContain($p->groupe);
         expect($p->nature)->toBe($p->automatique ? 'auto' : 'manuel')->and(str_starts_with($p->code, $p->nature . '.'))->toBeTrue()->and($p->source)->not->toBe('');

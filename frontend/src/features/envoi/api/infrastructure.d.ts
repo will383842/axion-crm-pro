@@ -15,9 +15,11 @@ export interface paths {
         get: operations["listerBoites"];
         put?: never;
         /**
-         * Ajouter une boîte (non disponible au palier 0)
-         * @description Au palier 0, une boîte s'ajoute par commande locale sur le serveur
-         *     (les identifiants ne transitent jamais par l'écran) : la route répond 501.
+         * Ajouter une boîte (propriétaire, code de confirmation)
+         * @description Au seul ajout, le propriétaire saisit le mot de passe de la boîte (jamais
+         *     journalisé, jamais relu) avec le code reçu par `POST /envoi/boites/ajout/code`.
+         *     La boîte naît en pause (`suspension_manuelle`). Tant que le serveur n'est pas
+         *     branché (lot F3-B1), la route répond encore 501 `serveur_reel_requis`.
          */
         post: operations["ajouterBoite"];
         delete?: never;
@@ -95,6 +97,29 @@ export interface paths {
          * @description Permission requise, `users.manage` (403 sinon).
          */
         post: operations["suspendreBoite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/boites/ajout/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Demander le code de confirmation de l'ajout d'une boîte
+         * @description Corps sans secret. Le code est envoyé au propriétaire ; il expire et ne sert qu'une fois,
+         *     pour cette demande exacte. Au plus 3 codes en 15 minutes. `409 domaine_inconnu` si le domaine
+         *     de l'adresse est absent des domaines de l'espace ; `503 transport_courriel_non_sur` si le
+         *     courriel du code ne peut pas partir par un transport sûr.
+         */
+        post: operations["demanderCodeAjoutBoite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -403,6 +428,19 @@ export interface components {
             flux: components["schemas"]["FluxEnvoi"];
             statut: components["schemas"]["StatutBoite"];
         };
+        /** @description Demande d'ajout, avec le mot de passe (au seul ajout) et le code de confirmation. */
+        AjoutBoite: components["schemas"]["DemandeAjoutBoite"] & {
+            code: string;
+            /** Format: password */
+            secret: string;
+        };
+        BoiteAjoutee: {
+            /** @enum {string} */
+            etat: "en_pause";
+            id: components["schemas"]["Identifiant"];
+            /** @enum {string} */
+            pause_motif: "suspension_manuelle";
+        };
         /**
          * @description Boîte d'envoi. Elle n'a plus de chauffe propre : la montée en douceur se
          *     lit par domaine et par adresse IP (`GET /envoi/chauffe`). Jamais d'identifiants
@@ -438,6 +476,16 @@ export interface components {
             courante: components["schemas"]["VersionConfiguration"] | null;
             historique: components["schemas"]["VersionConfiguration"][];
             prete: components["schemas"]["VersionConfiguration"] | null;
+        };
+        /** @description Demande d'ajout d'une boîte, sans le mot de passe. */
+        DemandeAjoutBoite: {
+            /** Format: email */
+            adresse: string;
+            /** @enum {string} */
+            chiffrement: "tls" | "starttls";
+            hote: string;
+            port: number;
+            utilisateur: string;
         };
         DomaineResume: {
             /**
@@ -730,19 +778,29 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** Format: email */
-                    adresse: string;
-                    domaine_id: components["schemas"]["Identifiant"];
-                    mode_absence?: components["schemas"]["ModeAbsence"];
-                    nom_affiche: string;
-                    /** @description Signature ajoutée en bas des messages de cette boîte. */
-                    signature?: string;
-                };
+                "application/json": components["schemas"]["AjoutBoite"];
             };
         };
         responses: {
-            201: components["responses"]["Boite"];
+            /** @description Boîte créée, en pause. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoiteAjoutee"];
+                };
+            };
+            403: components["responses"]["Erreur"];
+            /** @description Code invalide (faux, expiré, consommé, 5 essais, demande différente) ou boîte existante. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Erreur"];
+                };
+            };
             422: components["responses"]["Erreur"];
             501: components["responses"]["Erreur"];
         };
@@ -836,6 +894,38 @@ export interface operations {
             200: components["responses"]["Boite"];
             403: components["responses"]["Erreur"];
             404: components["responses"]["Erreur"];
+        };
+    };
+    demanderCodeAjoutBoite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DemandeAjoutBoite"];
+            };
+        };
+        responses: {
+            /** @description Code envoyé. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        expire_le: string;
+                    };
+                };
+            };
+            403: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
+            429: components["responses"]["Erreur"];
+            503: components["responses"]["Erreur"];
         };
     };
     testerConnexionBoite: {

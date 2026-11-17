@@ -38,7 +38,7 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
      * @param  array<string, Closure(string $workspaceId, string $domaine): ServeurEnvoi>  $fabriques  adaptateurs réels (`kumo`, `smtp`), appelés seulement quand les trois conditions valent (sauf `pause()`)
      * @param  Closure(): bool  $porte  `PorteEnvoiReelle::ouverte()`
      * @param  Closure(): ListeFeuVert  $liste  liste des points du feu vert (lue à chaque appel)
-     * @param  (Closure(): list<string>)|null  $adaptateursPortes  lecteur des adaptateurs réels portés (défaut : `envoi_adaptateurs_reels_portes()`)
+     * @param  (Closure(): list<array{workspace_id: string, domaine: string, adaptateur: string}>)|null  $couplesPortes  lecteur des couples (espace, domaine, adaptateur réel) (défaut : `envoi_couples_reels_portes()`)
      */
     public function __construct(
         private readonly ServeurEnvoi $faux,
@@ -46,12 +46,16 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
         private readonly Closure $porte,
         private readonly Closure $liste,
         private readonly ?Closure $maintenant = null,
-        private readonly ?Closure $adaptateursPortes = null,
+        private readonly ?Closure $couplesPortes = null,
+        private readonly GardeConformiteSortie $garde = new GardeConformiteSortie,
     ) {}
 
     public function injecter(MessageAEnvoyer $message): ResultatInjection
     {
         $ws = $message->workspaceId;
+        if (WorkspaceContext::current() !== $ws) { // F2 : contexte absent compris, AVANT toute lecture
+            throw EnvoiRefuse::autreEspace();
+        }
         $domaine = Fournisseur::domaine($message->expediteur);
         $adaptateur = $this->adaptateurDuDomaine($ws, $domaine);
         if ($adaptateur === null) {
@@ -75,6 +79,8 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
             throw EnvoiRefuse::conditionNonRemplie('dns_non_vert');
         }
 
+        $this->garde->verifier($message->corps); // E6 : adaptateurs réels seulement, avant la fabrique
+
         return $this->adaptateur($adaptateur, $ws, $domaine)->injecter($message);
     }
 
@@ -82,8 +88,8 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
      * L'adaptateur qui a pris l'injection est résolu à partir de l'identifiant RENDU par `injecter` (contrat du kit de conformité),
      * dans le contexte d'espace (RLS), jamais deviné par `actifs()[0]` : `envoi_injections_locales` d'abord (faux, kumo, et smtp si
      * une ligne y existe), PUIS `envoi_injections_smtp` (l'identifiant rendu par l'adaptateur smtp est l'UUID de cette table).
-     * Kumo : le registre durable écrira (plus tard, PAS encore en production) `envoi_injections_locales(id_injection = id Kumo,
-     * adaptateur = 'kumo')` avant le réseau ; ce chemin est déjà accepté ici. Sans ligne (faux serveur : « sim-N », non UUID) : le faux
+     * Kumo : depuis C1 l'identifiant du registre (`envoi_injections_locales.id_injection`, `adaptateur = 'kumo'`) EST l'identifiant posté à
+     * Kumo (`id_injection` de `/v1/injections`) : ce chemin est celui de la production. Sans ligne (faux serveur : « sim-N », non UUID) : le faux
      * serveur répond s'il est le seul actif (aucun adaptateur réel autorisé), sinon `Inconnu`. Un adaptateur réel n'est interrogé que si
      * les trois conditions valent encore. Le domaine passé à la fabrique est celui de la boîte pour smtp quand il est connu ; sinon le
      * premier domaine vert de l'adaptateur (limite : `envoi_injections_locales` ne porte pas le domaine).
@@ -127,21 +133,26 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
     }
 
     /**
-     * Sens sûr (comportement conservé) : transmise à tout adaptateur réel qui porte au moins un domaine, MÊME porte fermée, sans feu
-     * vert ni DNS ; lue par la fonction (RLS). Sans contexte d'espace, les fabriques reçoivent l'espace courant ou '' et le domaine '' :
-     * l'adaptateur construit ne doit pas dépendre de l'espace pour `pause()`.
+     * Sens sûr : pause GLOBALE (M1). Transmise à CHAQUE couple (espace, domaine, adaptateur réel) lu par la fonction
+     * `envoi_couples_reels_portes()` (RLS contournée par la fonction, jamais par un SELECT direct), quel que soit le contexte courant,
+     * MÊME porte fermée, sans feu vert ni DNS. Chaque fabrique reçoit SON espace et SON domaine (jamais '' ni l'espace courant).
+     * Le stop gagne : chaque couple est tenté, la première erreur est relancée à la fin. Dédoublonné par (espace, adaptateur, domaine) seulement.
      */
     public function pause(): void
     {
-        // TODO M1 (ESCALADE, non implémenté ici) : pause globale tous espaces avant de lier une fabrique réelle. Aujourd'hui les
-        // fabriques sont appelées avec l'espace courant ou '' et le domaine '' : à trancher avant toute liaison réelle.
         $this->faux->pause();
         $premiere = null;
-        foreach ($this->portes() as $nom) {
+        $vus = [];
+        foreach ($this->couples() as $c) {
+            $cle = $c['workspace_id'] . '|' . $c['adaptateur'] . '|' . $c['domaine'];
+            if (isset($vus[$cle])) {
+                continue;
+            }
+            $vus[$cle] = true;
             try {
-                $this->adaptateur($nom, WorkspaceContext::current() ?? '', '')->pause();
+                $this->adaptateur($c['adaptateur'], $c['workspace_id'], $c['domaine'])->pause();
             } catch (Throwable $e) {
-                $premiere ??= $e; // le stop gagne : les autres adaptateurs sont tout de même interrogés
+                $premiere ??= $e; // le stop gagne : les autres couples sont tout de même interrogés
             }
         }
         if ($premiere !== null) {
@@ -199,7 +210,7 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
         foreach ($actifs as $nom => $domaine) {
             $s = $this->adaptateur($nom, $ws, $domaine)->sante();
             $ok = $ok && $s->ok;
-            $details[] = $nom . ' : ' . $s->detail;
+            $details[] = $nom . ' : ' . ($s->ok ? 'ok' : 'ko'); // F3 : le detail de l'adaptateur n'est jamais recopié
         }
 
         return new SanteServeur($ok, implode(' ; ', $details));
@@ -228,14 +239,17 @@ final class AiguilleurServeurEnvoi implements ServeurEnvoi
         return ($this->fabriques[$nom])($workspaceId, $domaine);
     }
 
-    /** @return list<string> adaptateurs réels portés par au moins un domaine (toutes lectures par la fonction, sans contexte d'espace) */
-    private function portes(): array
+    /** @return list<array{workspace_id: string, domaine: string, adaptateur: string}> couples réels, TOUS espaces (lecture par la fonction, sans contexte) */
+    private function couples(): array
     {
-        if ($this->adaptateursPortes !== null) {
-            return ($this->adaptateursPortes)();
+        if ($this->couplesPortes !== null) {
+            return ($this->couplesPortes)();
         }
 
-        return array_values(array_map(static fn ($l): string => (string) $l->nom, DB::select('SELECT envoi_adaptateurs_reels_portes() AS nom')));
+        return array_values(array_map(
+            static fn ($l): array => ['workspace_id' => (string) $l->workspace_id, 'domaine' => (string) $l->domaine, 'adaptateur' => (string) $l->adaptateur],
+            DB::select('SELECT workspace_id, domaine, adaptateur FROM envoi_couples_reels_portes()'),
+        ));
     }
 
     private function adaptateurDuDomaine(string $ws, string $domaine): ?string

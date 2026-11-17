@@ -50,7 +50,7 @@ class EnvoiReponsesController extends ApiController
         if (! is_string($classement) || ! in_array($classement, ServiceReponses::CLASSEMENTS, true)) {
             return $this->erreur('validation', 'Ce classement n’existe pas.', 422);
         }
-        $r = ctype_digit($id) ? $this->service->classer($this->espace(), (string) $request->user()?->getAuthIdentifier(), (int) $id, $classement) : null;
+        $r = ctype_digit($id) ? $this->service->classer($this->espace(), (string) $request->user()?->getAuthIdentifier(), (int) $id, $classement, $request->json('creer_tache') === true) : null;
 
         return $r === null ? $this->introuvable() : response()->json($r);
     }

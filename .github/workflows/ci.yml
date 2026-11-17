@@ -962,7 +962,7 @@ jobs:
       # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
       # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
       - name: Brouillon — contrôles non joués
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        if: github.event.pull_request.draft == true
         run: |
           echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
           exit 1
@@ -1014,6 +1014,37 @@ jobs:
           fi
           exit "$ko"
 
+      # Lot E1 « CI allégée » — OBSERVATION SEULE. Sur PR, après un verdict vert,
+      # on publie un artefact minuscule nommé d'après l'arbre git testé. La mise
+      # en ligne (`deploy-direct-ssh.yml`) cherche celui de l'arbre de `main` et
+      # l'ÉCRIT dans son résumé ; elle n'en tire AUCUNE décision (la CI y reste
+      # rejouée). Retour arrière : retirer ces deux étapes.
+      - name: Récupérer l'arbre testé
+        continue-on-error: true  # observation : une panne ne rougit jamais le verdict
+        if: github.event_name == 'pull_request' && success()
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Calculer l'empreinte de l'arbre testé
+        continue-on-error: true  # observation : une panne ne rougit jamais le verdict
+        id: arbre
+        if: github.event_name == 'pull_request' && success()
+        run: |
+          set -euo pipefail
+          arbre="$(git rev-parse HEAD^{tree})"
+          echo "arbre=${arbre}" >> "$GITHUB_OUTPUT"
+          echo "${arbre}" > arbre.txt
+
+      - name: Publier ci-arbre-<empreinte de l'arbre>
+        continue-on-error: true  # observation : une panne ne rougit jamais le verdict
+        if: github.event_name == 'pull_request' && success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-arbre-${{ steps.arbre.outputs.arbre }}
+          path: arbre.txt
+          retention-days: 7
+
   frontend:
     name: Frontend React/Vite
     runs-on: ubuntu-24.04
@@ -1022,7 +1053,7 @@ jobs:
       # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
       # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
       - name: Brouillon — contrôles non joués
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        if: github.event.pull_request.draft == true
         run: |
           echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
           exit 1
@@ -1110,7 +1141,7 @@ jobs:
       # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
       # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
       - name: Brouillon — contrôles non joués
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        if: github.event.pull_request.draft == true
         run: |
           echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
           exit 1

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  * Un geste humain « stop » met l'adresse à l'écart (`EnregistrerOpposition` puis ses effets), sans rien effacer.
  * Chaque geste prend un verrou consultatif PAR RÉPONSE : deux gestes simultanés se suivent.
  *
- * @phpstan-type LigneReponse object{id: int, recue_le: string, expediteur_chiffre: string, objet_chiffre: string, extrait_chiffre: string, contact_id: int|null, boite_id: string|null, classement: string, sug_classement: string, sug_confiance: int|string, auteur: string, evenement_id: int, emp_evt: string|null, emp_dest: string|null, rattachee: bool}
+ * @phpstan-type LigneReponse object{id: int, recue_le: string, expediteur_chiffre: string, objet_chiffre: string, extrait_chiffre: string, contact_id: int|null, boite_id: string|null, empreinte_expediteur: string, classement: string, sug_classement: string, sug_confiance: int|string, auteur: string, evenement_id: int, emp_evt: string|null, emp_dest: string|null, rattachee: bool}
  */
 final class ServiceReponses
 {
@@ -27,6 +27,7 @@ final class ServiceReponses
     public function __construct(
         private readonly EnregistrerOpposition $opposition,
         private readonly ContactUpserter $contacts,
+        private readonly EffetsClassement $effets = new EffetsClassement,
     ) {}
 
     private const BASE = <<<'SQL'
@@ -168,9 +169,9 @@ final class ServiceReponses
      *
      * @return array<string, mixed>|null
      */
-    public function classer(string $ws, string $userId, int $id, string $classement): ?array
+    public function classer(string $ws, string $userId, int $id, string $classement, bool $creerTache = false): ?array
     {
-        return WorkspaceContext::run($ws, function () use ($ws, $userId, $id, $classement): ?array {
+        return WorkspaceContext::run($ws, function () use ($ws, $userId, $id, $classement, $creerTache): ?array {
             $l = $this->ligne($ws, $id);
             if ($l === null) {
                 return null;
@@ -180,21 +181,23 @@ final class ServiceReponses
                     $this->opposer($ws, (string) $empreinte);
                 }
             }
-            DB::transaction(function () use ($ws, $userId, $id, $classement): void {
+            // Ligne de classement, puis arrêts, puis tâche : une seule transaction (rien d'écrit si la tâche échoue ; le rejeu refait tout).
+            $tache = DB::transaction(function () use ($ws, $userId, $id, $classement, $creerTache, $l): ?string {
                 $this->verrou($ws, $id);
                 $courant = DB::table('envoi_reponses_classements')->where('reponse_id', $id)->where('geste', 'classement')->orderByDesc('id')->first();
-                if ($courant !== null && $courant->auteur === 'humain' && $courant->classement === $classement) {
-                    return; // rejeu : rien à ajouter
+                if (! ($courant !== null && $courant->auteur === 'humain' && $courant->classement === $classement)) {
+                    DB::table('envoi_reponses_classements')->insert([
+                        'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'classement', 'classement' => $classement,
+                        'confiance' => 100, 'auteur' => 'humain', 'auteur_id' => $userId, 'cree_le' => now(),
+                    ]);
                 }
-                DB::table('envoi_reponses_classements')->insert([
-                    'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'classement', 'classement' => $classement,
-                    'confiance' => 100, 'auteur' => 'humain', 'auteur_id' => $userId, 'cree_le' => now(),
-                ]);
+
+                return $this->effets->appliquer($ws, $l, $classement, $creerTache);
             });
 
             return $this->resumeDe($ws, $id) + [
                 'resume_crm' => ['classement' => $classement, 'le' => now()->utc()->format('Y-m-d\TH:i:s\Z'),
-                    'lien' => '/envoi/reponses/' . $id, 'tache' => null, 'opposition' => $classement === 'stop'],
+                    'lien' => '/envoi/reponses/' . $id, 'tache' => $tache, 'opposition' => $classement === 'stop'],
             ];
         });
     }

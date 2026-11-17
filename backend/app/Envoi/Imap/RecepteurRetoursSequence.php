@@ -7,6 +7,7 @@ use App\Envoi\Desinscription\OpposerAdresse;
 use App\Envoi\Sequence\Evenement;
 use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
+use App\Envoi\Sequence\ReportAbsence;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
@@ -19,9 +20,8 @@ use Illuminate\Support\Facades\DB;
  * des autres personnes de la même entreprise). Rattachement exact : l'injection du retour -> les messages du
  * séquenceur (`envoi_messages.id_injection`) -> leur inscription. Aucune adresse n'est lue ni écrite ici.
  *
- * S13 — absence du bureau : PAS de pause. L'état « en pause » n'existe pas (la contrainte de `envoi_inscriptions.statut`
- * n'admet que active/terminee/arretee) : l'inventer exigerait une migration et un contrôle côté tirage. L'auto-réponse
- * n'arrête donc rien (ni arrêt par erreur, ni relance retardée) ; voir `docs/envoi/rebonds-plaintes-k11.md`.
+ * S13 (RR-4C) — absence du bureau : aucun arrêt ni nouveau statut ; la prochaine relance est repoussée de 7 jours
+ * (`ReportAbsence`, jamais d'avance, jamais sur une inscription arrêtée) ; voir `docs/envoi/rebonds-plaintes-k11.md`.
  *
  * Idempotent (l'événement est tracé une fois par inscription), ajout seul, aucun envoi.
  */
@@ -44,6 +44,16 @@ final class RecepteurRetoursSequence implements RecepteurRetours
      */
     public function recevoir(string $workspaceId, RetourDetecte $retour): void
     {
+        if ($retour->classe === ClasseRetour::AutoReponse) {
+            $maintenant = DateTimeImmutable::createFromInterface(now());
+            WorkspaceContext::run($workspaceId, fn () => (new ReportAbsence)->reporter(
+                $workspaceId,
+                $this->rattachees->pour($workspaceId, $retour->idInjection),
+                $maintenant,
+            ));
+
+            return;
+        }
         $evenement = match ($retour->classe) {
             ClasseRetour::ReponseHumaine => Evenement::REPONSE,
             ClasseRetour::Desinscription, ClasseRetour::Hostile => Evenement::OPPOSITION,

@@ -93,6 +93,7 @@ final class Sequenceur
         private readonly ParametresExpedition $expedition,
         private readonly RegistreInjectionsSequence $registre = new RegistreInjectionsSequence,
         private ?LecteurVariables $variables = null,
+        private ?RelationAvancee $relation = null,
     ) {}
 
     /** @var list<array{0: string, 1: array<string, mixed>}> alertes critiques en attente du COMMIT de la transaction en cours */
@@ -278,6 +279,12 @@ final class Sequenceur
 
         if ($this->entrepriseArretee($ws, (int) $ins->entreprise_id, (string) $ins->id)) {
             return $this->arreter($ins, Evenement::MOTIF_ENTREPRISE, $maintenant);
+        }
+
+        // Rendez-vous pris ou entreprise devenue cliente : AVANT la fenêtre et la réservation (rien n'est réservé).
+        $this->relation ??= new RelationAvancee;
+        if (($m = $this->relation->motif($ws, (int) $ins->entreprise_id, (int) $ins->contact_id, new DateTimeImmutable((string) $ins->inscrite_le))) !== null) {
+            return $this->arreter($ins, $m, $maintenant);
         }
 
         $fenetre = new FenetreHoraire((int) $version['fenetre']['debut'], (int) $version['fenetre']['fin']);

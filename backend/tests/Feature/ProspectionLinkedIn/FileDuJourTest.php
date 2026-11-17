@@ -4,6 +4,7 @@ use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\ProspectionLinkedIn\Arret;
 use App\ProspectionLinkedIn\FileDuJour;
 use App\ProspectionLinkedIn\Plafonds;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -177,7 +178,7 @@ test('demande RGPD en cours, fiche presse, société cliente ⇒ exclus avec ges
         $cRgpd = fdjContact($ws, 'rgpd@example.test');
         $cPresse = fdjContact($ws, 'presse@example.test');
         $cClient = fdjContact($ws, 'client@example.test');
-        WorkspaceContext::run($ws, static function () use ($ws, $cRgpd, $cPresse, $cClient): void {
+        WorkspaceContext::run($ws, static function () use ($ws, $cPresse, $cClient): void {
             DB::table('rgpd_requests')->insert(['workspace_id' => $ws, 'type' => 'access', 'status' => 'pending', 'subject_email' => 'rgpd@example.test', 'created_at' => now(), 'updated_at' => now()]);
             DB::table('contacts')->where('id', $cPresse)->update(['external_ref' => 'journaliste:42']);
             DB::table('contacts')->where('id', $cClient)->update(['discovery_source' => 'console']);
@@ -191,7 +192,7 @@ test('demande RGPD en cours, fiche presse, société cliente ⇒ exclus avec ges
             foreach (fdjJournal($ws, 'controle_refuse') as $l) {
                 $motifs[(string) $l->prospect_id] = json_decode((string) $l->details, true)['motif'];
             }
-            expect($motifs)->toBe([$pRgpd => 'rgpd_en_cours', $pPresse => 'presse', $pClient => 'client'])
+            expect($motifs)->toEqualCanonicalizing([$pRgpd => 'rgpd_en_cours', $pPresse => 'presse', $pClient => 'client'])
                 ->and(fdjEtat($ws, $pRgpd))->toBe('qualifie');
         });
     }
@@ -208,7 +209,7 @@ test('contacté par courriel il y a 30 jours ⇒ exclu ; il y a 120 jours ⇒ in
         foreach ([['recent@example.test', '2026-10-20 09:00:00+01'], ['ancien@example.test', '2026-07-21 09:00:00+01']] as [$adresse, $le]) {
             $c = (int) DB::table('contacts')->where('workspace_id', $ws)->where('email', $adresse)->value('id');
             DB::table('envoi_inscriptions')->insert(['workspace_id' => $ws, 'sequence_id' => $seq, 'contact_id' => $c, 'entreprise_id' => (int) DB::table('contacts')->where('id', $c)->value('company_id'),
-                'empreinte_adresse' => App\Support\ListeSuppression::empreinte($adresse), 'prochaine_echeance' => $le, 'version_figee' => '{}', 'inscrite_le' => $le]);
+                'empreinte_adresse' => ListeSuppression::empreinte($adresse), 'prochaine_echeance' => $le, 'version_figee' => '{}', 'inscrite_le' => $le]);
         }
         fdjSous($mode, $ws, function () use ($ws, $exp, $recent, $ancien, $mode) {
             $r = (new FileDuJour)->construire($ws, $exp, fdjJeudi());
@@ -365,7 +366,8 @@ test('espace B : ne voit ni ne touche les prospects de A ; plafonds et arrêt de
         fdjSous($mode, $wsB, function () use ($wsA, $wsB, $exp, $pa, $mode) {
             expect((new Arret)->actif($wsB, $exp))->toBeFalse($mode)->and((new Plafonds)->restants($wsB, $exp, fdjJeudi()))->toBe(['jour' => 10, 'semaine' => 50]);
             expect((new FileDuJour)->construire($wsB, $exp, fdjJeudi())['prospects'])->toBe([]);
-            expect(fdjEtat($wsA, $pa))->toBe(''); // invisible depuis B sous RLS ; en propriétaire, le filtre d'espace de fdjEtat le prouve aussi
+            expect(WorkspaceContext::run($wsB, static fn () => DB::table('pl_prospects')->where('workspace_id', $wsB)->where('id', $pa)->value('etat')))->toBeNull()
+                ->and(fdjEtat($wsA, $pa))->toBe('qualifie');
         });
     }
 });

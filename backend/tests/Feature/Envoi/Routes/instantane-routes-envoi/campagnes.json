@@ -45,6 +45,17 @@
     },
     {
         "methode": "POST",
+        "uri": "api/v1/envoi/campagnes/{id}/arreter",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
         "uri": "api/v1/envoi/campagnes/{id}/date",
         "middlewares": [
             "api",
@@ -68,6 +79,17 @@
     {
         "methode": "POST",
         "uri": "api/v1/envoi/campagnes/{id}/dupliquer",
+        "middlewares": [
+            "api",
+            "auth:sanctum",
+            "first-login",
+            "permission:workspaces.manage",
+            "workspace"
+        ]
+    },
+    {
+        "methode": "POST",
+        "uri": "api/v1/envoi/campagnes/{id}/lancer",
         "middlewares": [
             "api",
             "auth:sanctum",

@@ -233,6 +233,8 @@ test('NR-08 sous le rôle de production, la relance des effets d’opposition te
         $o->table('opt_out')->whereIn('email_hash', array_values($hashes))->delete();
         $o->table('envoi_oppositions')->whereIn('workspace_id', array_values($e))->delete();
         $o->table('envoi_liens_desinscription')->whereIn('workspace_id', array_values($e))->delete();
+        // C3-3 : le retrait réel lié écrit une demande (empreinte) par opposition ; ajout seul, donc nettoyée ici avec les autres.
+        $o->table('envoi_retraits_demandes')->whereIn('workspace_id', array_values($e))->delete();
         $o->statement("SET session_replication_role = 'origin'");
         nr08Nettoyer($e);
     }

@@ -7,6 +7,7 @@
 use App\Console\Commands\EnvoiCycle;
 use App\Envoi\Desinscription\ArretParEntreprise;
 use App\Envoi\Desinscription\RetraitEnvoisEnFile;
+use App\Envoi\Desinscription\RetraitEnvoisEnFileAbsent;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Tests\TestCase;
@@ -38,6 +39,8 @@ test('la tâche n\'est pas due tant que la porte d\'envoi réel est fermée, et 
     expect($evenement->filtersPass(app()))->toBeFalse();
 
     config(['envoi.reel_actif' => true]);
+    // C3-3 lie le retrait réel par défaut : l'intention du test (« absent => porte fermée ») est posée explicitement.
+    app()->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);
     expect($evenement->filtersPass(app()))->toBeFalse(); // retrait absent : toujours fermée
 
     app()->instance(RetraitEnvoisEnFile::class, new class implements RetraitEnvoisEnFile

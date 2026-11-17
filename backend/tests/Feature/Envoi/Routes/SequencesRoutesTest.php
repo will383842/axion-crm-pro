@@ -12,6 +12,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\ContratOpenApiEnvoi;
+use Tests\Support\LienCampagneSequence;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class)->group('envoi');
@@ -180,4 +181,36 @@ test('une séquence SANS étape n\'est ni listée ni lisible ni pausable (le con
     $this->actingAs($u)->getJson(SEQR_BASE . "/{$vide}")->assertNotFound();
     $this->actingAs($u)->postJson(SEQR_BASE . "/{$vide}/pause")->assertNotFound();
     expect(seqrGestes($vide))->toBe(0);
+});
+
+test('L5-C 6 reprise directe d\'une séquence née d\'une campagne : 409 pilotee_par_la_campagne, aucun geste ; pause directe permise ; séquence libre inchangée', function () {
+    $u = seqrCompte('owner');
+    $ws = (string) $u->current_workspace_id;
+    $campagne = (string) Str::uuid();
+    DB::table('envoi_campagnes')->insert(['id' => $campagne, 'workspace_id' => $ws, 'nom' => 'Campagne fictive', 'cible' => json_encode(['type' => 'liste', 'reference' => 'l', 'libelle' => 'l']), 'nb_etapes' => 2, 'cree_par' => 'le fondateur']);
+    DB::table('envoi_campagnes')->where('id', $campagne)->update(['statut' => 'a_valider', 'version' => 2]);
+    DB::table('envoi_campagnes')->where('id', $campagne)->update(['statut' => 'programmee', 'version' => 3]);
+    $sid = LienCampagneSequence::poser(DB::connection(), $ws, $campagne, 3, 2)['sequence'];   // née en pause
+
+    $avant = seqrGestes($sid);
+    $r = $this->actingAs($u)->postJson(SEQR_BASE . "/{$sid}/reprise")->assertStatus(409)->assertJsonPath('error', 'pilotee_par_la_campagne');
+    expect($r->json('message'))->toBe('Cette séquence appartient à une campagne : reprenez la campagne.')->and(seqrGestes($sid))->toBe($avant);
+
+    // le stop gagne toujours : la pause directe reste permise (sur une séquence déjà en pause : aucun doublon, mais 200)
+    $this->actingAs($u)->postJson(SEQR_BASE . "/{$sid}/pause")->assertOk();
+
+    // le vrai danger : campagne en cours (préparation terminée, la base accepterait), séquence mise en pause à la main, puis reprise directe
+    DB::table('envoi_campagnes_materialisations')->insert(['campagne_id' => $campagne, 'workspace_id' => $ws, 'sequence_id' => $sid]);
+    DB::table('envoi_campagnes_materialisations')->where('campagne_id', $campagne)->update(['etat' => 'terminee', 'terminee_le' => now(), 'compteurs' => '{"inscrits":1,"membres":1,"retenus":1}']);
+    DB::table('envoi_campagnes')->where('id', $campagne)->update(['statut' => 'en_cours', 'version' => 5]);
+    $this->actingAs($u)->postJson(SEQR_BASE . "/{$sid}/pause")->assertOk();
+    $avant = seqrGestes($sid);
+    $this->actingAs($u)->postJson(SEQR_BASE . "/{$sid}/reprise")->assertStatus(409)->assertJsonPath('error', 'pilotee_par_la_campagne');
+    expect(seqrGestes($sid))->toBe($avant);
+
+    // séquence libre : reprise inchangée
+    $libre = seqrSequence($ws);
+    $this->actingAs($u)->postJson(SEQR_BASE . "/{$libre}/pause")->assertOk();
+    $this->actingAs($u)->postJson(SEQR_BASE . "/{$libre}/reprise")->assertOk();
+    expect($this->resolutions)->toBe(0);
 });

@@ -363,10 +363,11 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         }
     }
 
-    private function commander(string $commande): void
+    /** @param  list<string>  $cibles */
+    private function commander(string $commande, array $cibles = []): void
     {
         try {
-            $this->commandeur->commander($this->workspaceId, $this->source, (string) Str::uuid(), $commande);
+            $this->commandeur->commander($this->workspaceId, $this->source, (string) Str::uuid(), $commande, $cibles);
         } catch (ServeurEnvoiRefuse $e) {
             Log::critical('Envoi : commande refusée ou injoignable.', ['commande' => $commande]);
             throw $e;
@@ -419,10 +420,15 @@ final class ServeurEnvoiKumo implements RenvoiParMemeCle, ServeurEnvoi
         $this->registre->reinitialiser5xx($this->workspaceId); // on ne repart pas avec les 5xx qui ont causé la pause
     }
 
-    /** Retrait urgent (opposition) : file du serveur. Hors `ServeurEnvoi` (D4) : l'appelant teste `instanceof`. */
-    public function retirer(): void
+    /**
+     * Retrait urgent (opposition) des injections NOMMÉES (contrat v3 : jamais « la file » sans cible).
+     * Hors `ServeurEnvoi` (D4) : l'appelant teste `instanceof`.
+     *
+     * @param  list<string>  $cibles  les `id_injection` à retirer (1 à 100)
+     */
+    public function retirer(array $cibles): void
     {
-        $this->commander('retrait');
+        $this->commander('retrait', $cibles);
     }
 
     public function modeTemoins(): bool

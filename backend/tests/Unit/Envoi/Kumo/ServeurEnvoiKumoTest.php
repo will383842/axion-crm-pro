@@ -26,7 +26,7 @@ final class CommandeurEspion implements CommandeurServeur
     /** @var list<string> */
     public array $commandes = [];
 
-    public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+    public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
     {
         $this->commandes[] = $commande;
 
@@ -218,14 +218,14 @@ test('pause, reprise et retrait passent par la passerelle (commandes signées)',
     $s = kumoFabrique(null, $c);
     $s->pause();
     $s->reprise();
-    $s->retirer();
+    $s->retirer(['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
     expect($c->commandes)->toBe(['pause', 'reprise', 'retrait']);
 });
 
 test('pause() pose la pause AVANT la commande : passerelle injoignable => plus aucune injection', function () {
     $c = new class implements CommandeurServeur
     {
-        public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+        public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
         {
             throw ServeurEnvoiRefuse::motif('passerelle injoignable');
         }
@@ -253,7 +253,7 @@ test('reprise : si la commande échoue, la pause reste posée (sûr par défaut)
     kumoFabrique(null, null, null, $reg)->pause();
     $ko = new class implements CommandeurServeur
     {
-        public function commander(string $workspaceId, string $source, string $commandeId, string $commande): bool
+        public function commander(string $workspaceId, string $source, string $commandeId, string $commande, array $cibles = []): bool
         {
             throw ServeurEnvoiRefuse::motif('injoignable');
         }

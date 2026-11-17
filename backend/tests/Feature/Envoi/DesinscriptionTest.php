@@ -490,6 +490,8 @@ test('M2 opposition -> envoi réel : refusé tant que le retrait des envois en f
     $m = new MessageAEnvoyer($ws, 'a@example.test', 'f@example.test', 'S', 'C', 'k');
     $this->post($this->chemin)->assertOk();
     config(['envoi.reel_actif' => true]);
+    // C3-3 lie le retrait réel par défaut (TransportServiceProvider) : la liaison « absente » de EnvoiServiceProvider est reposée ici.
+    app()->bind(RetraitEnvoisEnFile::class, RetraitEnvoisEnFileAbsent::class);
 
     // Retrait « absent » branché : l'envoi réel est tenu pour inactif, rien ne part.
     expect(app(RetraitEnvoisEnFile::class))->toBeInstanceOf(RetraitEnvoisEnFileAbsent::class);
@@ -550,6 +552,8 @@ test('concurrence RÉELLE : deux processus simultanés sur le même lien = une o
         $proprio->table('email_suppressions')->where('email_hash', $h)->delete();
         $proprio->table('envoi_oppositions')->where('workspace_id', $ws)->delete();
         $proprio->table('envoi_liens_desinscription')->where('workspace_id', $ws)->delete();
+        // C3-3 : l'opposition écrit une demande de retrait (ajout seul, FK vers l'espace) : nettoyée avant l'espace, sans orphelin.
+        $proprio->table('envoi_retraits_demandes')->where('workspace_id', $ws)->delete();
         $proprio->table('workspaces')->where('id', $ws)->delete();
         $proprio->statement("SET session_replication_role = 'origin'");
         $proprio->disconnect();

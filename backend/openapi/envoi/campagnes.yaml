@@ -185,6 +185,37 @@ paths:
                       - { $ref: './commun.yaml#/components/schemas/Horodatage' }
                       - { type: 'null' }
         '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/lancer:
+    post:
+      operationId: lancerCampagne
+      summary: Lancer une campagne programmée (la préparation doit être terminée ; rien ne part tant que l'envoi réel est fermé)
+      description: |
+        Réservé au propriétaire. Refus 409 (champ `error`) : `transition_refusee`, `sans_sequence`, `materialisation_en_cours`,
+        `materialisation_bloquee`, `aucun_destinataire`, `frein_arret_general`, `frein_pause_automatique`, `reprise_refusee_base`,
+        `concurrence`, `version_perimee`, `cle_reutilisee`. Aucun refus n'écrit quoi que ce soit.
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - $ref: '#/components/parameters/CleIdempotence'
+      responses:
+        '200': { $ref: '#/components/responses/Campagne' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/campagnes/{id}/arreter:
+    post:
+      operationId: arreterCampagne
+      summary: Arrêter une campagne (les inscriptions sont fermées, jamais supprimées)
+      description: |
+        Réservé au propriétaire. Une campagne programmée sans séquence ne peut pas être arrêtée (`sans_sequence`). Mêmes codes
+        de refus 409 que `lancer` pour la concurrence et les clés ; arrêter n'est jamais bloqué par un frein.
+      parameters:
+        - $ref: './commun.yaml#/components/parameters/Identifiant'
+        - $ref: '#/components/parameters/CleIdempotence'
+      responses:
+        '200': { $ref: '#/components/responses/Campagne' }
+        '404': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/campagnes/{id}/pause:
     post:
       operationId: mettreCampagneEnPause

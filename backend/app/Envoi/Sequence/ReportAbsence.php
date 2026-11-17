@@ -29,7 +29,7 @@ final class ReportAbsence
         return DB::update(
             "UPDATE envoi_inscriptions SET prochaine_echeance = GREATEST(prochaine_echeance, ?::timestamptz + interval '" . self::JOURS . " days')
              WHERE workspace_id = ? AND statut = 'active' AND id IN ({$marqueurs})",
-            [$maintenant->format('c'), $ws, ...array_values($ids)],
+            [$maintenant->format('c'), $ws, ...$ids],
         );
     }
 }

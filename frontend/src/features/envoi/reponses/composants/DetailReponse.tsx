@@ -19,6 +19,8 @@ const GESTES: ReadonlyArray<{ touche: string; classement: Classement; libelle: s
   { touche: '1', classement: 'refus', libelle: 'Pas intéressé' },
   { touche: '2', classement: 'pas_maintenant', libelle: 'Plus tard' },
   { touche: '3', classement: 'absence', libelle: 'Absent' },
+  { touche: '4', classement: 'interesse', libelle: 'Intéressé' },
+  { touche: '5', classement: 'question', libelle: 'Question' },
 ];
 
 /** Le détail d'une réponse : fil, suggestion appliquée en un geste, réponse, classement. */
@@ -94,7 +96,7 @@ export function DetailReponse({ id, stopOuvert, onStopOuvert, onGeste }: DetailR
 
       <div role="group" aria-label="Classer autrement" className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
         {GESTES.map((g) => (
-          <Button key={g.touche} variant="secondary" aria-keyshortcuts={g.touche} className="max-md:h-11" onClick={() => classerEn(g.classement)}>
+          <Button key={g.touche} variant="secondary" aria-keyshortcuts={g.touche} className="max-md:h-11" onClick={() => classerEn(g.classement, { creer_tache: CLASSEMENTS_AVEC_TACHE.includes(g.classement) })}>
             <Touche>{g.touche}</Touche>
             {g.libelle}
           </Button>

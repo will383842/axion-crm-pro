@@ -89,7 +89,13 @@ export function EtapeCible({
         })}
       </div>
 
-      <FiltreReseau reseaux={saisie.reseaux} modifier={(reseaux) => { modifier({ reseaux, reseauxModifies: true }); }} />
+      <FiltreReseau
+        reseaux={saisie.reseaux}
+        modifier={(reseaux) => { modifier({ reseaux, reseauxModifies: true }); }}
+        mots={saisie.mots}
+        guides={saisie.guides}
+        modifierContenu={(patch) => { modifier({ ...patch, reseauxModifies: true }); }}
+      />
 
       <div className="mt-4 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200" role="status" aria-live="polite">
         {saisie.cible === null ? (

@@ -20,22 +20,22 @@ const SPLI_TABLES = ['pl_prospects', 'pl_journal', 'pl_plafonds', 'pl_arret'];
 function spliEspace(): array
 {
     $id = (string) Str::uuid();
-    DB::table('workspaces')->insert(['id' => $id, 'name' => 'Spli', 'slug' => 'spli-'.substr($id, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('workspaces')->insert(['id' => $id, 'name' => 'Spli', 'slug' => 'spli-' . substr($id, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
     $u = (string) Str::uuid();
-    DB::table('users')->insert(['id' => $u, 'email' => 'u-'.substr($u, 0, 8).'@example.test', 'name' => 'Utilisateur fictif']);
+    DB::table('users')->insert(['id' => $u, 'email' => 'u-' . substr($u, 0, 8) . '@example.test', 'name' => 'Utilisateur fictif']);
 
     return [$id, $u];
 }
 
 function spliProspect(string $ws, string $u, array $plus = []): array
 {
-    return $plus + ['id' => (string) Str::uuid(), 'workspace_id' => $ws, 'expediteur_user_id' => $u, 'linkedin_slug' => 'exemple-prenom-nom-'.Str::lower(Str::random(6)),
+    return $plus + ['id' => (string) Str::uuid(), 'workspace_id' => $ws, 'expediteur_user_id' => $u, 'linkedin_slug' => 'exemple-prenom-nom-' . Str::lower(Str::random(6)),
         'source' => 'recherche', 'source_le' => '2026-12-09'];
 }
 
 function spliJournal(string $ws, array $plus = []): array
 {
-    return $plus + ['workspace_id' => $ws, 'evenement' => 'ajout', 'origine' => 'humain', 'auteur' => 'responsable', 'cle_idempotence' => 'cle-'.Str::random(20)];
+    return $plus + ['workspace_id' => $ws, 'evenement' => 'ajout', 'origine' => 'humain', 'auteur' => 'responsable', 'cle_idempotence' => 'cle-' . Str::random(20)];
 }
 
 function spliEchec(Closure $f): ?string
@@ -46,9 +46,9 @@ function spliEchec(Closure $f): ?string
             throw new RuntimeException('__annule__');
         });
     } catch (QueryException $e) {
-        return (string) $e->getCode().'|'.$e->getMessage();
+        return (string) $e->getCode() . '|' . $e->getMessage();
     } catch (RuntimeException $e) {
-        return $e->getMessage() === '__annule__' ? null : 'autre:'.$e->getMessage();
+        return $e->getMessage() === '__annule__' ? null : 'autre:' . $e->getMessage();
     }
 
     return 'inattendu';
@@ -60,7 +60,7 @@ function spliCode(string $mode, string $ws, Closure $f): ?string
     return spliEchec(function () use ($mode, $ws, $f) {
         if ($mode === 'app') {
             WorkspaceContext::set($ws);
-            DB::statement('SET LOCAL ROLE "'.str_replace('"', '""', (string) config('database.connections.pgsql_app.username')).'"');
+            DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
         }
         $f();
     });
@@ -74,15 +74,15 @@ function spliSqlstate(?string $code): ?string
 test('1 structure : tables, RLS forcée, droits, déclencheurs, unicités', function () {
     $app = (string) config('database.connections.pgsql_app.username');
     foreach (SPLI_TABLES as $t) {
-        $r = DB::selectOne('SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = to_regclass(?)', ['public.'.$t]);
+        $r = DB::selectOne('SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = to_regclass(?)', ['public.' . $t]);
         expect($r)->not->toBeNull("{$t} absente")->and((bool) $r->relrowsecurity)->toBeTrue($t)->and((bool) $r->relforcerowsecurity)->toBeTrue($t);
         $nn = DB::selectOne("SELECT is_nullable FROM information_schema.columns WHERE table_name = ? AND column_name = 'workspace_id'", [$t]);
         expect($nn->is_nullable)->toBe('NO');
         foreach (['SELECT' => true, 'INSERT' => true, 'DELETE' => false, 'TRUNCATE' => false] as $droit => $attendu) {
-            expect((bool) DB::selectOne('SELECT has_table_privilege(?, ?, ?) AS ok', [$app, 'public.'.$t, $droit])->ok)->toBe($attendu, "{$t} {$droit}");
+            expect((bool) DB::selectOne('SELECT has_table_privilege(?, ?, ?) AS ok', [$app, 'public.' . $t, $droit])->ok)->toBe($attendu, "{$t} {$droit}");
         }
         // UPDATE au niveau table : jamais.
-        expect((bool) DB::selectOne('SELECT has_table_privilege(?, ?, ?) AS ok', [$app, 'public.'.$t, 'UPDATE'])->ok)->toBeFalse("{$t} UPDATE table");
+        expect((bool) DB::selectOne('SELECT has_table_privilege(?, ?, ?) AS ok', [$app, 'public.' . $t, 'UPDATE'])->ok)->toBeFalse("{$t} UPDATE table");
     }
     foreach (['etat', 'score', 'variante', 'relance_le', 'contact_id', 'maj_le'] as $col) {
         expect((bool) DB::selectOne('SELECT has_column_privilege(?, ?, ?, ?) AS ok', [$app, 'public.pl_prospects', $col, 'UPDATE'])->ok)->toBeTrue($col);
@@ -245,7 +245,7 @@ test('9 additif : down() puis up() rejoués, aucune ligne perdue ni modifiée', 
     DB::table('pl_arret')->insert(['workspace_id' => $ws, 'geste' => 'arret', 'motif' => 'arrêt de test fictif', 'auteur' => 'responsable', 'declencheur' => 'humain']);
     $avant = array_map(fn ($t) => DB::table($t)->count(), SPLI_TABLES);
     foreach (['2026_12_09_000130_pl_prospects_journal.php', '2026_12_09_000140_pl_plafonds_arret.php'] as $f) {
-        $m = require database_path('migrations/'.$f);
+        $m = require database_path('migrations/' . $f);
         $m->down();
         $m->up();
     }

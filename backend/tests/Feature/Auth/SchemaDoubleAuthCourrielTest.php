@@ -171,6 +171,6 @@ it('G3-0 down() puis up() : retour réel et rejouable, sans toucher aux comptes'
 
 it('G3-0 la migration est additive : aucun UPDATE ni DELETE de lignes, seul DROP = down() sur ses objets', function () {
     $src = (string) file_get_contents(base_path(DAC_MIGRATION));
-    [$up] = explode('function down', $src);
+    $up = explode('function down', explode('function up', $src)[1])[0];
     expect($up)->not->toMatch('/\b(DROP|DELETE\s+FROM|TRUNCATE\s+TABLE|UPDATE\s+\w+\s+SET)\b/i');
 });

@@ -19,9 +19,9 @@ import { DetailReponse } from './composants/DetailReponse';
 import { ListeReponses } from './composants/ListeReponses';
 import { useClasser, useListeReponses } from './composants/requetes';
 import type { Classement } from './composants/libelles';
-import { nomComplet } from './composants/libelles';
+import { CLASSEMENTS_AVEC_TACHE, nomComplet } from './composants/libelles';
 
-const TOUCHES_CLASSEMENT: Record<string, Classement> = { '1': 'refus', '2': 'pas_maintenant', '3': 'absence' };
+const TOUCHES_CLASSEMENT: Record<string, Classement> = { '1': 'refus', '2': 'pas_maintenant', '3': 'absence', '4': 'interesse', '5': 'question' };
 
 function estSaisie(cible: EventTarget | null): boolean {
   if (!(cible instanceof HTMLElement)) return false;
@@ -64,7 +64,7 @@ export function ReponsesPage() {
         if (suivant) setChoix(String(suivant.id));
       } else if (selection && courante && touche in TOUCHES_CLASSEMENT) {
         classer.mutate(
-          { id: selection, classement: TOUCHES_CLASSEMENT[touche]! },
+          { id: selection, classement: TOUCHES_CLASSEMENT[touche]!, ...(CLASSEMENTS_AVEC_TACHE.includes(TOUCHES_CLASSEMENT[touche]!) ? { creer_tache: true } : {}) },
           { onSuccess: (r) => r.resume_crm && setConfirmation({ nom: nomComplet(courante), resume: r.resume_crm }) },
         );
       } else if (touche === 's' && selection) {
@@ -79,7 +79,7 @@ export function ReponsesPage() {
   }, [reponses, rang, selection, courante, stopOuvert, classer]);
 
   const parFile = liste.data?.par_file;
-  const interessees = reponses.filter((r) => r.suggestion.classement === 'interesse').length;
+  const interessees = reponses.filter((r) => r.classement === 'interesse' || r.suggestion.classement === 'interesse').length;
   const total = parFile?.a_traiter ?? reponses.length;
 
   return (

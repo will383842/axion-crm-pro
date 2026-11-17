@@ -618,8 +618,8 @@ final class SelectionDestinataires
                     $replisPasses[(int) $r->v] = true;
                 }
                 // D10 : une adresse générale portée par contacts de plusieurs fiches (cabinet, domiciliation) est exclue.
-                foreach (DB::select('SELECT lower(email::text) AS adresse FROM contacts WHERE workspace_id = ? AND deleted_at IS NULL AND email = ANY(?::citext[]) GROUP BY lower(email::text) HAVING COUNT(DISTINCT company_id) > 1', [$ws, self::tableau(array_values($replis))]) as $r) {
-                    $partagees[(string) $r->adresse] = true;
+                foreach (DB::select('SELECT min(email::text) AS adresse FROM contacts WHERE workspace_id = ? AND deleted_at IS NULL AND email = ANY(?::citext[]) GROUP BY email HAVING COUNT(DISTINCT company_id) > 1', [$ws, self::tableau(array_values($replis))]) as $r) {
+                    $partagees[mb_strtolower((string) $r->adresse)] = true; // email est CITEXT : regroupé sans tenir compte de la casse
                 }
             }
         } catch (QueryException $e) {

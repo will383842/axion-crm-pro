@@ -78,6 +78,8 @@ jobs:
     permissions:
       contents: read
       packages: read
+      # Requis par le job `changements` de ci.yml (un appelé ne peut pas demander plus que l'appelant).
+      pull-requests: read
     secrets: inherit
 
   deploy:

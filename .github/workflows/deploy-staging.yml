@@ -67,6 +67,8 @@ jobs:
       # LIRE GHCR (l'image Postgres du job backend). Même déclaration que dans
       # `deploy-direct-ssh.yml`.
       packages: read
+      # Requis par le job `changements` de ci.yml (un appelé ne peut pas demander plus que l'appelant).
+      pull-requests: read
     secrets: inherit
 
   build-and-push:

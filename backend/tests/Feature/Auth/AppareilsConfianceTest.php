@@ -63,7 +63,7 @@ function g3cNavigateur(array $cookies = []): void
         $t->withCookie($nom, $valeur);
     }
     // `auth:sanctum` a fait de « sanctum » le garde par défaut du processus : le login suivant exige « web ».
-    app('auth')->shouldUse((string) config('auth.defaults.guard'));
+    app('auth')->shouldUse('web');
     app('auth')->forgetGuards();
 }
 

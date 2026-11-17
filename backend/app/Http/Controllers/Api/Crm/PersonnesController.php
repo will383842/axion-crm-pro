@@ -8,10 +8,12 @@ use App\Crm\Ingest\ContenusAccords;
 use App\Crm\Ingest\OrigineDictionnaire;
 use App\Crm\Ingest\PersonnesIngestService;
 use App\Crm\Opposition\StatutOpposition;
+use App\Crm\Origines\RequetesOrigines;
 use App\Crm\Personnes\Abonnements;
 use App\Crm\ProvenanceTiers\ProvenanceTiers;
 use App\Crm\Sites\QuarantaineSite;
 use App\Crm\Taxonomy;
+use App\Envoi\Campagnes\FiltreOrigine;
 use App\Support\CelluleCsv;
 use App\Support\EntreprisesFermees;
 use App\Support\MasquageCoordonnees;
@@ -73,10 +75,11 @@ class PersonnesController extends ConsoleController
             }
             $oppositions = (new StatutOpposition)->pourLignes($workspaceId, $lignes);
 
+            $reseaux = FiltreOrigine::actif($workspaceId);
             $data = [];
             foreach ($page->items() as $row) {
                 /** @var \stdClass $row */
-                $data[] = $this->presenter($row, $oppositions[(int) $row->id] ?? null);
+                $data[] = $this->presenter($row, $oppositions[(int) $row->id] ?? null, $reseaux);
             }
 
             return $this->ok([
@@ -633,7 +636,7 @@ class PersonnesController extends ConsoleController
     // ── Internes ────────────────────────────────────────────────────────────
 
     /**
-     * @return array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille: ?string, origine_detail: ?string}
+     * @return array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille: ?string, origine_detail: ?string, origine_reseau: ?string}
      */
     private function filtres(Request $request): array
     {
@@ -648,13 +651,17 @@ class PersonnesController extends ConsoleController
             // éteint, comportement historique inchangé.
             'origine_famille' => ['nullable', 'string', ...($this->origineV3Active() ? ['max:80'] : [])],
             'origine_detail' => ['nullable', 'string', ...($this->origineV3Active() ? ['max:80'] : [])],
+            // PO-L : un seul réseau (jeton fermé). Un tableau est refusé par `string`.
+            'origine_reseau' => ['nullable', 'string', 'regex:' . RequetesOrigines::JETON],
         ]);
+        $origineReseau = $this->filtreReseau($v['origine_reseau'] ?? null, $this->businessWorkspace($request));
 
         [$origineFamille, $origineDetail] = $this->filtreOrigine($v['origine_famille'] ?? null, $v['origine_detail'] ?? null);
 
         return [
             'origine_famille' => $origineFamille,
             'origine_detail' => $origineDetail,
+            'origine_reseau' => $origineReseau,
             'source' => $this->texte($v['source'] ?? null),
             'statut_lettre' => $this->texte($v['statut_lettre'] ?? null),
             'nature' => $this->texte($v['nature'] ?? null),
@@ -691,6 +698,24 @@ class PersonnesController extends ConsoleController
         return [$famille, $detail];
     }
 
+    /**
+     * PO-L : filtre « réseau ». Porte = `FiltreOrigine::actif()` (jamais le
+     * drapeau lu directement). Porte fermée et paramètre présent : 422, jamais
+     * une liste non filtrée présentée comme filtrée.
+     */
+    private function filtreReseau(mixed $reseau, string $workspaceId): ?string
+    {
+        $reseau = is_string($reseau) ? $this->texte($reseau) : null;
+        if ($reseau === null) {
+            return null;
+        }
+        if (str_contains($reseau, "\n") || ! FiltreOrigine::actif($workspaceId)) {
+            throw ValidationException::withMessages(['origine_reseau' => str_contains($reseau, "\n") ? 'validation' : 'origine_lecture_inactive']);
+        }
+
+        return $reseau;
+    }
+
     /** Contrat v3 : interrupteur allumé ET colonne présente (fenêtre de déploiement). */
     private function origineV3Active(): bool
     {
@@ -698,7 +723,7 @@ class PersonnesController extends ConsoleController
     }
 
     /**
-     * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille?: ?string, origine_detail?: ?string}  $f
+     * @param  array{source: ?string, statut_lettre: ?string, nature: ?string, rattachee: ?string, q: ?string, fermees: string, origine_famille?: ?string, origine_detail?: ?string, origine_reseau?: ?string}  $f
      */
     public function requete(string $workspaceId, array $f): Builder
     {
@@ -759,6 +784,20 @@ class PersonnesController extends ConsoleController
             }
         }
 
+        // PO-L : filtre « réseau ». Échec fermé : porte fermée ⇒ aucune ligne.
+        if (($f['origine_reseau'] ?? null) !== null) {
+            if (! FiltreOrigine::actif($workspaceId)) {
+                $requete->whereRaw('1 = 0');
+            } else {
+                $motif = json_encode(['reseau' => $f['origine_reseau']], JSON_THROW_ON_ERROR);
+                $requete->whereRaw('personnes.origines @> ?::jsonb', ['[' . $motif . ']']);
+                $requete->whereRaw(
+                    'EXISTS (SELECT 1 FROM jsonb_array_elements(personnes.origines) AS e(v) WHERE e.v @> ?::jsonb AND (e.v -> \'masque_le\') IS NULL)',
+                    [$motif],
+                );
+            }
+        }
+
         // FERMÉES INSEE (décision du 27/10/2026) : la personne d'une fiche
         // fermée n'apparaît ni dans la liste ni dans l'export par défaut ;
         // `fermees=inclure|seules` la remet. Sans fiche (LEFT JOIN nul), rien à exclure.
@@ -803,7 +842,7 @@ class PersonnesController extends ConsoleController
      * @param  array{opposee: bool, motifs: list<string>}|null  $opposition  statut D14 (lecture seule), lu par lot par l'appelant
      * @return array<string, mixed>
      */
-    private function presenter(\stdClass $p, ?array $opposition = null): array
+    private function presenter(\stdClass $p, ?array $opposition = null, bool $reseaux = false): array
     {
         return [
             'opposition' => $opposition ?? ['opposee' => false, 'motifs' => []],
@@ -837,7 +876,27 @@ class PersonnesController extends ConsoleController
             // L3c-0 (ADR contrat v3 § 6, I1) : AUCUNE PURGE. Clé conservée pour
             // les lecteurs existants, valeur toujours `null`.
             'purge_prevue_le' => null,
-        ] + $this->origineLecture($p);
+        ] + $this->origineLecture($p) + ($reseaux ? ['reseaux' => $this->reseauxDistincts($p)] : []);
+    }
+
+    /**
+     * PO-L : réseaux distincts, triés, des entrées NON masquées (lecture seule).
+     *
+     * @return list<string>
+     */
+    private function reseauxDistincts(\stdClass $p): array
+    {
+        $brut = property_exists($p, 'origines') ? (is_string($p->origines) ? json_decode($p->origines, true) : $p->origines) : null;
+        $reseaux = [];
+        foreach (is_array($brut) ? $brut : [] as $o) {
+            if (is_array($o) && ! ContenusAccords::estMasquee($o) && is_string($o['reseau'] ?? null) && $o['reseau'] !== '') {
+                $reseaux[$o['reseau']] = true;
+            }
+        }
+        $liste = array_map('strval', array_keys($reseaux));
+        sort($liste, SORT_STRING);
+
+        return $liste;
     }
 
     /**

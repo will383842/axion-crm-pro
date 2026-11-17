@@ -48,6 +48,7 @@ final class ReetalementStock
             "SELECT i.id, i.sequence_id, i.version_figee->'fenetre' AS fenetre
                FROM envoi_inscriptions i
                JOIN envoi_sequences s ON s.workspace_id = i.workspace_id AND s.id = i.sequence_id AND s.campagne_id IS NOT NULL
+               JOIN envoi_campagnes c ON c.workspace_id = s.workspace_id AND c.id = s.campagne_id AND c.statut IN ('programmee', 'en_cours', 'en_pause')
               WHERE i.workspace_id = ? AND i.statut = 'active' AND i.etape_courante = 1 AND i.reports = 0 AND i.echecs = 0
                 AND i.prochaine_echeance < ?
                 AND NOT EXISTS (SELECT 1 FROM envoi_messages m WHERE m.workspace_id = i.workspace_id AND m.inscription_id = i.id)

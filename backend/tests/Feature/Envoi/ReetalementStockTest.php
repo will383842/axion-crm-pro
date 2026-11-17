@@ -211,3 +211,22 @@ test('X1-L4-C 7 ligne verrouillée par une autre connexion : sautée (SKIP LOCKE
         }
     }
 });
+
+test('L5-B 7 re-étalement : une campagne arrêtée ou terminée n\'est plus déplacée ; une campagne en pause l\'est encore', function () {
+    foreach (['app', 'proprio'] as $mode) {
+        foreach (['arretee' => 0, 'terminee' => 0, 'en_pause' => 2] as $statut => $attendu) {
+            [$ws, $id] = reeStock(2);
+            foreach (['en_cours', $statut] as $etape) {   // chemin de la base : programmee -> en_cours -> statut visé (la version avance d'un cran)
+                DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => $etape, 'version' => DB::raw('version + 1')]);
+            }
+            $avant = reeEcheances($ws);
+
+            $n = l4cSous($mode, fn () => app(ReetalementStock::class)->reetaler($ws, l4cLundi()));
+
+            expect($n)->toBe($attendu, "{$mode} {$statut}");
+            if ($attendu === 0) {
+                expect(reeEcheances($ws))->toBe($avant, "{$mode} {$statut}");
+            }
+        }
+    }
+});

@@ -172,6 +172,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_09_000110_envoi_campagnes_filtre_origine_contenu.php',
     // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0A : registre d'opposition LinkedIn en ajout seul (DELETE/UPDATE/TRUNCATE refusés) ; le retirer effacerait des oppositions ; down() inerte, up() rejouable.
     '2026_12_09_000120_envoi_oppositions_linkedin.php',
+    // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0B : tables pl_prospects et pl_journal (prospect écarté définitif, journal en ajout seul) ; les retirer effacerait des oppositions et des gestes ; down() inerte, up() rejouable.
+    '2026_12_09_000130_pl_prospects_journal.php',
+    // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0B : plafonds et arrêt de la voie S en ajout seul ; les retirer effacerait l'historique des arrêts ; down() inerte, up() rejouable.
+    '2026_12_09_000140_pl_plafonds_arret.php',
     // Filet modifié : pourquoi — FINI-M0B : attestations du serveur réel, AJOUT SEUL (table, déclencheur, droits) ; la retirer effacerait les attestations ; down() inerte, up() rejouable.
     '2026_12_07_000120_envoi_attestations_serveur_reel.php',
     // Filet modifié : pourquoi — FINI-M0B : boîte figée par inscription (colonne nullable, clé composite), AJOUT SEUL ; la retirer effacerait la boîte posée ; down() inerte, up() rejouable.

@@ -58,7 +58,7 @@ it('le job changements répond « oui » hors PR et en cas de doute', function (
 });
 
 it('la liste couvre workers/, Dockerfile.worker et ci.yml, et rien d\'autre', function () {
-    foreach (['workers/package.json', 'workers/src/a/b.ts', 'Dockerfile.worker', '.github/workflows/ci.yml'] as $f) {
+    foreach (['workers/package.json', 'workers/src/a/b.ts', 'Dockerfile.worker', '.github/workflows/ci.yml', 'backend/app/Jobs/LaunchZoneScrapingJob.php'] as $f) {
         expect(correspondWorkersLotC($f))->toBeTrue($f);
     }
     foreach (['backend/app/Foo.php', 'frontend/src/a.ts', 'docs/workers/x.md', 'Dockerfile.laravel', '.github/workflows/security.yml'] as $f) {
@@ -78,4 +78,14 @@ it('le frontend, le backend et le filet ne dépendent pas de changements', funct
 it('aucun filtre paths sur ci.yml', function () {
     $on = ciLotC()[true] ?? ciLotC()['on'];
     expect($on['pull_request'])->not->toHaveKey('paths');
+});
+
+it('chaque fichier hors de workers/ lu par les tests des workers est dans le motif', function () {
+    $racine = realpath(base_path('..')) ?: base_path('..');
+    $trouves = trim((string) shell_exec('cd ' . escapeshellarg($racine) . " && grep -rhoE \"resolve\\(RACINE_WORKERS, '\\.\\./[^']+'\" workers/tests workers/src"));
+    Assert::assertNotSame('', $trouves, 'la lecture hors de workers/ a disparu : mettre ce test à jour');
+    foreach (explode("\n", $trouves) as $ligne) {
+        preg_match("/'\.\.\/([^']+)'/", $ligne, $m);
+        expect(correspondWorkersLotC($m[1]))->toBeTrue($m[1]);
+    }
 });

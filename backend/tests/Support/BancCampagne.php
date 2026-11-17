@@ -6,6 +6,8 @@ use App\Crm\FichesProtegees;
 use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Campagnes\GestesCampagne;
 use App\Envoi\Campagnes\MaterialisationCampagne;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
+use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\LotEvenements;
@@ -32,6 +34,7 @@ use App\Envoi\Sequence\LecteurFicheDb;
 use App\Envoi\Sequence\ParametresExpedition;
 use App\Envoi\Sequence\Sequenceur;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Closure;
 use DateTimeImmutable;
@@ -101,9 +104,10 @@ final class BancCampagne
     /**
      * Campagne de $n entreprises fictives (un contact nominatif chacune), SANS boîte ni plafond, validée puis matérialisée pour de vrai.
      *
+     * @param  list<int>  $secondContact  rangs (1..n) des entreprises qui ont un SECOND contact nominatif (une seule personne est inscrite par entreprise)
      * @return string identifiant de la campagne (statut « programmee », préparée)
      */
-    public function campagne(int $n = 2, int $etapes = 2, int $delaiJours = 3): string
+    public function campagne(int $n = 2, int $etapes = 2, int $delaiJours = 3, array $secondContact = []): string
     {
         $ws = $this->ws;
         $liste = (int) DB::table('listes_manuelles')->insertGetId(['workspace_id' => $ws, 'nom' => 'Liste banc ' . Str::random(6)]);
@@ -118,6 +122,11 @@ final class BancCampagne
             DB::table('envoi_temoins')->insert(['workspace_id' => $ws, 'empreinte' => EmpreinteTemoin::pourDecision($adresse), 'libelle' => 'banc ' . $i, 'fournisseur' => DepotSocleDb::FOURNISSEURS_TEMOINS[($i - 1) % count(DepotSocleDb::FOURNISSEURS_TEMOINS)]]);
             DB::table('company_tag')->insert(['company_id' => $e, 'tag_id' => $tag, 'workspace_id' => $ws, 'assigned_at' => now(), 'assigned_by' => 'auto-rule']);
             DB::table('contacts')->insert(['workspace_id' => $ws, 'company_id' => $e, 'first_name' => 'Prenom', 'last_name' => 'Nom' . $i, 'email' => $adresse, 'first_info_at' => $collecte, 'created_at' => $collecte, 'updated_at' => $collecte]);
+            if (in_array($i, $secondContact, true)) {
+                $autre = "autre.personne{$i}.{$e}@societe.example.test";
+                DB::table('envoi_temoins')->insert(['workspace_id' => $ws, 'empreinte' => EmpreinteTemoin::pourDecision($autre), 'libelle' => 'banc autre ' . $i, 'fournisseur' => DepotSocleDb::FOURNISSEURS_TEMOINS[($i - 1) % count(DepotSocleDb::FOURNISSEURS_TEMOINS)]]);
+                DB::table('contacts')->insert(['workspace_id' => $ws, 'company_id' => $e, 'first_name' => 'Autre', 'last_name' => 'Personne' . $i, 'email' => $autre, 'first_info_at' => $collecte, 'created_at' => $collecte, 'updated_at' => $collecte]);
+            }
             DB::table('listes_manuelles_membres')->insert(['workspace_id' => $ws, 'liste_id' => $liste, 'company_id' => $e, 'origine' => 'coche']);
         }
         $sequence = [];
@@ -237,8 +246,40 @@ final class BancCampagne
             $this->lecteur->deposer($this->boite, $m);
         }
         app()->instance(FabriqueLecteurs::class, new FabriqueLecteurFixe($this->lecteur));
+        app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire);   // le frein résout le fournisseur de l'adresse : jamais de DNS en test
         $releve = app(ReleveImap::class);   // chaîne et registre RÉELS du conteneur
         $releve->relever($this->ws, $this->boite);
+    }
+
+    /** Remet le curseur de la boîte à zéro : la prochaine relève relit les mêmes messages (mêmes clés boîte/UIDVALIDITY/UID). */
+    public function reinitialiserCurseur(): void
+    {
+        DB::table('envoi_curseurs_imap')->where('workspace_id', $this->ws)->where('boite', $this->boite)->update(['dernier_uid' => 0]);
+    }
+
+    /** Inscription de l'entreprise de rang $rang (« Societe banc <rang> »). */
+    public function inscriptionDe(int $rang): object
+    {
+        return DB::table('envoi_inscriptions as i')->join('companies as c', 'c.id', '=', 'i.entreprise_id')->where('i.workspace_id', $this->ws)
+            ->where('c.workspace_id', $this->ws)->where('c.denomination', 'Societe banc ' . $rang)->first(['i.*']);
+    }
+
+    /** Adresse du contact réellement inscrit (même empreinte que l'inscription). */
+    public function adresseInscrite(object $inscription): string
+    {
+        foreach (DB::table('contacts')->where('workspace_id', $this->ws)->where('company_id', $inscription->entreprise_id)->orderBy('id')->pluck('email') as $email) {
+            if (ListeSuppression::empreinte((string) $email) === $inscription->empreinte_adresse) {
+                return (string) $email;
+            }
+        }
+        throw new \LogicException('Aucun contact de l\'entreprise ne porte l\'empreinte de l\'inscription.');
+    }
+
+    /** Identifiant d'injection du registre (`envoi_messages_envoyes`) d'une étape : c'est lui que porte un VERP. */
+    public function idInjectionRegistre(string $inscriptionId, int $etape = 1): string
+    {
+        return (string) DB::table('envoi_messages_envoyes')->where('workspace_id', $this->ws)
+            ->where('message_id_empreinte', hash('sha256', 'mid:' . $this->messageId($inscriptionId, $etape)))->value('id_injection');
     }
 
     public function messagesEnvoyes(?int $etape = null): Collection
@@ -247,7 +288,7 @@ final class BancCampagne
     }
 
     /** Message-ID (chevrons ôtés) de la première étape d'une inscription. */
-    public function messageId(int $inscriptionId, int $etape = 1): string
+    public function messageId(string $inscriptionId, int $etape = 1): string
     {
         return trim((string) DB::table('envoi_messages')->where('workspace_id', $this->ws)->where('inscription_id', $inscriptionId)->where('etape', $etape)->where('statut', 'envoye')->value('message_id'), " \t\r\n<>");
     }
@@ -264,9 +305,10 @@ final class BancCampagne
         return new MessageBrut(++$this->uid, 'stop-' . $this->uid . '@mx.example.test', $messageId, [], $de, self::jour('11:00'), 'Re: Objet 1', 'STOP, ne me contactez plus.', [], null, null, null);
     }
 
-    public function rebondDur(string $messageId, string $adresse): MessageBrut
+    /** Rebond dur : rattaché par le Message-ID cité ET/OU par un VERP signé (`$verp`, de préférence seul : `$messageId` null). */
+    public function rebondDur(?string $messageId, string $adresse, ?string $verp = null): MessageBrut
     {
-        return new MessageBrut(++$this->uid, 'rb-' . $this->uid . '@mx.example.test', null, [], 'MAILER-DAEMON@retour.example.test', self::jour('11:00'), 'Undelivered', 'Adresse inconnue.', [], '5.1.1', $messageId, $adresse);
+        return new MessageBrut(++$this->uid, 'rb-' . $this->uid . '@mx.example.test', null, [], 'MAILER-DAEMON@retour.example.test', self::jour('11:00'), 'Undelivered', 'Adresse inconnue.', [], '5.1.1', $messageId, $adresse, adressesLocales: $verp === null ? [] : [$verp]);
     }
 
     public function rebondMou(string $messageId, string $adresse): MessageBrut

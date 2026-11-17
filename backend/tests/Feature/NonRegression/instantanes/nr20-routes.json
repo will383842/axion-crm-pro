@@ -166,7 +166,7 @@
     "POST /api/v1/companies/{company}/recompute-score | api,auth,first-login,permission,workspace",
     "POST /api/v1/companies/{company}/taches | api,auth,first-login,permission,workspace",
     "POST /api/v1/companies/{company}/taches/{activityId}/terminer | api,auth,first-login,permission,workspace",
-    "POST /api/v1/compte/appareils/{p}/retirer | api,auth,first-login,throttle,workspace",
+    "POST /api/v1/compte/appareils/{id}/retirer | api,auth,first-login,throttle,workspace",
     "POST /api/v1/compte/code | api,auth,first-login,throttle,workspace",
     "POST /api/v1/coverage/enrich | api,auth,first-login,permission,throttle,workspace",
     "POST /api/v1/coverage/launch | api,auth,first-login,permission,throttle,workspace",

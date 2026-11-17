@@ -375,8 +375,8 @@ test('R07 : le nombre de bloquants et les drapeaux ne bougent que comme attendu'
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     $points = app(ListeFeuVert::class)->points($ws);
     $bloquants = count(array_filter($points, fn ($p) => $p->bloquant));
-    // 48 points : 18 auto verts (toutVert pose l'essai à blanc et, X5, les signaux des deux freins), 1 auto sans source, 29 manuels non faits.
-    expect($bloquants)->toBe(1 + 29);
+    // 48 points : 19 auto verts (toutVert pose l'essai à blanc, les signaux des deux freins et, X5-B, l'IP du domaine), aucun auto sans source, 29 manuels non faits.
+    expect($bloquants)->toBe(29);
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
 });
 

@@ -5,13 +5,13 @@ namespace App\Envoi\Reponses;
 use App\Crm\Ingest\ContactUpserter;
 use App\Crm\Ingest\IngestOutcome;
 use App\Envoi\Desinscription\EnregistrerOpposition;
+use App\Envoi\Desinscription\OpposerAdresse;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Lecture et gestes sur les réponses (R12). Aucun envoi, jamais : « répondre » reste fermé (409 au contrôleur).
@@ -193,20 +193,7 @@ final class ServiceReponses
     /** Un lien par adresse (réutilisé au rejeu) → UNE opposition, mise à l'écart sans effacement. */
     private function opposer(string $ws, string $empreinte): void
     {
-        $reference = DB::transaction(function () use ($ws, $empreinte): string {
-            DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['envoi_stop|' . $ws . '|' . $empreinte]);
-            $lien = DB::table('envoi_liens_desinscription')->where('workspace_id', $ws)->where('empreinte_adresse', $empreinte)->orderBy('id')->first();
-            if ($lien !== null) {
-                return (string) $lien->reference;
-            }
-            $reference = (string) Str::uuid();
-            DB::table('envoi_liens_desinscription')->insert([
-                'workspace_id' => $ws, 'reference' => $reference, 'empreinte_adresse' => $empreinte, 'portee' => 'business',
-            ]);
-
-            return $reference;
-        });
-        $this->opposition->executer($ws, $reference, EnregistrerOpposition::CANAL_REPONSE);
+        (new OpposerAdresse($this->opposition))->executer($ws, $empreinte, EnregistrerOpposition::CANAL_REPONSE);
     }
 
     /** @return array{0: string, 1: ?array<string, mixed>}  [état, résultat] : ok | inconnue | inconnue_injection | deja */

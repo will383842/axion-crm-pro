@@ -29,29 +29,60 @@ paths:
                     items: { $ref: './commun.yaml#/components/schemas/BoiteResume' }
     post:
       operationId: ajouterBoite
-      summary: Ajouter une boîte (non disponible au palier 0)
+      summary: Ajouter une boîte (propriétaire, code de confirmation)
       description: |
-        Au palier 0, une boîte s'ajoute par commande locale sur le serveur
-        (les identifiants ne transitent jamais par l'écran) : la route répond 501.
+        Au seul ajout, le propriétaire saisit le mot de passe de la boîte (jamais
+        journalisé, jamais relu) avec le code reçu par `POST /envoi/boites/ajout/code`.
+        La boîte naît en pause (`suspension_manuelle`). Tant que le serveur n'est pas
+        branché (lot F3-B1), la route répond encore 501 `serveur_reel_requis`.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              type: object
-              required: [adresse, domaine_id, nom_affiche]
-              properties:
-                adresse: { type: string, format: email }
-                domaine_id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
-                nom_affiche: { type: string }
-                signature:
-                  description: Signature ajoutée en bas des messages de cette boîte.
-                  type: string
-                mode_absence: { $ref: '#/components/schemas/ModeAbsence' }
+            schema: { $ref: '#/components/schemas/AjoutBoite' }
       responses:
-        '201': { $ref: '#/components/responses/Boite' }
+        '201':
+          description: Boîte créée, en pause.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BoiteAjoutee' }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409':
+          description: Code invalide (faux, expiré, consommé, 5 essais, demande différente) ou boîte existante.
+          content:
+            application/json:
+              schema: { $ref: './commun.yaml#/components/schemas/Erreur' }
         '422': { $ref: './commun.yaml#/components/responses/Erreur' }
         '501': { $ref: './commun.yaml#/components/responses/Erreur' }
+  /envoi/boites/ajout/code:
+    post:
+      operationId: demanderCodeAjoutBoite
+      summary: Demander le code de confirmation de l'ajout d'une boîte
+      description: |
+        Corps sans secret. Le code est envoyé au propriétaire ; il expire et ne sert qu'une fois,
+        pour cette demande exacte. Au plus 3 codes en 15 minutes. `409 domaine_inconnu` si le domaine
+        de l'adresse est absent des domaines de l'espace ; `503 transport_courriel_non_sur` si le
+        courriel du code ne peut pas partir par un transport sûr.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DemandeAjoutBoite' }
+      responses:
+        '202':
+          description: Code envoyé.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [expire_le]
+                properties:
+                  expire_le: { type: string, format: date-time }
+        '403': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '409': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '422': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '429': { $ref: './commun.yaml#/components/responses/Erreur' }
+        '503': { $ref: './commun.yaml#/components/responses/Erreur' }
   /envoi/boites/test-connexion:
     post:
       operationId: testerConnexionBoite
@@ -596,6 +627,29 @@ components:
           oneOf: [{ type: string, format: date }, { type: 'null' }]
         message:
           oneOf: [{ type: string }, { type: 'null' }]
+    DemandeAjoutBoite:
+      type: object
+      description: Demande d'ajout d'une boîte, sans le mot de passe.
+      required: [adresse, hote, port, chiffrement, utilisateur]
+      # Écriture seule. Style compact voulu : le garde contrat-envoi-f03c interdit `hote:` / `port:` en début de ligne (lecture).
+      properties:
+        { adresse: { type: string, format: email }, hote: { type: string }, port: { type: integer, minimum: 1, maximum: 65535 }, chiffrement: { type: string, enum: [tls, starttls] }, utilisateur: { type: string } }
+    AjoutBoite:
+      description: Demande d'ajout, avec le mot de passe (au seul ajout) et le code de confirmation.
+      allOf:
+        - { $ref: '#/components/schemas/DemandeAjoutBoite' }
+        - type: object
+          required: [secret, code]
+          properties:
+            secret: { type: string, format: password, writeOnly: true }
+            code: { type: string, pattern: '^[0-9]{6}$' }
+    BoiteAjoutee:
+      type: object
+      required: [id, etat, pause_motif]
+      properties:
+        id: { $ref: './commun.yaml#/components/schemas/Identifiant' }
+        etat: { type: string, enum: [en_pause] }
+        pause_motif: { type: string, enum: [suspension_manuelle] }
     ReglagesBoite:
       type: object
       required: [signature, mode_absence]

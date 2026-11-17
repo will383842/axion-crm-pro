@@ -157,14 +157,12 @@ test('réactiver une boîte active est idempotent (200, rien d’écrit)', funct
     expect(ligneBoite($s['espace']->id, $s['boite'])->maj_le)->toBe($avant->maj_le);
 });
 
-test('POST /envoi/boites, test-connexion et PUT reglages répondent 501 serveur_reel_requis avant toute lecture, sans écrire', function () {
+test('test-connexion et PUT reglages répondent 501 serveur_reel_requis avant toute lecture, sans écrire', function () {
     $s = semerBoites($this);
     $avant = nbBoites($s['espace']->id);
     foreach (['owner'] as $role) {
         $this->actingAs($this->compte($s['espace'], $role), 'sanctum');
         foreach ([
-            ['POST', '/api/v1/envoi/boites', []],
-            ['POST', '/api/v1/envoi/boites', ['adresse' => 'pas-une-adresse']],
             ['POST', '/api/v1/envoi/boites/test-connexion', []],
             ['PUT', '/api/v1/envoi/boites/' . $s['boite'] . '/reglages', ['signature' => 'x']],
             ['PUT', '/api/v1/envoi/boites/' . $s['boiteAutre'] . '/reglages', []],
@@ -174,18 +172,20 @@ test('POST /envoi/boites, test-connexion et PUT reglages répondent 501 serveur_
             expect($r->json('error'))->toBe('serveur_reel_requis');
         }
     }
+    // F3-B1 : POST /envoi/boites est servi (voir BoitesAjoutTest) ; il reste sous workspaces.manage.
     // Sans workspaces.manage : 403 avant le 501 (la garde F36-001 exige une permission sur toute écriture).
     $this->actingAs($this->compte($s['espace'], 'viewer'), 'sanctum')->postJson('/api/v1/envoi/boites', [])->assertForbidden();
     expect(nbBoites($s['espace']->id))->toBe($avant)->and(ligneBoite($s['espace']->id, $s['boite'])->limite_jour)->toBe(20);
     expect($this->resolutions)->toBe(0);
 });
 
-test('les trois entrées NonServiAuPalier0 des boîtes sont déclarées en 501', function () {
+test('les deux entrées NonServiAuPalier0 des boîtes sont déclarées en 501 (POST /envoi/boites est servi depuis F3-B1)', function () {
     $e = NonServiAuPalier0::entrees();
-    foreach (['POST /envoi/boites', 'POST /envoi/boites/test-connexion', 'PUT /envoi/boites/{id}/reglages'] as $couple) {
+    foreach (['POST /envoi/boites/test-connexion', 'PUT /envoi/boites/{id}/reglages'] as $couple) {
         expect($e)->toHaveKey($couple);
         expect($e[$couple]['code'])->toBe(501);
     }
+    expect($e)->not->toHaveKey('POST /envoi/boites');
     expect($e['PUT /envoi/boites/{id}/reglages']['exemple'])->toBe('/envoi/boites/00000000-0000-0000-0000-000000000000/reglages');
 });
 

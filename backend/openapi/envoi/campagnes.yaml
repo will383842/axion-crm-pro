@@ -409,6 +409,20 @@ components:
           type: integer
           minimum: 1
           description: Version de la campagne (verrou optimiste).
+        blocage:
+          description: |
+            « Bloquée, pourquoi » (B8-A) : la première raison vraie, dans l'ordre fermé reglage_non_applique, preparation_bloquee,
+            aucun_destinataire, frein_arret_general, frein_pause_automatique, sequence_en_pause. Nul hors des statuts
+            programmee, en_cours et en_pause, et quand rien ne bloque. Le message ne contient ni adresse ni nom de personne.
+          oneOf:
+            - type: object
+              required: [code, message]
+              properties:
+                code:
+                  type: string
+                  enum: [reglage_non_applique, preparation_bloquee, aucun_destinataire, frein_arret_general, frein_pause_automatique, sequence_en_pause]
+                message: { type: string, minLength: 1, maxLength: 300 }
+            - { type: 'null' }
   responses:
     Campagne:
       description: Campagne après le geste.

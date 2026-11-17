@@ -404,7 +404,8 @@ d'un autre espace jamais choisie ; deux processus réels sur la même inscriptio
 `PlafondConcurrenceTest`) ; aucune boîte active ⇒ rien injecté.
 **Mutations** : retirer le `WHERE boite_id IS NULL` ⇒ test concurrent rouge ; choisir une autre boîte si la sienne est
 en pause ⇒ rouge.
-**Dépendances** : M0B déployée.
+**Dépendances** : M0B déployée ; **#677 (RR-5C, même fichier `Sequenceur.php`) fusionnée** (décision de pilotage,
+commentaire sur #680 : ne rien coder d'ici là).
 
 ### C4-B — câblage de `KumoHttp` dans la passerelle (inerte par défaut) et mesure `file_age_s`
 

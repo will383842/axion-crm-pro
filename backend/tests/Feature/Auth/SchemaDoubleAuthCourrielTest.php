@@ -154,23 +154,22 @@ it('G3-0 aucune colonne identifiante ni JSON dans les deux tables', function () 
     }
 });
 
-it('G3-0 down() puis up() : retour réel et rejouable, sans toucher aux comptes', function () {
+it('G3-0 down() inerte : rien n\'est retiré, la ligne users reste intacte, up() rejouable', function () {
     $u = dacUtilisateur('email');
     $migration = require base_path(DAC_MIGRATION);
     $migration->down();
-    expect(Schema::hasTable('codes_connexion_courriel'))->toBeFalse()
-        ->and(Schema::hasTable('appareils_confiance'))->toBeFalse()
-        ->and(Schema::hasColumn('users', 'double_auth_methode'))->toBeFalse()
-        ->and(DB::table('users')->where('id', $u)->exists())->toBeTrue();
-    $migration->up();
-    $migration->up(); // rejouable (gardes hasColumn / hasTable)
     expect(Schema::hasTable('codes_connexion_courriel'))->toBeTrue()
         ->and(Schema::hasTable('appareils_confiance'))->toBeTrue()
-        ->and(Schema::hasColumn('users', 'double_auth_methode'))->toBeTrue();
+        ->and(Schema::hasColumn('users', 'double_auth_methode'))->toBeTrue()
+        ->and(DB::table('users')->where('id', $u)->value('double_auth_methode'))->toBe('email');
+    $migration->up();
+    $migration->up(); // rejouable (gardes hasColumn / hasTable)
+    expect(Schema::hasTable('appareils_confiance'))->toBeTrue();
 });
 
-it('G3-0 la migration est additive : aucun UPDATE ni DELETE de lignes, seul DROP = down() sur ses objets', function () {
+it('G3-0 la migration est additive : ni up() ni down() ne contiennent DROP, DELETE, TRUNCATE ou UPDATE', function () {
     $src = (string) file_get_contents(base_path(DAC_MIGRATION));
-    $up = explode('function down', explode('function up', $src)[1])[0];
-    expect($up)->not->toMatch('/\b(DROP|DELETE\s+FROM|TRUNCATE\s+TABLE|UPDATE\s+\w+\s+SET)\b/i');
+    $code = preg_replace('#/\*.*?\*/|//[^\n]*#s', '', explode('function up', $src)[1]);
+    expect($code)->not->toMatch('/\b(DROP|DELETE\s+FROM|TRUNCATE\s+TABLE|UPDATE\s+\w+\s+SET)\b/i');
+    expect(explode('function down', $src)[1])->not->toMatch('/DB::|Schema::/');
 });

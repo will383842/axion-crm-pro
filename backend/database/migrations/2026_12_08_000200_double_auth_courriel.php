@@ -70,10 +70,9 @@ return new class extends Migration
         });
     }
 
-    public function down(): void
-    {
-        DB::statement('DROP TABLE IF EXISTS appareils_confiance');
-        DB::statement('DROP TABLE IF EXISTS codes_connexion_courriel');
-        DB::statement('ALTER TABLE users DROP COLUMN IF EXISTS double_auth_methode');
-    }
+    /**
+     * Ajout seul : rien n'est retiré (un retour arrière ferait perdre la double
+     * authentification par courriel et effacerait des données de sécurité).
+     */
+    public function down(): void {}
 };

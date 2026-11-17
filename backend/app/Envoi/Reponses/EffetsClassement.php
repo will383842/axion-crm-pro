@@ -6,6 +6,7 @@ use App\Envoi\Imap\InscriptionsDuRetour;
 use App\Envoi\Sequence\Evenement;
 use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
+use App\Envoi\Sequence\ReportAbsence;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * aucune opposition levée, aucune inscription rouverte. Rejouable (tâche en `insertOrIgnore` sur `external_ref`).
  * À appeler DANS la transaction du classement et sous le `WorkspaceContext` de l'espace. Ni adresse ni extrait écrits.
  *
- * « absence » : le report de 7 jours (RR-4C, `ReportAbsence`) n'est pas encore sur `main` ; en attendant, aucun effet.
+ * « absence » : `ReportAbsence` (RR-4C) repousse de 7 jours la relance des inscriptions actives visées ; aucun arrêt, aucune tâche.
  */
 /**
  * @phpstan-type LigneEffets object{id: int|string, evenement_id: int|string, empreinte_expediteur: string}
@@ -43,6 +44,10 @@ final class EffetsClassement
             foreach ($ids as $id) {
                 $service->evenement($ws, $id, Evenement::REPONSE, $maintenant);
             }
+        }
+
+        if ($classement === 'absence') {
+            (new ReportAbsence)->reporter($ws, $ids, new \DateTimeImmutable('now'));
         }
 
         if ($classement === 'interesse') {

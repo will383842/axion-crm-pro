@@ -204,7 +204,13 @@ test('erreur de lecture de l’attestation ⇒ exception, jamais « fait » (éc
         $ws = $espace();
         attSrSur('pgsql_owner', fn () => DB::statement('ALTER TABLE envoi_attestations_serveur_reel RENAME TO envoi_attestations_serveur_reel_x'));
         try {
-            expect(fn () => app(ListeFeuVert::class)->points($ws))->toThrow(Throwable::class);
+            $levee = false;
+            try {
+                app(ListeFeuVert::class)->points($ws);
+            } catch (Throwable) {
+                $levee = true;
+            }
+            expect($levee)->toBeTrue();
         } finally {
             attSrSur('pgsql_owner', fn () => DB::statement('ALTER TABLE envoi_attestations_serveur_reel_x RENAME TO envoi_attestations_serveur_reel'));
         }

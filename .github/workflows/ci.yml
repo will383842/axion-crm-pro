@@ -616,26 +616,26 @@ jobs:
           exit "$code"
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # BACKEND EN 4 PARTS + VERDICT.
+  # BACKEND EN 2 PARTS + VERDICT.
   #
-  # `backend` est une MATRICE de 4 parts (la suite Pest durait ~9 min en un seul
+  # `backend` est une MATRICE de 2 parts (la suite Pest durait ~9 min en un seul
   # processus). Il n'a volontairement AUCUN `needs` : un job dont le `needs` est
   # rouge est « skipped », et un job sauté compte comme RÉUSSI pour un check
   # exigé par la protection de branche — une PR au filet rouge était fusionnable.
   # Le contexte exigé « Backend Laravel (install + PHPStan + Pint + Pest) » est
   # désormais le `name:` du job `backend-verdict` (en fin de ce bloc), qui tourne
-  # TOUJOURS (`if: always()`) et ne passe au vert que si le filet ET les 4 parts
+  # TOUJOURS (`if: always()`) et ne passe au vert que si le filet ET les 2 parts
   # sont verts et que tous les tests ont bien été joués. La protection de branche
   # ne change pas. Les parts se nomment « Pest part N » : jamais le nom du verdict.
   # ═══════════════════════════════════════════════════════════════════════════
   backend:
-    name: Pest part ${{ matrix.part }}/4
+    name: Pest part ${{ matrix.part }}/2
     strategy:
       fail-fast: false
       matrix:
-        part: [1, 2, 3, 4]
+        part: [1, 2]
     runs-on: ubuntu-24.04
-    # F38-008 — plafond anti-gel. Durée mesurée ≈ 3-4 min par part (Postgres + 1/4 de la
+    # F38-008 — plafond anti-gel. Durée mesurée ≈ 6-11 min par part (Postgres + 1/2 de la
     # suite Pest) : 20 min = plus de 5× la durée utile, sans laisser un gel durer 1 h.
     timeout-minutes: 20
     steps:
@@ -814,7 +814,7 @@ jobs:
           docker logs axion-ci-postgres | tail -50
           exit 1
 
-      - name: Pest part ${{ matrix.part }}/4 (BLOQUANT)
+      - name: Pest part ${{ matrix.part }}/2 (BLOQUANT)
         working-directory: backend
         env:
           APP_ENV: testing
@@ -850,14 +850,14 @@ jobs:
         # aléatoire reste actif en local pour débusquer le couplage.
         #
         # LA PART : `tests/ci/decouper-suite.php` répartit les *Test.php par taille,
-        # VÉRIFIE lui-même que les 4 parts couvrent tout sans recouvrement (sinon
+        # VÉRIFIE lui-même que les 2 parts couvrent tout sans recouvrement (sinon
         # il échoue) et écrit `phpunit-part.xml` = `phpunit-ci.xml` dont seul le
         # bloc <testsuites> change (le bloc <php> reste identique).
         # La part 1 écrit aussi le nombre TOTAL de tests de la suite entière
         # (`parts/total.txt`) : `backend-verdict` le compare à la somme jouée.
         run: |
           set -euo pipefail
-          php tests/ci/decouper-suite.php "${{ matrix.part }}" 4
+          php tests/ci/decouper-suite.php "${{ matrix.part }}" 2
           if [ "${{ matrix.part }}" = "1" ]; then
             mkdir -p parts
             php vendor/bin/pest --list-tests --configuration phpunit-ci.xml > parts/liste.txt
@@ -963,7 +963,7 @@ jobs:
           pattern: pest-part-*
           path: artefacts
 
-      - name: Verdict (filet vert + 4 parts vertes + tous les tests joués)
+      - name: Verdict (filet vert + 2 parts vertes + tous les tests joués)
         if: always()
         env:
           RESULTAT_FILET: ${{ needs.filet-non-regression.result }}
@@ -971,18 +971,18 @@ jobs:
         run: |
           set -uo pipefail
           echo "filet-non-regression : ${RESULTAT_FILET}"
-          echo "backend (4 parts)    : ${RESULTAT_BACKEND}"
+          echo "backend (2 parts)    : ${RESULTAT_BACKEND}"
           ko=0
           if [ "${RESULTAT_FILET}" != "success" ]; then
             echo "::error::Le filet de non-régression n'est pas « success » (${RESULTAT_FILET})."; ko=1
           fi
           if [ "${RESULTAT_BACKEND}" != "success" ]; then
-            echo "::error::Le job backend (4 parts) n'est pas « success » (${RESULTAT_BACKEND})."; ko=1
+            echo "::error::Le job backend (2 parts) n'est pas « success » (${RESULTAT_BACKEND})."; ko=1
           fi
-          # Les parts : exactement 4 junit, au moins un test chacun.
+          # Les parts : exactement 2 junit, au moins un test chacun.
           mapfile -t junits < <(find artefacts -name 'junit-*.xml' | sort)
-          if [ "${#junits[@]}" -ne 4 ]; then
-            echo "::error::${#junits[@]} fichier(s) junit trouvé(s), exactement 4 attendus."; ko=1
+          if [ "${#junits[@]}" -ne 2 ]; then
+            echo "::error::${#junits[@]} fichier(s) junit trouvé(s), exactement 2 attendus."; ko=1
           fi
           # Chaque part doit avoir joué au moins un test, et l'égalité « somme jouée =
           # total listé » est BLOQUANTE (étalonnée sur un vrai run : 4544 = 4544).

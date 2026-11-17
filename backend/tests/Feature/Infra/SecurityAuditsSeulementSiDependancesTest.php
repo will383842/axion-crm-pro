@@ -56,9 +56,12 @@ it('les audits sautent sur PR sans dépendances, jamais ailleurs', function () {
     $jobs = securiteLotA()['jobs'];
     foreach (['composer-audit', 'pnpm-audit'] as $nom) {
         expect($jobs[$nom]['needs'])->toBe('changements');
-        expect($jobs[$nom]['if'])->toBe(
-            "github.event_name != 'pull_request' || needs.changements.outputs.deps == 'true'",
-        );
+        $condition = (string) $jobs[$nom]['if'];
+        // always() : sans lui, un `changements` en échec/annulé ferait SAUTER l'audit (même sur main et la nuit).
+        expect($condition)->toContain('always()')
+            ->toContain("needs.changements.result != 'success'")
+            ->toContain("github.event_name != 'pull_request'")
+            ->toContain("needs.changements.outputs.deps == 'true'");
     }
     $script = (string) $jobs['changements']['steps'][0]['run'];
     expect($script)->toContain('"$EVENEMENT" != "pull_request"')->toContain('deps=true');

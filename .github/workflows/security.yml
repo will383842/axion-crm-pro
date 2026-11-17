@@ -471,7 +471,7 @@ jobs:
   composer-audit:
     name: PHP deps audit
     needs: changements
-    if: github.event_name != 'pull_request' || needs.changements.outputs.deps == 'true'
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changements.result != 'success' || needs.changements.outputs.deps == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20  # F38-008
     steps:
@@ -535,7 +535,7 @@ jobs:
   pnpm-audit:
     name: Node deps audit
     needs: changements
-    if: github.event_name != 'pull_request' || needs.changements.outputs.deps == 'true'
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changements.result != 'success' || needs.changements.outputs.deps == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20  # F38-008
     strategy:

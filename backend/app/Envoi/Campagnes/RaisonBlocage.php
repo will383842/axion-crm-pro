@@ -39,7 +39,7 @@ final class RaisonBlocage
     /** Prédicat UNIQUE (partagé avec `MaterialisationCampagne`) : boîtes non vides ou plafond du jour renseigné. */
     public static function reglageNonApplique(\stdClass $c): bool
     {
-        if (self::REGLAGES_APPLIQUES) {
+        if (self::REGLAGES_APPLIQUES) { // @phpstan-ignore if.alwaysFalse (interrupteur de code : passe à vrai quand le transport applique boîtes et plafond)
             return false;
         }
         $contenu = json_decode((string) $c->saisie, true)['contenu'] ?? [];

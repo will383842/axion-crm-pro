@@ -167,6 +167,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_10_000100_envoi_campagnes_filtre_origine.php',
     // Filet modifié : pourquoi — envoi L6-0 : index partiel d'expression d'`envoi_evenements` (CONCURRENTLY hors transaction), ajout d'index seul ; down() inerte, up() rejouable.
     '2026_12_09_000100_envoi_evenements_index_injection.php',
+    // Filet modifié : pourquoi — FINI-M0A : inventaire des IP d'envoi, AJOUT SEUL (table, déclencheurs, droits) ; la retirer effacerait l'inventaire ; down() inerte, up() rejouable.
+    '2026_12_07_000100_envoi_ips.php',
+    // Filet modifié : pourquoi — FINI-M0A : rattachement domaine → IP (colonne nullable, FK NOT VALID, fonction), AJOUT SEUL ; le retirer effacerait les rattachements posés ; down() inerte, up() rejouable.
+    '2026_12_07_000110_envoi_domaines_ip.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

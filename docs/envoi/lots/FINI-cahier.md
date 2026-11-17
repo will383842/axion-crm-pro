@@ -94,6 +94,9 @@ X11-A (`GardeChauffe.php`, `Seuils.php`, 1 test), C4-A (`infra/…/passerelle/sr
 - C `backend/database/migrations/2026_12_07_000110_envoi_domaines_ip.php`
 - C `backend/tests/Feature/Envoi/MigrationsIpEnvoiTest.php`
 - C `docs/envoi/lots/FINI-M0A.md`
+- M `backend/tests/Feature/NonRegression/Nr17MigrationsTest.php` : seulement les 2 migrations ajoutées à
+  `NR17_RETOUR_INERTE_VOULU`, après la fusion de #675 (décision de pilotage, commentaire sur #680). Ordre imposé sur ce
+  fichier : #675, puis #683 (M0A), puis #685 (M0B).
 
 **Comportement**
 - `000100` : table `envoi_ips` : `id UUID PK`, `workspace_id UUID NOT NULL REFERENCES workspaces(id)`,
@@ -257,6 +260,9 @@ hors `example.test`, ou une clé de plus de 16 caractères.
 **Fichiers autorisés** : M `backend/app/Envoi/FeuVert/ListeFeuVert.php` ; M `backend/app/Envoi/FeuVert/CatalogueManuels.php` ;
 M `backend/app/Envoi/FeuVert/DecisionFeuVert.php` ; C `backend/tests/Feature/Envoi/FeuVertBatterieFraicheTest.php` ;
 M `backend/tests/Feature/Envoi/FeuVertListeTest.php` (comptes seulement : voir « filet modifié ») ;
+M `backend/tests/Feature/Envoi/FeuVertDecisionTest.php`, `FeuVertRoutesTest.php`, `FeuVertCatalogueV4Test.php`,
+`FeuVertFreinsSignauxTest.php` : comptes seulement (48 → 49 points, version 5 → 6), aucune assertion retirée
+(décision de pilotage, commentaire sur #680) ;
 C `docs/envoi/lots/X5-C.md`.
 **Fichiers chauds** : `ListeFeuVert.php`, `CatalogueManuels.php` (X5-A, X5-B attendent).
 

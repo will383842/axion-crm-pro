@@ -9,6 +9,7 @@ use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Chauffe\Freins;
 use App\Envoi\Chauffe\ResolveurEnMemoire;
 use App\Envoi\Chauffe\ResolveurFournisseur;
+use App\Envoi\Depot\DepotSocle;
 use App\Envoi\Imap\ClasseRetour;
 use App\Envoi\Imap\RecepteurRetoursFreins;
 use App\Envoi\Imap\RetourDetecte;
@@ -127,7 +128,7 @@ test('F3b la file « à rattacher » compte ; le journal garde son sens (le maxi
     $depot = app(DepotChauffe::class);
     expect($depot->reponsesEnAttente($this->a))->toBe(2);
     foreach (range(1, 5) as $_) {
-        $depot->journaliser($this->a, 'reponse_recue', 'test');
+        app(DepotSocle::class)->journaliser($this->a, 'reponse_recue', 'test');
     }
     expect($depot->reponsesEnAttente($this->a))->toBe(5); // journal 5 − 0 > file 2
 });

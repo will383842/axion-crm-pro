@@ -188,7 +188,7 @@ final class AssistantCreation
             return [null, null];
         }
         try {
-            $filtre = is_array($origine) ? FiltreOrigine::depuisColonne($origine) : throw new \InvalidArgumentException('forme');
+            $filtre = is_array($origine) ? (FiltreOrigine::depuisColonne($origine) ?? throw new \InvalidArgumentException('forme')) : throw new \InvalidArgumentException('forme');
         } catch (\InvalidArgumentException) {
             throw ErreurCreation::invalide('validation', 'Le filtre par réseau d\'origine est {"reseaux": [...]} : 1 à ' . FiltreOrigine::RESEAUX_MAX . ' réseaux (minuscules, chiffres, . _ -).');
         }
@@ -501,7 +501,7 @@ final class AssistantCreation
         }
 
         return [
-            $actif
+            $actif && $filtre !== null
                 ? $c7('filtre_origine', 'Filtre par réseau d\'origine', 'ok', 'Filtre par réseau : ' . implode(', ', $filtre->reseaux))
                 : $c7('filtre_origine', 'Filtre par réseau d\'origine', 'bloquant', 'Le filtre par réseau d\'origine est inactif : retirez-le ou attendez son ouverture'),
             $c7('filtre_origine_estimation', 'Estimation et filtre par réseau', 'attention', 'L\'estimation affichée ne tient pas compte du filtre ; le compte exact (hors réseau) apparaît à la préparation de l\'envoi'),

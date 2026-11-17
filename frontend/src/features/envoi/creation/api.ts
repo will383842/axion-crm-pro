@@ -3,6 +3,7 @@
  * Contrat : `backend/openapi/envoi/creation.yaml` (types générés par `pnpm api:envoi`).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { api } from '@/lib/api';
 import type { components } from '@/features/envoi/api/creation';
 
@@ -66,6 +67,48 @@ export function useExemples() {
   return useQuery({
     queryKey: CLES.exemples,
     queryFn: async () => (await api.get<{ data: DestinataireExemple[] }>('/envoi/creation/destinataires-exemples')).data.data,
+  });
+}
+
+/** Un réseau proposé pour restreindre la cible, avec le nombre de personnes venues par lui. */
+export interface ReseauPropose {
+  reseau: string;
+  personnes: number;
+}
+
+/** Motif du serveur pour un réseau (`FiltreOrigine`). */
+export const JETON_RESEAU = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+export const RESEAUX_MAX = 10;
+
+export type ReseauxOrigine = { etat: 'actif'; reseaux: ReseauPropose[] } | { etat: 'inactif' } | { etat: 'indisponible' };
+
+/**
+ * Réseaux d'origine proposables (lecture seule, `GET /crm/origines/par-reseau`).
+ * 404 (écran éteint ou fonction d'espace fermée) ou `actif: false` : « inactif » —
+ * le bloc n'est pas affiché. Toute autre erreur : « indisponible » (rien n'est proposé).
+ * Jamais de réessai automatique : un refus ne doit pas se répéter seul.
+ */
+export function useReseauxOrigine() {
+  return useQuery<ReseauxOrigine>({
+    queryKey: ['envoi', 'creation', 'reseaux-origine'],
+    retry: false,
+    staleTime: 60_000,
+    queryFn: async () => {
+      try {
+        const r = (await api.get<{ actif?: boolean; data?: Array<{ reseau: string | null; personnes: number }> }>('/crm/origines/par-reseau')).data;
+        if (r.actif !== true) return { etat: 'inactif' };
+        // Un réseau peut revenir sur plusieurs canaux ou comptes : on regroupe.
+        const parReseau = new Map<string, number>();
+        for (const l of r.data ?? []) {
+          if (l.reseau === null || !JETON_RESEAU.test(l.reseau)) continue;
+          parReseau.set(l.reseau, (parReseau.get(l.reseau) ?? 0) + l.personnes);
+        }
+        const reseaux = [...parReseau].map(([reseau, personnes]) => ({ reseau, personnes })).sort((a, b) => b.personnes - a.personnes || a.reseau.localeCompare(b.reseau));
+        return { etat: 'actif', reseaux };
+      } catch (e) {
+        return isAxiosError(e) && e.response?.status === 404 ? { etat: 'inactif' } : { etat: 'indisponible' };
+      }
+    },
   });
 }
 

@@ -111,10 +111,8 @@ const ECARTS_CONNUS: string[] = [
   'POST /api/v1/envoi/reponses/{p}/creer-fiche',
   'POST /api/v1/envoi/reponses/{p}/rattacher',
   'POST /api/v1/envoi/reponses/{p}/repondre',
-  'GET /api/v1/compte/appareils',
   'GET /api/v1/compte/codes-secours',
   'GET /api/v1/rgpd/oppositions/export',
-  'POST /api/v1/compte/appareils/{p}/retirer',
   'POST /api/v1/compte/codes-secours/regenerer',
   'POST /api/v1/crm/propositions/{p}/{p}',
   // DM2-ASS — création de campagne.

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Services\Auth\CodeCourriel\AppareilsConfiance;
 use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use App\Services\Auth\CodeCourriel\TropDeRenvois;
 use App\Support\AuditLogger;
@@ -29,19 +30,30 @@ class CodeEmailController extends ApiController
             return response()->json(['error' => 'methode_non_courriel', 'message' => 'Ce compte n\'utilise pas le code par courriel.'], 409);
         }
 
-        $request->validate(['code' => ['required', 'string', 'regex:/^\d{6}$/']]);
+        $request->validate([
+            'code' => ['required', 'string', 'regex:/^\d{6}$/'],
+            'appareil_confiance' => ['sometimes', 'boolean'],
+        ]);
 
         if (! $this->codes->verifier($user, 'connexion', (string) $request->input('code'))) {
             AuditLogger::log('auth.code_courriel.refuse', ['user_id' => (string) $user->id]);
             throw ValidationException::withMessages(['code' => ['Code incorrect. Vérifiez-le et réessayez.']]);
         }
 
-        // `appareil_confiance` est ignoré en G3-B (servi en G3-C).
         $request->session()->put('2fa_passed_at', now()->toIso8601String());
         $request->session()->regenerate();
         AuditLogger::log('auth.code_courriel.verifie', ['user_id' => (string) $user->id]);
 
-        return $this->ok(['ok' => true]);
+        $reponse = $this->ok(['ok' => true]);
+
+        // G3-C : « Faire confiance à cet appareil » — cookie 30 jours, seule l'empreinte reste en base.
+        if ($request->boolean('appareil_confiance')) {
+            $jeton = app(AppareilsConfiance::class)->ajouter($user, $request->ip(), $request->userAgent());
+            $minutes = 60 * 24 * (int) config('double_auth.duree_appareil_jours', 30);
+            $reponse->withCookie(cookie(AppareilsConfiance::COOKIE, $jeton, $minutes, '/', null, true, true, false, 'lax'));
+        }
+
+        return $reponse;
     }
 
     public function renvoyer(Request $request): JsonResponse

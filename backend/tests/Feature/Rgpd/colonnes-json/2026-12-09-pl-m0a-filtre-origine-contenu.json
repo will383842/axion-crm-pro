@@ -1,0 +1,3 @@
+{
+    "envoi_campagnes.filtre_origine_contenu": "hors-portee: listes de mots et de guides d'origine (jetons [a-z0-9._-], 10 au plus par liste), jamais une valeur de personne ; une contrainte en base refuse tout autre contenu (aucune adresse e-mail), 2 048 octets au plus"
+}

@@ -2,8 +2,8 @@
  * DM2-CAM — suivi d'une campagne : progression, ce qui se passe maintenant,
  * résultats par message et par boîte, état de chaque destinataire, test A/B.
  *
- * Les réponses sont l'indicateur principal. Aucun clic n'est suivi et aucune
- * ouverture n'est affichée (décision produit).
+ * Les réponses sont l'indicateur principal. Aucun clic n'est suivi : les
+ * ouvertures ne sont pas mesurées et la carte dit « non suivi », jamais 0.
  */
 import { useState, type ReactNode } from 'react';
 import { Link, useParams } from '@tanstack/react-router';
@@ -22,11 +22,83 @@ function Tuile({ id, children }: { id: string; children: ReactNode }) {
   return <div data-testid={id}>{children}</div>;
 }
 
+type Issues = FicheCampagne['compteurs']['issues'];
+
+/** Ordre de la barre = priorité de la partition côté serveur ; le libellé se lit sans la couleur. */
+const ISSUES: Array<{ cle: keyof Issues; libelle: string; classe: string }> = [
+  { cle: 'opposition', libelle: 'Oppositions', classe: 'bg-slate-700' },
+  { cle: 'rebond_dur', libelle: 'Rebonds durs', classe: 'bg-rose-600' },
+  { cle: 'reponse', libelle: 'Réponses', classe: 'bg-emerald-600' },
+  { cle: 'rebond_mou', libelle: 'Rebonds mous', classe: 'bg-amber-500' },
+  { cle: 'arretee_autre', libelle: 'Arrêtés', classe: 'bg-slate-400' },
+  { cle: 'terminee', libelle: 'Terminés', classe: 'bg-sky-600' },
+  { cle: 'active', libelle: 'En cours', classe: 'bg-produit' },
+];
+
+/** Pourcentages entiers dont la somme vaut exactement 100 (plus fort reste) ; l'API ne donne que des effectifs. */
+function partsEntieres(valeurs: number[]): number[] {
+  const somme = valeurs.reduce((a, b) => a + b, 0);
+  if (somme === 0) return valeurs.map(() => 0);
+  const brut = valeurs.map((v) => (v / somme) * 100);
+  const bas = brut.map(Math.floor);
+  const ordre = brut.map((b, i) => ({ i, reste: b - Math.floor(b) })).sort((a, b) => b.reste - a.reste || a.i - b.i);
+  const manque = 100 - bas.reduce((a, b) => a + b, 0);
+  for (let k = 0; k < manque; k++) bas[ordre[k]!.i]! += 1;
+  return bas;
+}
+
+function BarreIssues({ issues }: { issues: Issues }) {
+  const valeurs = ISSUES.map((i) => issues[i.cle]);
+  const somme = valeurs.reduce((a, b) => a + b, 0);
+  if (somme === 0) return <p className="mt-3 text-sm text-slate-600">Aucune personne inscrite pour l’instant.</p>;
+  const parts = partsEntieres(valeurs);
+  return (
+    <div data-testid="barre-issues" className="mt-3">
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-slate-100" aria-hidden>
+        {ISSUES.map((i, k) => (valeurs[k]! > 0 ? <span key={i.cle} className={i.classe} style={{ width: `${(valeurs[k]! / somme) * 100}%` }} /> : null))}
+      </div>
+      <ul className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-4">
+        {ISSUES.map((i, k) => (
+          <li key={i.cle} className="flex items-center gap-2">
+            <span className={`inline-block size-2.5 shrink-0 rounded-full ${i.classe}`} aria-hidden />
+            <span>
+              {i.libelle} : <span className="font-semibold tabular-nums text-slate-900">{nombre(valeurs[k]!)}</span> ({parts[k]} %)
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-slate-500">Total : 100 %</p>
+    </div>
+  );
+}
+
+function CartesCompteurs({ compteurs: k }: { compteurs: FicheCampagne['compteurs'] }) {
+  return (
+    <section aria-labelledby="titre-compteurs" className="space-y-3">
+      <h2 id="titre-compteurs" className="text-lg font-bold text-slate-900">Compteurs réels</h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Tuile id="carte-inscrits"><KpiCard label="Inscrits" value={nombre(k.inscrits)} sublabel="personnes dans la séquence" /></Tuile>
+        <Tuile id="carte-envoyes"><KpiCard label="Envoyés" value={nombre(k.envoyes)} sublabel={`${nombre(k.touches)} ${k.touches > 1 ? 'personnes touchées' : 'personne touchée'}`} /></Tuile>
+        <Tuile id="carte-ouverts"><KpiCard label="Ouverts" value={k.ouverts === null ? 'Non suivi' : nombre(k.ouverts)} sublabel="pas mesuré par l’application" tone="slate" /></Tuile>
+        <Tuile id="carte-reponses"><KpiCard label="Réponses" value={nombre(k.reponses)} sublabel="personnes ayant répondu" tone="emerald" /></Tuile>
+        <Tuile id="carte-rebonds"><KpiCard label="Rebonds" value={nombre(k.rebonds_durs + k.rebonds_mous)} sublabel={`${nombre(k.rebonds_durs)} ${k.rebonds_durs > 1 ? 'durs' : 'dur'} · ${nombre(k.rebonds_mous)} ${k.rebonds_mous > 1 ? 'mous' : 'mou'}`} tone="rose" /></Tuile>
+        <Tuile id="carte-oppositions"><KpiCard label="Oppositions" value={nombre(k.oppositions)} sublabel="désinscriptions et refus de contact" tone="slate" /></Tuile>
+        <Tuile id="carte-arretes"><KpiCard label="Arrêtés" value={nombre(k.issues.arretee_autre)} sublabel="suite arrêtée, hors opposition" tone="slate" /></Tuile>
+      </div>
+      <Card className="p-4">
+        <h3 className="text-sm font-semibold text-slate-900">Où en sont les personnes inscrites</h3>
+        <BarreIssues issues={k.issues} />
+      </Card>
+    </section>
+  );
+}
+
 function Progression({ fiche }: { fiche: FicheCampagne }) {
   const { campagne: c, compteurs, par_jour: parJour, derniers_evenements: evenements, maintenant } = fiche;
   const maxJour = Math.max(1, ...parJour.map((j) => j.envoyes));
   return (
     <div className="space-y-6">
+      <CartesCompteurs compteurs={compteurs} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tuile id="tuile-envoyes">
           <KpiCard label="Envoyés" value={nombre(c.envoyes)} sublabel={`sur ${nombre(c.total)} · ${pourcentage(c.total === 0 ? 0 : (c.envoyes / c.total) * 100, 0)}`} />

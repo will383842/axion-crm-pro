@@ -16,7 +16,7 @@ use Tests\Support\ContratOpenApiEnvoi;
 /**
  * F3-B1 — ajout d'une boîte par l'écran (propriétaire seul, code de confirmation). Données fictives en `*.example.test`.
  * Les routes (HTTP) tournent sur la connexion de test (propriétaire) ; le service `AjoutBoite` tourne sur CHAQUE connexion
- * (propriétaire PUIS `pgsql_app`, RLS armée) avec des données committées par le propriétaire, nettoyées dans un `finally`.
+ * (propriétaire `pgsql_owner`, connexion à part et auto-commit : sur la connexion de test, la transaction du test bloquerait le nettoyage ; PUIS `pgsql_app`, RLS armée) avec des données committées par le propriétaire, nettoyées dans un `finally`.
  */
 uses(BaseRoutesEnvoi::class)->group('envoi');
 
@@ -127,7 +127,7 @@ test('le journal HTTP générique est coupé dès l\'entrée (secret masqué : r
 
 // ───────────────────────── Service, sur chaque connexion ─────────────────────────
 
-dataset('connexions', ['propriétaire (pgsql)' => ['pgsql'], 'applicatif (pgsql_app)' => ['pgsql_app']]);
+dataset('connexions', ['propriétaire (pgsql_owner)' => ['pgsql_owner'], 'applicatif (pgsql_app)' => ['pgsql_app']]);
 
 /** Espaces et comptes committés par le propriétaire ; $f reçoit [wsA, userA, wsB, userB]. Nettoyage dans un finally. */
 function baScenario(string $conn, \Closure $f): void

@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_oppositions_linkedin', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations', 'envoi_boites_acces_imap', 'envoi_retraits_demandes', 'envoi_kumo_injections', 'envoi_kumo_etat', 'envoi_kumo_5xx', 'envoi_ips',
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_oppositions_linkedin', 'pl_prospects', 'pl_journal', 'pl_plafonds', 'pl_arret', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations', 'envoi_boites_acces_imap', 'envoi_retraits_demandes', 'envoi_kumo_injections', 'envoi_kumo_etat', 'envoi_kumo_5xx', 'envoi_ips',
         'envoi_attestations_serveur_reel',
         'envoi_boites_codes_ajout',
     ];
@@ -222,6 +222,11 @@ final class SemeurTablesScopees
         'envoi_oppositions_registre',
         // PONT-LINKEDIN PL-M0A : registre d'opposition LinkedIn, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_oppositions_linkedin',
+        // PONT-LINKEDIN PL-M0B : prospects (parent) puis journal (FK composite), plafonds, arrêt : ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
+        'pl_prospects',
+        'pl_journal',
+        'pl_plafonds',
+        'pl_arret',
         // Envoi R17 : constats de réputation (ajout seul + FK workspaces) : APPEND_SEUL_AVEC_FK.
         'envoi_reputation_constats',
         // Envoi R08 : campagnes (parent) puis journal et codes (FK composite) : APPEND_SEUL_AVEC_FK.
@@ -291,7 +296,7 @@ final class SemeurTablesScopees
         $userId = (string) Str::uuid();
         $owner->table('users')->insert([
             'id' => $userId,
-            'email' => 'zz-etancheite-' . Str::random(10) . '@test.invalid',
+            'email' => 'zz-etancheite-'.Str::random(10).'@test.invalid',
             'name' => 'ZZ Étanchéité',
         ]);
 
@@ -353,9 +358,9 @@ final class SemeurTablesScopees
         // sur 55 tables, c'est une heure perdue à chaque évolution de schéma.
         $echec = static function (string $table, Throwable $e): never {
             throw new RuntimeException(
-                "Semis impossible dans « {$table} » : " . $e->getMessage()
-                . ' — corriger la charge utile dans SemeurTablesScopees::semer(), '
-                . 'et surtout ne pas retirer la table du contrôle.',
+                "Semis impossible dans « {$table} » : ".$e->getMessage()
+                .' — corriger la charge utile dans SemeurTablesScopees::semer(), '
+                .'et surtout ne pas retirer la table du contrôle.',
                 0,
                 $e,
             );
@@ -384,30 +389,30 @@ final class SemeurTablesScopees
         // ── Racines ──────────────────────────────────────────────────────────
         $id['companies'] = $insererAvecId('companies', [
             'siren' => str_pad((string) random_int(100000000, 999999999), 9, '0'),
-            'denomination' => 'ZZ Étanchéité ' . $marque,
+            'denomination' => 'ZZ Étanchéité '.$marque,
         ]);
 
         $id['contacts_retires'] = $insererAvecId('contacts_retires', [
-            'cle_nom' => hash('sha256', 'zz-retire-' . $marque),
+            'cle_nom' => hash('sha256', 'zz-retire-'.$marque),
         ]);
 
         $id['contacts'] = $insererAvecId('contacts', [
             'company_id' => $id['companies'],
-            'last_name' => 'ZZ Contact ' . $marque,
+            'last_name' => 'ZZ Contact '.$marque,
         ]);
 
         $id['tags'] = $insererAvecId('tags', [
-            'slug' => 'zz-etancheite-' . $marque,
-            'name' => 'ZZ Étanchéité ' . $marque,
+            'slug' => 'zz-etancheite-'.$marque,
+            'name' => 'ZZ Étanchéité '.$marque,
         ]);
 
         $id['candidates'] = $insererAvecId('candidates', [
-            'last_name' => 'ZZ Candidat ' . $marque,
+            'last_name' => 'ZZ Candidat '.$marque,
             'relation_type' => 'candidat_autre',
         ]);
 
         $id['personnes'] = $insererAvecId('personnes', [
-            'person_key' => hash('sha256', 'zz-personne-' . $marque),
+            'person_key' => hash('sha256', 'zz-personne-'.$marque),
             'premiere_source' => 'newsletter',
             'premiere_source_at' => now(),
             'legal_basis' => 'consent',
@@ -422,13 +427,13 @@ final class SemeurTablesScopees
 
         $inserer('personne_origines_archive', [
             'personne_id' => $id['personnes'],
-            'cle' => 'zz-origine-' . $marque,
+            'cle' => 'zz-origine-'.$marque,
             'origine' => json_encode(['mot' => 'guide', 'date' => '2026-11-01T10:00:00Z']),
         ]);
 
         $id['events'] = $insererAvecId('events', [
-            'external_ref' => 'zz-evenement-' . $marque,
-            'nom' => 'ZZ Événement ' . $marque,
+            'external_ref' => 'zz-evenement-'.$marque,
+            'nom' => 'ZZ Événement '.$marque,
             'type' => 'salon',
         ]);
 
@@ -446,18 +451,18 @@ final class SemeurTablesScopees
         ]);
 
         $id['crm_pipelines'] = $insererAvecId('crm_pipelines', [
-            'name' => 'ZZ Pipeline ' . $marque,
-            'slug' => 'zz-pipeline-' . $marque,
+            'name' => 'ZZ Pipeline '.$marque,
+            'slug' => 'zz-pipeline-'.$marque,
         ]);
 
         $id['pipeline_stages'] = $insererAvecId('pipeline_stages', [
             'pipeline_id' => $id['crm_pipelines'],
-            'slug' => 'zz-etape-' . $marque,
+            'slug' => 'zz-etape-'.$marque,
             'name' => 'ZZ Étape',
         ]);
 
         $id['crm_lost_reasons'] = $insererAvecId('crm_lost_reasons', [
-            'slug' => 'zz-perdu-' . $marque,
+            'slug' => 'zz-perdu-'.$marque,
             'label' => 'ZZ Motif',
         ]);
 
@@ -468,12 +473,12 @@ final class SemeurTablesScopees
         ]);
 
         $id['campaigns'] = $insererAvecId('campaigns', [
-            'name' => 'ZZ Campagne ' . $marque,
+            'name' => 'ZZ Campagne '.$marque,
             'channel' => 'cold_email',
         ]);
 
         $id['email_templates'] = $insererAvecId('email_templates', [
-            'slug' => 'zz-gabarit-' . $marque,
+            'slug' => 'zz-gabarit-'.$marque,
             'subject' => 'ZZ',
             'body_html' => '<p>ZZ</p>',
             'body_text' => 'ZZ',
@@ -487,19 +492,19 @@ final class SemeurTablesScopees
         ]);
 
         $id['email_audiences'] = $insererAvecId('email_audiences', [
-            'name' => 'ZZ Audience ' . $marque,
+            'name' => 'ZZ Audience '.$marque,
         ]);
 
         $id['listes_manuelles'] = $insererAvecId('listes_manuelles', [
-            'nom' => 'ZZ Liste ' . $marque,
+            'nom' => 'ZZ Liste '.$marque,
         ]);
 
         $id['linkedin_accounts'] = $insererAvecId('linkedin_accounts', [
-            'profile_url' => 'https://linkedin.invalid/in/zz-' . $marque,
+            'profile_url' => 'https://linkedin.invalid/in/zz-'.$marque,
         ]);
 
         $id['media'] = $insererAvecId('media', [
-            'name' => 'ZZ Média ' . $marque,
+            'name' => 'ZZ Média '.$marque,
             'media_type' => 'blog',
         ]);
 
@@ -508,11 +513,11 @@ final class SemeurTablesScopees
             'type' => 'note',
             'kind' => 'scraped',
             'contact_id' => $id['contacts'],
-            'person_key' => hash('sha256', 'zz-' . $marque),
+            'person_key' => hash('sha256', 'zz-'.$marque),
         ]);
 
         $inserer('ai_act_register', [
-            'system_name' => 'ZZ Système ' . $marque,
+            'system_name' => 'ZZ Système '.$marque,
             'purpose' => 'ZZ',
             'risk_class' => 'minimal',
         ]);
@@ -535,12 +540,12 @@ final class SemeurTablesScopees
         ]);
 
         $inserer('analytics_funnels', [
-            'name' => 'ZZ Entonnoir ' . $marque,
+            'name' => 'ZZ Entonnoir '.$marque,
             'steps' => '[]',
         ]);
 
         $inserer('analytics_kpis', [
-            'kpi_key' => 'zz_' . $marque,
+            'kpi_key' => 'zz_'.$marque,
         ]);
 
         $inserer('audience_members', [
@@ -676,7 +681,7 @@ final class SemeurTablesScopees
         $owner->table('envoi_campagnes')->where('id', $campagne)->update(['statut' => 'a_valider', 'version' => 2]);
         $inserer('envoi_campagnes_journal', [
             'campagne_id' => $campagne, 'transition' => 'brouillon>a_valider', 'auteur' => 'zz-etancheite',
-            'motif' => 'zz-etancheite', 'cle_idempotence' => 'zz-etancheite-' . $marque,
+            'motif' => 'zz-etancheite', 'cle_idempotence' => 'zz-etancheite-'.$marque,
         ]);
         // Envoi X1-L1 : matérialisation de cette campagne (sans lien de séquence : le lien est posé par l'application, pas par le semeur).
         $inserer('envoi_campagnes_materialisations', ['campagne_id' => $campagne]);
@@ -729,19 +734,19 @@ final class SemeurTablesScopees
         ]);
 
         $inserer('crm_notes', [
-            'content' => 'ZZ note ' . $marque,
+            'content' => 'ZZ note '.$marque,
             'contact_id' => $id['contacts'],
             'author_id' => $user,
         ]);
 
         $inserer('crm_tasks', [
-            'title' => 'ZZ tâche ' . $marque,
+            'title' => 'ZZ tâche '.$marque,
             'contact_id' => $id['contacts'],
             'assignee_id' => $user,
         ]);
 
         $inserer('dnc_lists', [
-            'name' => 'ZZ Liste ' . $marque,
+            'name' => 'ZZ Liste '.$marque,
         ]);
 
         $inserer('duplicate_flags', [
@@ -762,11 +767,11 @@ final class SemeurTablesScopees
         $inserer('fusions_empreintes', [
             'fusion_id' => $id['fusions_fiches'],
             'chemin' => 'champs.website',
-            'empreinte' => hash('sha256', 'zz-fusion-' . $marque),
+            'empreinte' => hash('sha256', 'zz-fusion-'.$marque),
         ]);
 
         $inserer('adresses_partagees', [
-            'email_empreinte' => hash('sha256', 'zz-partagee-' . $marque),
+            'email_empreinte' => hash('sha256', 'zz-partagee-'.$marque),
             'domaine' => 'zz-etancheite.invalid',
             'nb_fiches' => 2,
             'nature' => 'inconnue',
@@ -778,7 +783,7 @@ final class SemeurTablesScopees
         ]);
 
         $inserer('email_inboxes', [
-            'email' => 'zz-boite-' . $marque . '@test.invalid',
+            'email' => 'zz-boite-'.$marque.'@test.invalid',
             'provider' => 'zz',
         ]);
 
@@ -788,12 +793,12 @@ final class SemeurTablesScopees
         ]);
 
         $inserer('email_verification_logs', [
-            'email' => 'zz-verif-' . $marque . '@test.invalid',
+            'email' => 'zz-verif-'.$marque.'@test.invalid',
             'status' => 'valid',
         ]);
 
         $inserer('email_warmup_pools', [
-            'domain' => 'zz-' . $marque . '.test.invalid',
+            'domain' => 'zz-'.$marque.'.test.invalid',
         ]);
 
         $inserer('finess_etablissements', [
@@ -804,22 +809,22 @@ final class SemeurTablesScopees
 
         $inserer('health_practitioners', [
             'company_id' => $id['companies'],
-            'nom' => 'ZZ Praticien ' . $marque,
-            'rpps' => '9' . substr($marque, 0, 9),
+            'nom' => 'ZZ Praticien '.$marque,
+            'rpps' => '9'.substr($marque, 0, 9),
         ]);
 
         $inserer('invitations', [
-            'email' => 'zz-invit-' . $marque . '@test.invalid',
+            'email' => 'zz-invit-'.$marque.'@test.invalid',
             'role_slug' => 'viewer',
             'invited_by' => $user,
-            'token_hash' => hash('sha256', 'zz-invit-' . $marque),
+            'token_hash' => hash('sha256', 'zz-invit-'.$marque),
             'expires_at' => now()->addDays(7),
         ]);
 
         $inserer('journalists', [
             'media_id' => $id['media'],
             'company_id' => $id['companies'],
-            'last_name' => 'ZZ Journaliste ' . $marque,
+            'last_name' => 'ZZ Journaliste '.$marque,
         ]);
 
         $inserer('linkedin_invitations', [
@@ -836,23 +841,23 @@ final class SemeurTablesScopees
         ]);
 
         $inserer('linkedin_profiles_cache', [
-            'profile_url' => 'https://linkedin.invalid/in/zz-cache-' . $marque,
+            'profile_url' => 'https://linkedin.invalid/in/zz-cache-'.$marque,
             'snapshot' => '{}',
         ]);
 
         $inserer('linkedin_sequences', [
-            'name' => 'ZZ Séquence ' . $marque,
+            'name' => 'ZZ Séquence '.$marque,
             'steps' => '[]',
         ]);
 
         $inserer('llm_usage', [
-            'use_case_slug' => 'zz-' . $marque,
+            'use_case_slug' => 'zz-'.$marque,
             'provider' => 'zz',
             'model' => 'zz',
         ]);
 
         $inserer('llm_use_cases', [
-            'slug' => 'zz-' . $marque,
+            'slug' => 'zz-'.$marque,
             'primary_provider' => 'zz',
             'model' => 'zz',
         ]);
@@ -869,16 +874,16 @@ final class SemeurTablesScopees
             'auteur' => 'zz',
         ]);
         $inserer('envoi_controles_dns', [
-            'domaine' => 'zz-' . $marque . '.example.test',
+            'domaine' => 'zz-'.$marque.'.example.test',
             'controle_le' => '2026-11-11 06:00:00+00',
             'pret' => false,
         ]);
         $inserer('envoi_temoins', [
-            'empreinte' => hash('sha256', 'zz-' . $marque),
+            'empreinte' => hash('sha256', 'zz-'.$marque),
             'libelle' => 'zz',
         ]);
         $inserer('envoi_serveurs', [
-            'source' => 'zz-' . substr($marque, 0, 8),
+            'source' => 'zz-'.substr($marque, 0, 8),
             'url_base' => 'https://zz.test.invalid',
         ]);
 
@@ -950,6 +955,31 @@ final class SemeurTablesScopees
             'motif' => 'zz-motif',
             'auteur' => 'zz',
         ]);
+        $idProspectPl = (string) Str::uuid();
+        $inserer('pl_prospects', [
+            'id' => $idProspectPl,
+            'expediteur_user_id' => $user,
+            'linkedin_slug' => 'exemple-prenom-nom-0a1b2c',
+            'source' => 'recherche',
+            'source_le' => '2026-12-09',
+        ]);
+        $inserer('pl_journal', [
+            'prospect_id' => $idProspectPl,
+            'evenement' => 'ajout',
+            'origine' => 'systeme',
+            'auteur' => 'zz',
+            'cle_idempotence' => 'zz-cle-journal-'.$marque,
+        ]);
+        $inserer('pl_plafonds', [
+            'expediteur_user_id' => $user,
+            'auteur' => 'zz',
+        ]);
+        $inserer('pl_arret', [
+            'geste' => 'arret',
+            'motif' => 'zz-arret-de-test',
+            'auteur' => 'zz',
+            'declencheur' => 'humain',
+        ]);
         $inserer('envoi_reputation_constats', [
             'source' => 'google_postmaster',
             'ressource_type' => 'domaine',
@@ -959,8 +989,8 @@ final class SemeurTablesScopees
             'saisie' => 'manuelle',
             'preuve' => 'zz-preuve-zz',
             'auteur' => 'zz',
-            'cle_rejeu' => 'zz-cle-rejeu-' . $marque,
-            'empreinte' => hash('sha256', 'zz-rep-' . $marque),
+            'cle_rejeu' => 'zz-cle-rejeu-'.$marque,
+            'empreinte' => hash('sha256', 'zz-rep-'.$marque),
         ]);
         $inserer('envoi_temoins_acces', [
             'empreinte_temoin' => str_repeat('a', 64),
@@ -1026,7 +1056,7 @@ final class SemeurTablesScopees
         $boiteId = (string) Str::uuid();
         $inserer('envoi_boites', [
             'id' => $boiteId,
-            'adresse' => 'zz-' . $marque . '@test.invalid',
+            'adresse' => 'zz-'.$marque.'@test.invalid',
             'hote' => 'smtp.exemple.test',
             'port' => 587,
             'chiffrement' => 'starttls',
@@ -1050,27 +1080,27 @@ final class SemeurTablesScopees
         $inserer('envoi_injections_smtp', [
             'boite_id' => $boiteId,
             'id_injection' => $idInjection,
-            'cle_idempotence' => 'zz-' . $marque,
+            'cle_idempotence' => 'zz-'.$marque,
         ]);
 
         $id['envoi_evenements'] = $insererAvecId('envoi_evenements', [
-            'boite' => 'zz-' . $marque,
+            'boite' => 'zz-'.$marque,
             'uid_validity' => 1,
             'uid' => 1,
-            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'empreinte_message' => hash('sha256', 'zz-msg-'.$marque),
             'classe' => 'reponse_humaine',
             'statut' => 'a_rattacher',
-            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-'.$marque),
             'recu_le' => now()->toDateTimeString(),
         ]);
         $inserer('envoi_curseurs_imap', [
-            'boite' => 'zz-' . $marque,
+            'boite' => 'zz-'.$marque,
             'uid_validity' => 1,
         ]);
         $inserer('envoi_rattachements', [
             'evenement_id' => $id['envoi_evenements'],
             'id_injection' => $idInjection,
-            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-'.$marque),
             'decide_par' => 'zz-revue',
         ]);
         $id['envoi_reponses'] = $insererAvecId('envoi_reponses', [
@@ -1078,7 +1108,7 @@ final class SemeurTablesScopees
             'objet_chiffre' => 'zz-chiffre',
             'extrait_chiffre' => 'zz-chiffre',
             'expediteur_chiffre' => 'zz-chiffre',
-            'empreinte_expediteur' => hash('sha256', 'zz-exp-' . $marque),
+            'empreinte_expediteur' => hash('sha256', 'zz-exp-'.$marque),
             'recue_le' => now()->toDateTimeString(),
             'conserver_jusqu_au' => '2031-01-01',
         ]);
@@ -1089,41 +1119,41 @@ final class SemeurTablesScopees
             'auteur' => 'classificateur',
         ]);
         $inserer('envoi_echecs_releve', [
-            'boite' => 'zz-' . $marque,
-            'empreinte_message' => hash('sha256', 'zz-msg-' . $marque),
+            'boite' => 'zz-'.$marque,
+            'empreinte_message' => hash('sha256', 'zz-msg-'.$marque),
             'motif' => 'RuntimeException',
         ]);
         $inserer('envoi_messages_envoyes', [
-            'message_id_empreinte' => hash('sha256', 'zz-mid-' . $marque),
+            'message_id_empreinte' => hash('sha256', 'zz-mid-'.$marque),
             'id_injection' => $idInjection,
-            'empreinte_destinataire' => hash('sha256', 'zz-dest-' . $marque),
+            'empreinte_destinataire' => hash('sha256', 'zz-dest-'.$marque),
         ]);
 
         $inserer('proxy_providers_config', [
-            'slug' => 'zz-' . $marque,
+            'slug' => 'zz-'.$marque,
             'type' => 'datacenter',
         ]);
 
         $inserer('proxy_usage_log', [
-            'provider_slug' => 'zz-' . $marque,
+            'provider_slug' => 'zz-'.$marque,
             'endpoint' => 'https://zz.test.invalid',
             'target_host' => 'zz.test.invalid',
         ]);
 
         $inserer('rgpd_requests', [
             'type' => 'access',
-            'subject_email' => 'zz-rgpd-' . $marque . '@test.invalid',
+            'subject_email' => 'zz-rgpd-'.$marque.'@test.invalid',
         ]);
 
         $inserer('rotations', [
             'dimension' => 'proxy',
-            'slug' => 'zz-' . $marque,
+            'slug' => 'zz-'.$marque,
         ]);
 
         $inserer('saved_views', [
             'user_id' => $user,
             'entity' => 'companies',
-            'name' => 'ZZ Vue ' . $marque,
+            'name' => 'ZZ Vue '.$marque,
         ]);
 
         $inserer('scraper_runs', [
@@ -1134,7 +1164,7 @@ final class SemeurTablesScopees
 
         $inserer('scraping_campaigns', [
             'created_by' => $user,
-            'name' => 'ZZ Collecte ' . $marque,
+            'name' => 'ZZ Collecte '.$marque,
         ]);
 
         $inserer('insee_mises_a_jour', [
@@ -1147,11 +1177,11 @@ final class SemeurTablesScopees
         ]);
 
         $inserer('strategic_keywords', [
-            'keyword' => 'zz-' . $marque,
+            'keyword' => 'zz-'.$marque,
         ]);
 
         $inserer('unsubscribes', [
-            'email' => 'zz-desabo-' . $marque . '@test.invalid',
+            'email' => 'zz-desabo-'.$marque.'@test.invalid',
             'source' => 'zz',
         ]);
 

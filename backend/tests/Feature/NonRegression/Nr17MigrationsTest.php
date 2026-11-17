@@ -172,6 +172,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_09_000110_envoi_campagnes_filtre_origine_contenu.php',
     // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0A : registre d'opposition LinkedIn en ajout seul (DELETE/UPDATE/TRUNCATE refusés) ; le retirer effacerait des oppositions ; down() inerte, up() rejouable.
     '2026_12_09_000120_envoi_oppositions_linkedin.php',
+    // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0B : tables pl_prospects et pl_journal (prospect écarté définitif, journal en ajout seul) ; les retirer effacerait des oppositions et des gestes ; down() inerte, up() rejouable.
+    '2026_12_09_000130_pl_prospects_journal.php',
+    // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0B : plafonds et arrêt de la voie S en ajout seul ; les retirer effacerait l'historique des arrêts ; down() inerte, up() rejouable.
+    '2026_12_09_000140_pl_plafonds_arret.php',
     // Filet modifié : pourquoi — FINI-M0B : attestations du serveur réel, AJOUT SEUL (table, déclencheur, droits) ; la retirer effacerait les attestations ; down() inerte, up() rejouable.
     '2026_12_07_000120_envoi_attestations_serveur_reel.php',
     // Filet modifié : pourquoi — FINI-M0B : boîte figée par inscription (colonne nullable, clé composite), AJOUT SEUL ; la retirer effacerait la boîte posée ; down() inerte, up() rejouable.
@@ -196,7 +200,7 @@ function nr17Migrations(): array
 /** @return 'reel'|'vide'|'refuse' */
 function nr17ClasseRetour(string $fichier): string
 {
-    $jetons = token_get_all((string) file_get_contents(database_path('migrations/' . $fichier)));
+    $jetons = token_get_all((string) file_get_contents(database_path('migrations/'.$fichier)));
     $n = count($jetons);
     for ($i = 0; $i < $n; $i++) {
         if (is_array($jetons[$i]) && $jetons[$i][0] === T_FUNCTION) {
@@ -257,7 +261,7 @@ function nr17SansRetour(): array
 
 function nr17AllerRetourAller(string $fichier): void
 {
-    $migration = require database_path('migrations/' . $fichier);
+    $migration = require database_path('migrations/'.$fichier);
     if (! is_object($migration)) {
         throw new RuntimeException("{$fichier} ne rend pas un objet migration.");
     }
@@ -277,7 +281,7 @@ test('NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, al
         if (in_array($fichier, NR17_RETOUR_INERTE_VOULU, true)) {
             // Retour inerte voulu : down() vide (rien n’est retiré ni effacé), up() rejouable.
             expect(nr17ClasseRetour($fichier))->toBe('vide');
-            $migration = require database_path('migrations/' . $fichier);
+            $migration = require database_path('migrations/'.$fichier);
             $migration->down();
             $migration->up();
             $migration->up();
@@ -300,7 +304,7 @@ test('NR-17 témoin : l’instrument aller-retour-aller joue sur une migration a
     $fichier = '2026_10_04_000010_create_partners_idempotence_table.php';
     expect(nr17Migrations())->toContain($fichier)
         ->and(nr17ClasseRetour($fichier))->toBe('reel');
-    $src = (string) file_get_contents(database_path('migrations/' . $fichier));
+    $src = (string) file_get_contents(database_path('migrations/'.$fichier));
     preg_match("/Schema::create\('([a-z_0-9]+)'/", $src, $m);
     $table = $m[1];
 
@@ -314,7 +318,7 @@ test('NR-17 témoin : un retour réel reste bloqué par une clé étrangère OUB
 
     try {
         foreach (['2026_11_10_000040_envoi_boites.php', '2026_11_10_000042_envoi_boites_durcissement_ssrf_fk_composite.php'] as $fichier) {
-            $migration = require database_path('migrations/' . $fichier);
+            $migration = require database_path('migrations/'.$fichier);
             $sqlstate = null;
             try {
                 DB::transaction(fn () => $migration->down());
@@ -323,7 +327,7 @@ test('NR-17 témoin : un retour réel reste bloqué par une clé étrangère OUB
             }
             expect($sqlstate)->toBe('2BP01');
             expect(DB::selectOne("select to_regclass('public.envoi_boites') as t")->t)->not->toBeNull();
-            expect((string) file_get_contents(database_path('migrations/' . $fichier)))->not->toContain('CASCADE');
+            expect((string) file_get_contents(database_path('migrations/'.$fichier)))->not->toContain('CASCADE');
         }
     } finally {
         DB::statement('DROP TABLE IF EXISTS nr17_temoin_oubli');

@@ -5,7 +5,9 @@
  * ET SOUS LE PROPRIÉTAIRE. Porte fermée, FauxServeurEnvoi, adresses en example.invalid, aucune personne réelle.
  */
 
+use App\Crm\FichesProtegees;
 use App\Envoi\Chauffe\DepotChauffe;
+use App\Envoi\Contrat\ResultatInjection;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Exceptions\EnvoiRefuse;
 use App\Envoi\PasserelleLocale;
@@ -13,17 +15,21 @@ use App\Envoi\Reglages\DepotReglages;
 use App\Envoi\Sequence\ChoixBoite;
 use App\Envoi\Sequence\ComposeurSequence;
 use App\Envoi\Sequence\DemandeComposition;
+use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
 use App\Envoi\Sequence\ParametresExpedition;
 use App\Envoi\Sequence\Sequenceur;
 use App\Envoi\Sequence\SourceExpeditionDb;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
+use App\Socle\Espace\FonctionsEspace;
+use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\Support\LienCampagneSequence;
+use Tests\Support\ServeurEspion;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class)->group('envoi');
@@ -186,5 +192,60 @@ it('course : la boîte déjà posée par l\'autre ouvrier gagne (WHERE boite_id 
         DB::table('envoi_inscriptions')->where('id', $perime->id)->update(['boite_id' => $b1]); // l'autre ouvrier a gagné avec b1
         $b = ($this->choix)()->pour($this->ws, $perime, ROT_DOMAINE, $this->jour);
         expect($b['id'])->toBe($b1)->and(DB::table('envoi_inscriptions')->where('id', $perime->id)->value('boite_id'))->toBe($b1);
+    });
+})->with(['app', 'proprio']);
+
+it('câblage Sequenceur : expéditeur composé, boite_id figé et message reçu viennent de ChoixBoite (pas de l\'expédition fixe)', function (string $mode) {
+    $a = rotBoite($this->ws, 'a');
+    $b = rotBoite($this->ws, 'b', cree: '2026-01-02 00:00:00+00');
+    app(DepotChauffe::class)->incrementer($this->ws, $a, $this->jour, 'autre', 'envoyes', 3); // a est la plus employée : ChoixBoite doit prendre b
+    FonctionsEspace::regler($this->ws, 'federations', true);
+    (new DepotSocleDb)->eteindreTemoins($this->ws, 'test-rotation');
+    DB::table('envoi_domaines')->insert([
+        'workspace_id' => $this->ws, 'nom' => ROT_DOMAINE, 'achete_le' => '2026-01-01',
+        'dmarc_verifie_le' => $this->jour->format('c'), 'spf_verifie_le' => $this->jour->format('c'), 'dkim_verifie_le' => $this->jour->format('c'),
+    ]);
+    $email = 'rot@zz-client.example.invalid';
+    $entreprise = F::fiche($this->ws, 'ZZ Entreprise', ['country_code' => 'FR', 'first_info_at' => $this->jour->modify('-3 days')->format('c')]);
+    F::lier($this->ws, $entreprise, F::tag($this->ws, FichesProtegees::TAG_FEDERATIONS));
+    $contact = (int) DB::table('contacts')->insertGetId([
+        'workspace_id' => $this->ws, 'company_id' => $entreprise, 'last_name' => 'Dupont-rot', 'email' => $email, 'email_status' => 'valid',
+        'created_at' => $this->jour->modify('-3 days')->format('c'), 'first_info_at' => $this->jour->modify('-3 days')->format('c'),
+    ]);
+    DB::table('envoi_verdicts_adresse')->insert([
+        'workspace_id' => $this->ws, 'empreinte_adresse' => ListeSuppression::empreinte($email),
+        'verdict' => 'valide', 'verifie_le' => $this->jour->modify('-2 days')->format('c'), 'source' => 'test',
+    ]);
+    $sequence = LienCampagneSequence::creerSequence(DB::connection(), $this->ws, null, 2);
+    $recu = new ServeurEspion(fn ($m, $s) => ResultatInjection::accepte('sim-rot'));
+    $vus = [];
+    rotSous($mode, $this->ws, function () use ($sequence, $contact, $recu, $b, &$vus) {
+        $id = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, $sequence, $contact, $this->jour);
+        expect(DB::table('envoi_inscriptions')->where('id', $id)->value('boite_id'))->toBeNull();
+        $composeur = new class($vus) implements ComposeurSequence
+        {
+            public function __construct(public array &$vus) {}
+
+            public function composer(DemandeComposition $d): string
+            {
+                $this->vus[] = $d->expediteur;
+
+                return "From: {$d->expediteur}\r\n\r\n{$d->corps}";
+            }
+        };
+        $seq = new Sequenceur(
+            new PasserelleLocale($recu, new DepotSocleDb, true, 300, fn () => $this->jour, $this->ws, 300, fn () => WorkspaceContext::current()),
+            new LecteurFicheDb,
+            $composeur,
+            new ParametresExpedition(ROT_DOMAINE, 'fixe@' . ROT_DOMAINE, 'ZZ SAS'), // expédition fixe : ne doit PAS être l'expéditeur
+            choixBoite: ($this->choix)(),
+        );
+        expect($seq->traiter($this->ws, $id, $this->jour))->toBe(Sequenceur::ENVOYE);
+        $attendu = 'b@' . ROT_DOMAINE;
+        expect($vus)->toBe([$attendu])
+            ->and(DB::table('envoi_inscriptions')->where('id', $id)->value('boite_id'))->toBe($b)
+            ->and($recu->recus)->toHaveCount(1)
+            ->and($recu->recus[0]->expediteur)->toBe($attendu)
+            ->and($recu->recus[0]->corps)->toContain("From: {$attendu}");
     });
 })->with(['app', 'proprio']);

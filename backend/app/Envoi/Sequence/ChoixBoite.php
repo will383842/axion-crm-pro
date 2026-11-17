@@ -43,10 +43,11 @@ final class ChoixBoite
             if ($actives === []) {
                 throw new EnvoiRefuse('Aucune boîte active pour ce domaine : report.', EnvoiRefuse::ATTENTE);
             }
-            usort($actives, function (array $a, array $b) use ($ws, $jour): int {
-                return [$this->depot->envoyesBoite($ws, $a['id'], $jour), $a['cree_le'], $a['id']]
-                    <=> [$this->depot->envoyesBoite($ws, $b['id'], $jour), $b['cree_le'], $b['id']];
-            });
+            $envoyes = [];
+            foreach ($actives as $b) {
+                $envoyes[$b['id']] = $this->depot->envoyesBoite($ws, $b['id'], $jour); // une requête par boîte, pas par comparaison
+            }
+            usort($actives, fn (array $a, array $b): int => [$envoyes[$a['id']], $a['cree_le'], $a['id']] <=> [$envoyes[$b['id']], $b['cree_le'], $b['id']]);
             $choix = $actives[0];
 
             // Deux ouvriers : un seul pose ; l'autre relit la boîte gagnante (et la valide à son tour).

@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
  * `personne_origines_archive` (au-delà). Le cloisonnement est filtré
  * explicitement (`workspace_id`) ET garanti par la RLS.
  *
- * @phpstan-type Filtres array{famille: ?string, detail: ?string, reseau: ?string, mot: ?string, oppose: string, du: ?string, au: ?string}
+ * @phpstan-type Filtres array{famille: ?string, detail: ?string, reseau: ?string, mot: ?string, guide: ?string, oppose: string, du: ?string, au: ?string}
  */
 final class RequetesOrigines
 {
@@ -27,7 +27,7 @@ final class RequetesOrigines
     /** @return Filtres */
     public static function filtresVides(): array
     {
-        return ['famille' => null, 'detail' => null, 'reseau' => null, 'mot' => null, 'oppose' => 'tous', 'du' => null, 'au' => null];
+        return ['famille' => null, 'detail' => null, 'reseau' => null, 'mot' => null, 'guide' => null, 'oppose' => 'tous', 'du' => null, 'au' => null];
     }
 
     /**
@@ -68,10 +68,12 @@ final class RequetesOrigines
     {
         $sql = [];
         $b = [];
-        foreach (['famille', 'detail', 'reseau', 'mot'] as $cle) {
-            if ($f[$cle] !== null) {
+        foreach (['famille', 'detail', 'reseau', 'mot', 'guide'] as $cle) {
+            // `guide` peut manquer chez un appelant antérieur à PO-A (OriginesController) : absent = pas de critère.
+            $valeur = $f[$cle] ?? null;
+            if ($valeur !== null) {
                 $sql[] = "x.o ->> '{$cle}' = ?";
-                $b[] = $f[$cle];
+                $b[] = $valeur;
             }
         }
         if ($f['du'] !== null) {
@@ -164,6 +166,31 @@ final class RequetesOrigines
     }
 
     /**
+     * Les guides (réseau, mot, famille et détail confondus), du plus demandé au moins demandé.
+     *
+     * @param  Filtres  $f
+     * @return array{data: list<array{guide: ?string, demandes: int, personnes: int}>, total: int}
+     */
+    public static function parGuide(string $espace, array $f, int $page, int $parPage): array
+    {
+        [$entrees, $be] = self::entrees($espace);
+        [$cond, $bc] = self::conditions($f);
+        $b = array_merge($be, $bc);
+        $groupe = "SELECT x.o ->> 'guide' AS guide, count(*) AS demandes, count(DISTINCT x.personne_id) AS personnes
+                     FROM x WHERE {$cond} AND (x.o ->> 'guide') IS NOT NULL GROUP BY 1";
+        $total = (int) (DB::selectOne("WITH x AS ({$entrees}), g AS ({$groupe}) SELECT count(*) AS n FROM g", $b)->n ?? 0);
+        $rows = DB::select(
+            "WITH x AS ({$entrees}), g AS ({$groupe}) SELECT * FROM g ORDER BY demandes DESC, guide LIMIT ? OFFSET ?",
+            array_merge($b, [$parPage, max(0, ($page - 1) * $parPage)]),
+        );
+
+        return [
+            'data' => array_values(array_map(static fn ($r): array => ['guide' => $r->guide, 'demandes' => (int) $r->demandes, 'personnes' => (int) $r->personnes], $rows)),
+            'total' => $total,
+        ];
+    }
+
+    /**
      * Série quotidienne : EXACTEMENT `$jours` points, jours vides à 0.
      *
      * @param  Filtres  $f
@@ -245,12 +272,74 @@ final class RequetesOrigines
      */
     public static function reseauxDesUnites(string $espace, array $entreprises, array $contacts, array $reseaux): array
     {
+        // Un jeton hors forme ne correspond à rien (et ne peut pas casser le littéral de tableau).
+        $reseaux = self::jetonsValides($reseaux);
+        if ($reseaux === []) {
+            return ['entreprises' => [], 'contacts' => [], 'contacts_opposes' => []];
+        }
+
+        return self::unites($espace, $entreprises, $contacts, "x.o ->> 'reseau' = ANY(?::text[])", ['{' . implode(',', $reseaux) . '}']);
+    }
+
+    /**
+     * Unités dont une personne NON OPPOSÉE porte UNE MÊME entrée visible satisfaisant TOUS les critères posés
+     * (réseau ∈ R si R posé, mot ∈ M si M posé, guide ∈ G si G posé) — lot PONT-LINKEDIN PO-A, LECTURE SEULE.
+     * Mêmes règles R1, R2, O1, O2 et même forme de retour que `reseauxDesUnites`. Un critère posé mais vide, ou
+     * dont aucun jeton n'est valide, ne correspond à rien (échec fermé) ; tous les critères `null` lèvent
+     * \LogicException (l'appelant ne doit jamais demander « tout »).
+     *
+     * @param  list<int>  $entreprises
+     * @param  list<int>  $contacts
+     * @param  list<string>|null  $reseaux
+     * @param  list<string>|null  $mots
+     * @param  list<string>|null  $guides
+     * @return array{entreprises: array<int, true>, contacts: array<int, true>, contacts_opposes: array<int, true>}
+     */
+    public static function unitesParOrigine(string $espace, array $entreprises, array $contacts, ?array $reseaux, ?array $mots, ?array $guides): array
+    {
+        if ($reseaux === null && $mots === null && $guides === null) {
+            throw new \LogicException('unitesParOrigine : au moins un critère (réseau, mot ou guide)');
+        }
+        $conditions = [];
+        $bindings = [];
+        foreach (['reseau' => $reseaux, 'mot' => $mots, 'guide' => $guides] as $cle => $jetons) {
+            if ($jetons === null) {
+                continue;
+            }
+            $valides = self::jetonsValides($jetons);
+            if ($valides === []) {
+                return ['entreprises' => [], 'contacts' => [], 'contacts_opposes' => []];
+            }
+            $conditions[] = "x.o ->> '{$cle}' = ANY(?::text[])";
+            $bindings[] = '{' . implode(',', $valides) . '}';
+        }
+
+        return self::unites($espace, $entreprises, $contacts, implode(' AND ', $conditions), $bindings);
+    }
+
+    /**
+     * @param  list<string>  $jetons
+     * @return list<string>
+     */
+    private static function jetonsValides(array $jetons): array
+    {
+        return array_values(array_filter($jetons, static fn (string $j): bool => preg_match(self::JETON, $j) === 1 && ! str_contains($j, "\n")));
+    }
+
+    /**
+     * Corps commun : `$condition` porte sur UNE entrée `x` (SQL à bindings `$bindingsCondition`).
+     *
+     * @param  list<int>  $entreprises
+     * @param  list<int>  $contacts
+     * @param  list<mixed>  $bindingsCondition
+     * @return array{entreprises: array<int, true>, contacts: array<int, true>, contacts_opposes: array<int, true>}
+     */
+    private static function unites(string $espace, array $entreprises, array $contacts, string $condition, array $bindingsCondition): array
+    {
         $vide = ['entreprises' => [], 'contacts' => [], 'contacts_opposes' => []];
         $entreprises = array_values(array_unique(array_map('intval', $entreprises)));
         $contacts = array_values(array_unique(array_map('intval', $contacts)));
-        // Un jeton hors forme ne correspond à rien (et ne peut pas casser le littéral de tableau).
-        $reseaux = array_values(array_filter($reseaux, static fn (string $r): bool => preg_match(self::JETON, $r) === 1 && ! str_contains($r, "\n")));
-        if ($reseaux === [] || ($entreprises === [] && $contacts === [])) {
+        if ($entreprises === [] && $contacts === []) {
             return $vide;
         }
         $litteral = static fn (array $ids): string => '{' . implode(',', $ids) . '}';
@@ -282,8 +371,8 @@ final class RequetesOrigines
         if ($libres !== []) {
             [$entrees, $be] = self::entrees($espace, array_keys($libres));
             $rows = DB::select(
-                "WITH x AS ({$entrees}) SELECT DISTINCT x.personne_id FROM x WHERE x.o ->> 'reseau' = ANY(?::text[])",
-                array_merge($be, ['{' . implode(',', $reseaux) . '}']),
+                "WITH x AS ({$entrees}) SELECT DISTINCT x.personne_id FROM x WHERE {$condition}",
+                array_merge($be, $bindingsCondition),
             );
             foreach ($rows as $r) {
                 $retenues[] = $libres[(int) $r->personne_id];

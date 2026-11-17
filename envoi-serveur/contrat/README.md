@@ -108,3 +108,22 @@ Traduction des réponses du moteur (C2-3, ADR K0 D7) :
 Chaîne de requête vide (sinon `400 requete`) ; autre méthode : `405`. Réponse `200 {"id_injection", "etat"}` avec `etat` dans
 `en_file | refuse | incertain | retire | inconnu`. Une ligne absente, une simple réservation ou l'identifiant d'un autre espace donnent
 `inconnu` (jamais `404` : l'existence dans un autre espace n'est pas révélée). Lecture seule : aucune écriture, aucun appel au moteur.
+
+## `POST /v1/commandes/retrait` — contrat v3 (C3-1, faux serveur seulement)
+
+Corps : `{"commande_id": "<uuid>", "commande": "retrait", "cibles": ["<id_injection>", …]}` : 1 à 100 identifiants d'injection
+distincts (UUID canoniques en minuscules). Sans `cibles` : `400 cibles_exigees` (un retrait sans cible n'a aucun sens sûr, ce n'est
+plus accepté) ; `cibles` invalide (vide, plus de 100, doublon, non UUID, pas une liste) : `400 cibles`. `pause` et `reprise` n'acceptent
+toujours pas `cibles` (`400 corps`). L'espace vient de la signature, jamais du corps.
+
+- Empreinte de la commande : `sha256("retrait\n<commande_id>\n<cibles triées, jointes par ,>")`. Même `commande_id` avec d'autres
+  cibles : `409 commande_id_deja_utilise` ; mêmes cibles dans un autre ordre : même corps, réponse rejouée.
+- Liste de retrait : chaque cible est inscrite (ajout seul, jamais effacée) AVANT l'appel du moteur, puis le moteur reçoit
+  `retrait` avec `cibles`. Un moteur en panne rend `502 {"statut":"echec"}` (rejouable avec le même `commande_id`), mais les cibles
+  sont déjà inscrites : l'échec est fermé. Succès : `200`, `resultat.retirees` = nombre de cibles de la commande.
+- Une injection (`POST /v1/injections`) dont l'identifiant est dans la liste de l'espace depuis moins de 30 jours reçoit
+  `409 {"erreur":"retire"}` AVANT toute réservation et tout appel du moteur, y compris pour le rejeu d'une injection déjà acceptée ;
+  `GET /v1/injections/{id}` rend `retire`. Un espace n'affecte jamais l'autre.
+- Le retrait RÉEL dans la file du moteur (API d'administration KumoMTA) reste à faire : lot C4.
+
+Déploiement : mettre à jour la passerelle AVANT le CRM. Un CRM ancien (retrait sans `cibles`) reçoit `400 cibles_exigees`.

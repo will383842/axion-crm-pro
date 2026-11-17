@@ -983,7 +983,8 @@ class CrmEmailsVerifier extends Command
             $ecrire();
             $tracer();
             $verrous = DB::selectOne(
-                "SELECT count(*) AS n_verrous, count(*) FILTER (WHERE locktype = 'transactionid') AS n_transactions
+                "SELECT count(DISTINCT (locktype, database, relation, page, tuple, virtualxid, transactionid::text, classid, objid, objsubid)) AS n_verrous,
+                        count(DISTINCT transactionid::text) FILTER (WHERE locktype = 'transactionid') AS n_transactions
                  FROM pg_locks WHERE pid = pg_backend_pid()",
             );
             if ($verrous instanceof stdClass) {

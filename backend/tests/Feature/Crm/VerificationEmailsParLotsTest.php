@@ -62,14 +62,10 @@ function vemlContacts(object $t, string $prefixe, int $n): void
 }
 
 /**
- * Repart d'une fiche NEUVE et sans personne. Le décompte de verrous est celui
- * des verrous de RELATION de la session, index compris : écrire dans `companies`
- * en verrouille d'un coup une quarantaine (un par index). Or la fiche n'est
- * réécrite par le recalcul de joignabilité QUE si son état change — donc selon
- * l'état laissé par l'exécution précédente. Sans fiche neuve à chaque scénario,
- * l'un des trois comptait ces index et pas l'autre : l'écart (183 contre 147 en
- * CI) ne disait rien du verrouillage par lot. Avec elle, les trois scénarios
- * écrivent exactement les mêmes tables.
+ * Repart d'une fiche NEUVE et sans personne : les trois scenarios ecrivent ainsi
+ * les memes tables, sans dependre de l'etat laisse par le precedent. Ce n'est PAS
+ * ce qui rend le decompte stable (c'est le decompte de verrous DISTINCTS du code
+ * produit, cf. le test) : c'est une symetrie sans danger.
  */
 function vemlRepartirDeZero(object $t): void
 {
@@ -101,6 +97,12 @@ test('les verrous tenus ne dependent ni du nombre de lots ni de leur taille', fu
 
     vemlRepartirDeZero($this);
     vemlContacts($this, 'b', 60);
+    // Un ANALYZE (en CI : l'autovacuum) invalide les plans en cache de la session ;
+    // la requete re-planifiee verrouille alors chaque index de `companies` (un
+    // RowShareLock par index). Bruit sans rapport avec le verrouillage par lot,
+    // que le decompte de verrous DISTINCTS (code produit) neutralise : on le
+    // provoque ici a coup sur, il ne doit pas faire rougir le test.
+    DB::statement('ANALYZE companies');
     $grandsLots = vemlVerifier(['--lot' => '60']);
 
     vemlRepartirDeZero($this);

@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import maplibregl, { type Map as MlMap, type StyleSpecification } from 'maplibre-gl';
+import { Map as MlMap, type ExpressionSpecification, type GeoJSONSource, type StyleSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { appliquerTotaux, SOURCE_DEPARTEMENTS } from './colorationCarte';
 import { echelleRelative, expressionCouleur } from './echelleCarte';
+
+/** Type des données d'une source GeoJSON (le namespace global GeoJSON n'est plus exposé par maplibre-gl 6). */
+type DonneesGeoJSON = Parameters<GeoJSONSource['setData']>[0];
 
 /** L'entrée de l'échelle : le total posé par `appliquerTotaux`, 0 à défaut. */
 const TOTAL_DEPARTEMENT = ['coalesce', ['feature-state', 'total'], 0];
@@ -108,7 +111,7 @@ export function FranceCoverageMap({
     let cancelled = false;
     LOG('creating maplibregl.Map…');
 
-    const map = new maplibregl.Map({
+    const map = new MlMap({
       container,
       style: TILES_URL ?? MINIMAL_STYLE,
       center: [2.4, 46.6], // centre métropole
@@ -224,10 +227,10 @@ export function FranceCoverageMap({
       });
       if (enDemo) {
         void fetch(String(geojsonUrl))
-          .then((r) => r.json() as Promise<GeoJSON.FeatureCollection>)
+          .then((r) => r.json() as Promise<DonneesGeoJSON>)
           .then((fond) => {
             if (cancelled) return;
-            const source = map.getSource('departements') as unknown as { setData?: (donnees: GeoJSON.FeatureCollection) => void } | undefined;
+            const source = map.getSource('departements') as unknown as { setData?: (donnees: DonneesGeoJSON) => void } | undefined;
             source?.setData?.(fond);
           })
           .catch(() => undefined);
@@ -396,7 +399,7 @@ export function FranceCoverageMap({
     echelleRef.current = echelle;
     const map = mapRef.current;
     if (!map || !map.getLayer('dept-fill')) return;
-    map.setPaintProperty('dept-fill', 'fill-color', expressionCouleur(echelle, TOTAL_DEPARTEMENT));
+    map.setPaintProperty('dept-fill', 'fill-color', expressionCouleur(echelle, TOTAL_DEPARTEMENT) as ExpressionSpecification);
   }, [echelle]);
 
   return (

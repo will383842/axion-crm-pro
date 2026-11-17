@@ -26,3 +26,4 @@ Après : `OK (12 tests, 35 assertions)`. Suite passerelle entière : 224 tests, 
 Aucun réseau réel : faux serveur sur 127.0.0.1, port libre. Pas de base Postgres (SQLite de la passerelle), donc pas de
 double connexion `pgsql_app`/propriétaire ; le cloisonnement par espace est prouvé par le test A/B. `pint` : style
 du backend, non appliqué à la passerelle.
+- Correctif relecture : `pause` appelle TOUJOURS `POST /api/admin/suspend/v1` (le miroir local peut être périmé après 30 j ou un redémarrage de KumoMTA) ; deux pauses = deux suspensions, toutes levées par `reprise`.

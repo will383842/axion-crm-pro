@@ -117,15 +117,38 @@ final class KumoHttpTest extends TestCase
         $k->executer(self::WS_A, 'pause', []);
     }
 
-    public function test_pause_deux_fois_une_seule_requete(): void
+    public function test_pause_deux_fois_deux_suspensions_puis_reprise_deux_delete(): void
     {
         $k = $this->demarrer();
         $k->executer(self::WS_A, 'pause', []);
         $k->executer(self::WS_A, 'pause', []);
         $r = $this->requetes();
+        $this->assertCount(2, $r);
+        foreach ($r as $q) {
+            $this->assertSame('/api/admin/suspend/v1', $q['chemin']);
+            $this->assertSame(self::WS_A, $q['corps']['tenant']);
+        }
+        $this->assertCount(2, $this->stockage->suspensionsActives(self::WS_A));
+        $this->assertSame(['levees' => 2], $k->executer(self::WS_A, 'reprise', []));
+        $r = $this->requetes();
+        $this->assertCount(4, $r);
+        $this->assertSame('DELETE', $r[2]['methode']);
+        $this->assertSame('DELETE', $r[3]['methode']);
+        $this->assertSame([], $this->stockage->suspensionsActives(self::WS_A));
+    }
+
+    public function test_suspension_notee_perimee_nouvelle_pause_rappelle_kumo(): void
+    {
+        $k = $this->demarrer();
+        // miroir local « suspendu » depuis plus de 30 jours, KumoMTA l'a oubliée : l'arrêt doit quand même repartir
+        $this->stockage->noterSuspension(self::WS_A, 'susp-ancienne');
+        $rep = $k->executer(self::WS_A, 'pause', []);
+        $r = $this->requetes();
         $this->assertCount(1, $r);
+        $this->assertSame('POST', $r[0]['methode']);
         $this->assertSame('/api/admin/suspend/v1', $r[0]['chemin']);
-        $this->assertSame(self::WS_A, $r[0]['corps']['tenant']);
+        $this->assertTrue($rep['suspendue']);
+        $this->assertArrayNotHasKey('deja', $rep);
     }
 
     public function test_reprise_delete_avec_id_note_puis_ne_refait_rien(): void

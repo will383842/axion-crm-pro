@@ -62,9 +62,7 @@ final class KumoHttp implements Kumo
     /** @return array<string,mixed> */
     private function pause(string $ws): array
     {
-        if ($this->stockage->suspensionsActives($ws) !== []) {
-            return ['suspendue' => true, 'deja' => true];
-        }
+        // Toujours rappeler KumoMTA : le miroir local peut être périmé (suspension expirée à 30 j, redémarrage).
         $rep = $this->appeler('POST', '/api/admin/suspend/v1', ['tenant' => $ws, 'reason' => 'tout-arreter', 'duration' => '30d']);
         $id = $rep['id'] ?? null;
         if (! is_string($id) || $id === '') {

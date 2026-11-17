@@ -23,8 +23,8 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class)->group('envoi');
 
-/** R07 : points automatiques dont la source n'existe pas encore (toujours faux). X5 : les deux freins ont une source structurelle (voir FeuVertFreinsSignauxTest). */
-const FV_AUTO_SANS_SOURCE = ['auto.separation_lettre_prospection'];
+/** R07 : points automatiques dont la source n'existe pas encore (toujours faux). X5 : les freins ont une source structurelle ; X5-B : la séparation lit l'inventaire des IP (voir FeuVertSeparationIpTest). */
+const FV_AUTO_SANS_SOURCE = [];
 function espaceFeuVert(): string
 {
     $id = (string) Str::uuid();
@@ -59,6 +59,10 @@ function toutVert(string $ws): void
     WorkspaceContext::run($ws, function () use ($ws) {
         // K17-FV (v5) : un essai à blanc réussi de moins de 7 jours (point auto.essai_a_blanc_recent).
         DB::table('envoi_essais_blanc')->insert(['workspace_id' => $ws, 'auteur' => 'test', 'debut' => now()->subHour(), 'fin' => now()->subMinutes(30), 'reussi' => true, 'etapes' => '[]']);
+        // X5-B : un domaine de prospection relié à son IP (inventaire envoi_ips ; IP de documentation RFC 5737).
+        $ip = (string) Str::uuid();
+        DB::table('envoi_ips')->insert(['id' => $ip, 'workspace_id' => $ws, 'ref' => '192.0.2.10', 'flux' => 'prospection', 'auteur' => 'test']);
+        DB::table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'a.exemple.test', 'achete_le' => '2026-01-01', 'flux' => 'prospection', 'ip_id' => $ip]);
         DB::table('envoi_controles_dns')->insert(['workspace_id' => $ws, 'domaine' => 'a.exemple.test', 'controle_le' => now(), 'pret' => true, 'pause' => false]);
         DB::table('envoi_controles_listes')->insert(['workspace_id' => $ws, 'type' => 'domaine', 'ressource' => 'a.exemple.test', 'statut' => 'non_liste', 'zone' => 'z.test', 'pause' => false]);
         foreach (DepotSocleDb::FOURNISSEURS_TEMOINS as $i => $f) {
@@ -347,7 +351,7 @@ test('R07 : les points automatiques sans source sont FAUX, même avec tout au ve
 
 test('R07 : un point auto.* refuse toute preuve', function (string $code) {
     expect(fn () => app(DepotPreuves::class)->ajouter(espaceFeuVert(), $code, 'Preuve de test, réf. exemple-01', 'auteur'))->toThrow(InvalidArgumentException::class);
-})->with(FV_AUTO_SANS_SOURCE);
+})->with(['auto.separation_lettre_prospection']);
 
 test('R07 : A11 éclaté : quatre inscriptions bloquantes (Signal Spam aussi, par prudence) ; l’ancien point disparaît', function () {
     $ws = espaceFeuVert();
@@ -371,8 +375,8 @@ test('R07 : le nombre de bloquants et les drapeaux ne bougent que comme attendu'
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     $points = app(ListeFeuVert::class)->points($ws);
     $bloquants = count(array_filter($points, fn ($p) => $p->bloquant));
-    // 48 points : 18 auto verts (toutVert pose l'essai à blanc et, X5, les signaux des deux freins), 1 auto sans source, 29 manuels non faits.
-    expect($bloquants)->toBe(1 + 29);
+    // 48 points : 19 auto verts (toutVert pose l'essai à blanc, les signaux des deux freins et, X5-B, l'IP du domaine), aucun auto sans source, 29 manuels non faits.
+    expect($bloquants)->toBe(29);
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant);
 });
 
@@ -394,6 +398,6 @@ test('R07 : A12 reste à faire tant qu’un domaine a flux NULL, et tant que la 
     });
     expect(point($ws, 'auto.separation_lettre_prospection'))->fait->toBeFalse()->detail->toContain('flux');
     WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('nom', 'l.exemple.test')->update(['flux' => 'lettre']));
-    // Les deux flux sont étiquetés, mais aucune source ne dit encore les adresses IP : prudence, toujours faux.
+    // Les deux flux sont étiquetés, mais le domaine lettre n'a pas d'IP reliée : toujours faux (voir FeuVertSeparationIpTest).
     expect(point($ws, 'auto.separation_lettre_prospection')->fait)->toBeFalse();
 });

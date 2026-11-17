@@ -45,6 +45,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Tests\Support\DoublonsFixtures as F;
@@ -582,12 +583,14 @@ test('pause() : porte fermée ⇒ la passerelle ne transmet rien, aucun adaptate
     expect($m['kumo']->appels)->toBe(['pause' => 1]); // l'aiguilleur seul transmet (la porte est testée par la passerelle)
 });
 
-test('garde (témoin) : tant que le seul serveur est le faux, aucune pause n\'atteint un serveur réel (aucune fabrique réelle liée)', function () {
+test('garde (témoin) : tant que le seul serveur est le faux, aucune pause n\'atteint un serveur réel (seule la fabrique kumo est liée, jamais appelée)', function () {
+    Http::preventStrayRequests();
     $aig = app('envoi.serveur_interne');
     expect($aig)->toBeInstanceOf(AiguilleurServeurEnvoi::class);
     $aig->pause(); // aucun domaine réel : ne construit rien, ne lève rien
     $propriete = new ReflectionProperty($aig, 'fabriques');
-    expect($propriete->getValue($aig))->toBe([]);
+    expect(array_keys($propriete->getValue($aig)))->toBe(['kumo']); // C3-5 : liée ; smtp NON lié (décision E4)
+    Http::assertNothingSent();
 });
 
 // ── Commande journalisée, seule voie ─────────────────────────────────────────
@@ -778,6 +781,55 @@ test('etatEnvoi smtp : le domaine de la boîte de l\'injection est passé à la 
     }], fn (): bool => true, fn (): ListeFeuVert => app(ListeFeuVert::class));
     $aig->etatEnvoi($id);
     expect($recus)->toBe([$m['domaine']]);
+});
+
+/** Second domaine de l'espace du montage, sur l'adaptateur donné, DNS vert du jour. */
+function aigSecondDomaine(array $m, string $adaptateur, bool $dns = true): string
+{
+    $d = 'aig2-' . Str::lower(Str::random(6)) . '.example.test';
+    DB::table('envoi_domaines')->insert(['workspace_id' => $m['ws'], 'nom' => $d, 'achete_le' => '2026-01-01']);
+    aigAdaptateur($m['ws'], $d, $adaptateur);
+    $dns && aigDns($m['ws'], $d);
+
+    return $d;
+}
+
+test('C3-5 (b) kumo ET smtp actifs dans l\'espace : chaque injection et chaque identifiant va à SON adaptateur (fabrique smtp espionne)', function () {
+    $m = aigMontage('kumo');
+    $dSmtp = aigSecondDomaine($m, 'smtp');
+    $m['aig']->injecter(aigMessage($m['ws'], $m['domaine'], 'cle-k'));
+    $m['aig']->injecter(aigMessage($m['ws'], $dSmtp, 'cle-s'));
+    expect($m['kumo']->appels)->toBe(['injecter' => 1])->and($m['smtp']->appels)->toBe(['injecter' => 1]);
+    $idKumo = aigInjectionLocale($m['ws'], 'kumo');
+    $m['aig']->etatEnvoi($idKumo);
+    expect($m['kumo']->appels)->toBe(['injecter' => 1, 'etatEnvoi' => 1])->and($m['smtp']->appels)->toBe(['injecter' => 1]);
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $m['ws'], 'adresse' => 'contact@' . $dSmtp, 'hote' => 'imap.example.test', 'port' => 587, 'identifiants_chiffres' => 'x']);
+    $idSmtp = (string) Str::uuid();
+    WorkspaceContext::run($m['ws'], fn () => DB::table('envoi_injections_smtp')->insert(['workspace_id' => $m['ws'], 'boite_id' => $boite, 'cle_idempotence' => 'c-s2', 'etat' => 'accepte', 'id_injection' => $idSmtp]));
+    $m['aig']->etatEnvoi($idSmtp);
+    expect($m['kumo']->appels)->toBe(['injecter' => 1, 'etatEnvoi' => 1])->and($m['smtp']->appels)->toBe(['injecter' => 1, 'etatEnvoi' => 1]);
+});
+
+test('C3-5 (c) smtp : l\'identifiant n\'est interrogé qu\'avec le domaine de SA boîte (jamais un autre domaine smtp) ; aucun domaine smtp vert ⇒ Inconnu, fabrique jamais appelée', function () {
+    $m = aigMontage('smtp');
+    $autre = aigSecondDomaine($m, 'smtp');
+    $boite = (string) Str::uuid();
+    DB::table('envoi_boites')->insert(['id' => $boite, 'workspace_id' => $m['ws'], 'adresse' => 'contact@' . $autre, 'hote' => 'imap.example.test', 'port' => 587, 'identifiants_chiffres' => 'x']);
+    $id = (string) Str::uuid();
+    WorkspaceContext::run($m['ws'], fn () => DB::table('envoi_injections_smtp')->insert(['workspace_id' => $m['ws'], 'boite_id' => $boite, 'cle_idempotence' => 'c-c', 'etat' => 'accepte', 'id_injection' => $id]));
+    $recus = [];
+    $aig = new AiguilleurServeurEnvoi($m['faux'], ['smtp' => function (string $ws, string $d) use (&$recus, $m): ServeurEnvoi {
+        $recus[] = $d;
+
+        return $m['smtp'];
+    }], fn (): bool => true, fn (): ListeFeuVert => app(ListeFeuVert::class));
+    $aig->etatEnvoi($id);
+    expect($recus)->toBe([$autre])->and($recus)->not->toContain($m['domaine']);
+    // Plus aucun domaine smtp vert : Inconnu, aucune fabrique appelée.
+    WorkspaceContext::run($m['ws'], fn () => DB::table('envoi_controles_dns')->where('workspace_id', $m['ws'])->update(['pret' => false]));
+    $recus = [];
+    expect($aig->etatEnvoi($id))->toBe(EtatMessage::Inconnu)->and($recus)->toBe([]);
 });
 
 /** Serveur minimal de test : `sante()` rend ce qu'on lui donne, `pause()` échoue si demandé ; tout autre appel est une erreur. */

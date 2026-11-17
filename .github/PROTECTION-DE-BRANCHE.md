@@ -80,9 +80,7 @@ Liste lue par la garde du dépôt. Chaque nom doit correspondre au `name:` d'un 
 - `Frontend React/Vite`
 - `Workers Node + Playwright`
 - `Secrets scan (Gitleaks)`
-- `La config de production ne publie que 80 et 443`
-- `Le Caddyfile est-il valide ?`
-- `Les scripts d'infra sont-ils exécutables ?`
+- `Gardes d'infra (ports 80/443, Caddyfile, scripts)`
 - `axe-core Playwright`
 <!-- CONTEXTES-REQUIS:FIN -->
 
@@ -104,9 +102,7 @@ gh api -X PUT repos/will383842/axion-crm-pro/branches/main/protection \
       "Frontend React/Vite",
       "Workers Node + Playwright",
       "Secrets scan (Gitleaks)",
-      "La config de production ne publie que 80 et 443",
-      "Le Caddyfile est-il valide ?",
-      "Les scripts d'infra sont-ils exécutables ?",
+      "Gardes d'infra (ports 80/443, Caddyfile, scripts)",
       "axe-core Playwright"
     ]
   },

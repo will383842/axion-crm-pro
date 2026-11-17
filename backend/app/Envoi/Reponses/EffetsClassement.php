@@ -45,6 +45,13 @@ final class EffetsClassement
             }
         }
 
+        if ($classement === 'interesse') {
+            // Avis aux responsables, APRÈS validation de la transaction du geste (RR-5B) ; l'auteur = dernier classement humain écrit.
+            $auteur = DB::table('envoi_reponses_classements')->where('workspace_id', $ws)->where('reponse_id', $l->id)
+                ->where('geste', 'classement')->where('auteur', 'humain')->orderByDesc('id')->value('auteur_id');
+            AvisReponseInteressee::apres($ws, (int) $l->id, is_string($auteur) ? $auteur : null);
+        }
+
         $tache = match ($classement) {
             'interesse' => $creerTache ? ['Rappeler : réponse intéressée', 'tache', 0] : null,
             'question' => $creerTache ? ['Répondre à la question reçue', 'tache', 0] : null,

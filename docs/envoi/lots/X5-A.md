@@ -21,7 +21,7 @@ Cahier : `docs/envoi/lots/FINI-cahier.md` (PR #680). Dépend de FINI-M0B (#685, 
 - Vert : commit `9d74920`, les 24 contrôles verts ou ignorés. Le test de plan SQL `QuarantaineSitesNonVerifiesTest` (zone non touchée) a échoué une fois puis réussi à la relance, sans changement de code.
 - Essai local : impossible dans ce bac à sable (connexion PostgreSQL refusée), non poursuivi.
 
-## Mutations demandées
-Jouées sur la CI de la PR (un commit de mutation, puis son annulation) : résultats dans le commentaire de la PR.
-- Retirer le filtre « preuve postérieure » (`p.cree_le > att.le`) ⇒ le test « preuve antérieure » doit échouer.
-- Lire l'attestation sans filtre d'espace ⇒ le test « espace B sans effet sur A » doit échouer.
+## Mutations demandées (jouées sur la CI de la PR, commit `76b363a`, annulé par un commit de revert)
+- Filtre « preuve postérieure » (`p.cree_le > att.le`) retiré ⇒ « attestation + preuve antérieure » échoue, sous `pgsql` ET `pgsql_app` (2 échecs).
+- Lecture de la dernière attestation sans filtre d'espace ⇒ « l'attestation de l'espace B est sans effet sur A » échoue (sous `pgsql`).
+- Total : 3 échecs sur 1 911 tests ; aucun autre test touché. Mutations annulées, code de production rétabli à l'identique de `9d74920`.

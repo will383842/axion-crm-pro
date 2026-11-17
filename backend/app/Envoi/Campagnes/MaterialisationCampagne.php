@@ -70,7 +70,7 @@ final class MaterialisationCampagne
             return $this->resultat($ligne, 0, $ligne->motif);
         }
         $contenu = json_decode((string) $c->saisie, true)['contenu'] ?? [];
-        if (trim((string) $c->boites, '{}') !== '' || (is_array($contenu) && ($contenu['plafond_jour'] ?? null) !== null)) {
+        if (RaisonBlocage::reglageNonApplique($c)) {
             throw new MaterialisationRefusee('reglage_non_applique', false, 'Boîtes ou plafond saisis : le transport ne les applique pas encore, la campagne reste programmée.');
         }
 

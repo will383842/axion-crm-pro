@@ -174,6 +174,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_07_000130_envoi_inscriptions_boite.php',
     // Filet modifié : pourquoi — FINI-M0B : codes d'ajout de boîte, AJOUT SEUL (table, déclencheur, droits) ; la retirer effacerait les codes ; down() inerte, up() rejouable.
     '2026_12_07_000140_envoi_boites_codes_ajout.php',
+    // Filet modifié : pourquoi — FINI-M0A : inventaire des IP d'envoi, AJOUT SEUL (table, déclencheurs, droits) ; la retirer effacerait l'inventaire ; down() inerte, up() rejouable.
+    '2026_12_07_000100_envoi_ips.php',
+    // Filet modifié : pourquoi — FINI-M0A : rattachement domaine → IP (colonne nullable, FK NOT VALID, fonction), AJOUT SEUL ; le retirer effacerait les rattachements posés ; down() inerte, up() rejouable.
+    '2026_12_07_000110_envoi_domaines_ip.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

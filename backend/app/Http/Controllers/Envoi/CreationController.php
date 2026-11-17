@@ -59,7 +59,7 @@ final class CreationController extends Controller
         return $this->garde(function () use ($r, $id, $cible): JsonResponse {
             $this->assistant->lire($this->ws($r), $id);
 
-            return response()->json($this->assistant->estimer($this->ws($r), $cible));
+            return response()->json($this->assistant->estimer($this->ws($r), $cible, $id));
         });
     }
 

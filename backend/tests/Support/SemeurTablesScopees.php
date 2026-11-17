@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations', 'envoi_boites_acces_imap', 'envoi_retraits_demandes', 'envoi_kumo_injections', 'envoi_kumo_etat', 'envoi_kumo_5xx',
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations', 'envoi_boites_acces_imap', 'envoi_retraits_demandes', 'envoi_kumo_injections', 'envoi_kumo_etat', 'envoi_kumo_5xx', 'envoi_ips',
         'envoi_attestations_serveur_reel',
         'envoi_boites_codes_ajout',
     ];
@@ -132,6 +132,8 @@ final class SemeurTablesScopees
         'envoi_domaines',
         // FINI-M0B : attestations du serveur réel (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK).
         'envoi_attestations_serveur_reel',
+        // FINI-M0A : inventaire des IP d'envoi (ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK).
+        'envoi_ips',
         // Envoi R15 : rappels DMARC (ajout seul + FK workspaces et envoi_domaines) : APPEND_SEUL_AVEC_FK ; APRÈS son domaine parent.
         'envoi_domaines_rappels_dmarc',
         // Envoi P0 L1 : séquences, étapes, inscriptions, messages (dans l'ordre des clés étrangères).
@@ -615,6 +617,13 @@ final class SemeurTablesScopees
             'geste' => 'atteste',
             'auteur' => 'zz',
             'motif' => 'zz étanchéité : attestation de test',
+        ]);
+
+        $inserer('envoi_ips', [
+            'id' => (string) Str::uuid(),
+            'ref' => '192.0.2.1',
+            'flux' => 'prospection',
+            'auteur' => 'zz',
         ]);
 
         $sequence = (string) Str::uuid();

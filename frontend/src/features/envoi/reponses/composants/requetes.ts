@@ -81,6 +81,11 @@ export function useClasser() {
   });
 }
 
+/** Annule le classement humain : la réponse revient « à traiter ». Rien n'est supprimé ; un STOP répond 409. */
+export function useAnnuler() {
+  return useGeste(async (v: { id: string }) => (await api.post<ReponseApresGeste>(`/envoi/reponses/${v.id}/annuler`)).data);
+}
+
 export function useRepondre() {
   return useGeste(async (v: { id: string; corps: string; raccourci_id?: string; attribuer_a?: string | null }) => {
     const { id, ...corps } = v;

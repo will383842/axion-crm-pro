@@ -41,7 +41,11 @@ class ListeFeuVert
     /** X5-C : âge maximal des contrôles DNS et listes pour accorder (15 minutes). */
     public const BATTERIE_FRAICHEUR_SECONDES = 900;
 
-    public function __construct(private readonly DepotPreuves $preuves, private readonly DepotSante $sante) {}
+    public function __construct(
+        private readonly DepotPreuves $preuves,
+        private readonly DepotSante $sante,
+        private readonly DepotAttestationServeurReel $attestations = new DepotAttestationServeurReel,
+    ) {}
 
     /** @return list<PointFeuVert> */
     public function points(string $ws): array
@@ -80,6 +84,9 @@ class ListeFeuVert
         ];
 
         $preuves = $this->preuves->dernieres($ws);
+        // X5-A : attestation humaine « serveur réel ». Toute erreur de lecture remonte (échec fermé : jamais « fait » par défaut).
+        $attestee = $this->attestations->active($ws);
+        $apres = $attestee ? array_flip($this->attestations->codesProuvesApres($ws)) : [];
         foreach (CatalogueManuels::codesManuels() as $code) {
             $p = $preuves[$code] ?? null;
             $depose = $p !== null && $p['fait'];
@@ -87,14 +94,17 @@ class ListeFeuVert
             // Aucun signal « K17 fait » n'existe encore dans le code : par prudence, un point qui exige le vrai serveur attend toujours.
             // Règle : `fait` = (`etat` == « fait »). Un point qui attend le vrai serveur n'est PAS fait (donc bloquant),
             // même avec une preuve déposée, qui reste affichée.
-            $attend = $c['serveur_reel'];
-            $etat = $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($depose ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE);
+            $attend = $c['serveur_reel'] && ! $attestee;
+            // Avec attestation active, un point « serveur réel » n'est fait que si sa preuve est postérieure à l'attestation.
+            $fait = $c['serveur_reel'] && $attestee ? isset($apres[$code]) : $depose;
+            $revalider = $c['serveur_reel'] && $attestee && $depose && ! $fait;
+            $etat = $attend ? PointFeuVert::ETAT_ATTEND_SERVEUR : ($fait ? PointFeuVert::ETAT_FAIT : PointFeuVert::ETAT_A_FAIRE);
             $points[] = new PointFeuVert(
                 $code,
                 $c['libelle'],
                 false,
                 $etat === PointFeuVert::ETAT_FAIT,
-                self::detailManuel($attend, $depose),
+                $revalider ? 'Preuve antérieure à l’attestation : à revalider.' : self::detailManuel($attend, $depose),
                 $c['source'],
                 $c['groupe'],
                 $etat,

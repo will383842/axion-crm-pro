@@ -42,12 +42,13 @@ final class DepotIps
         foreach ($lignes as $l) {
             $out[(string) $l->flux][] = (string) $l->ref;
         }
-        foreach ($out as $flux => $refs) {
-            usort($refs, fn (string $a, string $b): int => ip2long($a) <=> ip2long($b));
-            $out[$flux] = $refs;
-        }
+        $trier = static function (array $refs): array {
+            usort($refs, fn (string $x, string $y): int => ip2long($x) <=> ip2long($y));
 
-        return $out;
+            return $refs;
+        };
+
+        return ['prospection' => $trier($out['prospection']), 'lettre' => $trier($out['lettre'])];
     }
 
     /** Domaines de l'espace sans IP active (aucune, ou retirée). */

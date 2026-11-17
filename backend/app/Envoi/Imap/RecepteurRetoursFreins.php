@@ -6,13 +6,14 @@ use App\Envoi\Contrat\EvenementEnvoi;
 use App\Envoi\Retours\AppliquerRetour;
 
 /**
- * Alimente les freins de L7 : chaque retour qui compte (désinscription, plainte, rebond dur, rebond mou)
+ * Alimente les freins de L7 : chaque retour qui compte (réponse humaine, désinscription, plainte, rebond dur, rebond mou)
  * est transmis à `AppliquerRetour` sous la forme d'un `EvenementEnvoi`. L'identifiant de l'événement est
  * l'EMPREINTE DU MESSAGE (stable : ni UID, ni UIDVALIDITY), pour que L7 compte une seule fois.
  */
 final class RecepteurRetoursFreins implements RecepteurRetours
 {
     private const TYPES = [
+        'reponse_humaine' => 'reponse',
         'desinscription' => 'desinscription',
         'hostile' => 'plainte',
         'rebond_dur' => 'rebond_dur',

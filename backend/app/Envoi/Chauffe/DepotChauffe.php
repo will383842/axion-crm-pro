@@ -4,6 +4,7 @@ namespace App\Envoi\Chauffe;
 
 use App\Envoi\Exceptions\ReculRefuse;
 use App\Envoi\JourEnvoi;
+use App\Envoi\Reponses\ServiceReponses;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use Illuminate\Database\Query\Builder;
@@ -433,14 +434,17 @@ final class DepotChauffe
         }));
     }
 
-    /** Réponses « en attente » = reçues − traitées, d'après le journal (contrat du lot Retours : commandes `reponse_recue` / `reponse_traitee`). */
+    /**
+     * Réponses « en attente » : le plus grand de (reçues − traitées d'après le journal, commandes `reponse_recue` / `reponse_traitee`)
+     * et de la file réelle des réponses non classées. Le maximum ne fait qu'envoyer moins (frein).
+     */
     public function reponsesEnAttente(string $ws): int
     {
         $c = WorkspaceContext::run($ws, fn () => DB::table('envoi_journal_commandes')
             ->where('workspace_id', $ws)->whereIn('commande', ['reponse_recue', 'reponse_traitee'])
             ->selectRaw("COUNT(*) FILTER (WHERE commande = 'reponse_recue') r, COUNT(*) FILTER (WHERE commande = 'reponse_traitee') t")->first());
 
-        return max(0, (int) ($c->r ?? 0) - (int) ($c->t ?? 0));
+        return max(0, (int) ($c->r ?? 0) - (int) ($c->t ?? 0), ServiceReponses::nonTraitees($ws));
     }
 
     public function derniereValidation(string $ws): ?DateTimeImmutable

@@ -11,6 +11,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: serveur-envoi-shaping-${{ github.ref }}
+  # annule le run remplacé sur PR seulement ; jamais sur push main
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   shaping:
     name: Validation du modèle de shaping

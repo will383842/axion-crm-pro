@@ -27,5 +27,6 @@ final class DemandeEnvoi
         public readonly ?string $segment = null,
         public readonly bool $premierContact = true,
         public readonly bool $nonInformes = false,
+        public readonly bool $repliGenerique = false, // L5a : repli sur l'adresse générale (un `risque/generique` récent n'est admis que pour lui)
     ) {}
 }

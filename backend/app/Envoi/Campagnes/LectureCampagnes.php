@@ -9,8 +9,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Lecture du suivi des campagnes (R09) : liste, calendrier, fiche, destinataires. LECTURE SEULE, aucune écriture.
- * Tant que `sequence_id` est nul (toujours, ce dépôt ne l'écrit jamais), il n'y a ni inscription ni destinataire : tous les
- * compteurs sont 0 et la liste des destinataires est vide. Les compteurs réels viendront de R04 (non fusionné ici).
+ * Les compteurs viennent de `CompteursCampagne` (L6-A, lecture seule) : une requête pour toute la page de la liste, une pour la fiche.
+ * Une campagne sans séquence (ou d'un autre espace) a des compteurs à 0 ; la liste des destinataires reste vide (liste nominative : hors lot).
+ * Les gestes rendent la forme `CampagneSuivi` avec des zéros (`exposer` sans compteurs).
  */
 final class LectureCampagnes
 {
@@ -35,8 +36,10 @@ final class LectureCampagnes
                 ->orderByDesc('cree_le')->orderBy('id')->offset(($page - 1) * $parPage)->limit($parPage)->get();
             $filtre = $statut === null ? $total : $parStatut[$statut];
 
+            $compteurs = (new CompteursCampagne)->pourListe($ws, array_values(array_map(static fn (\stdClass $l): string => (string) $l->id, $lignes->all())));
+
             return [
-                'data' => array_values($lignes->map(fn ($c) => self::exposer($c))->all()),
+                'data' => array_values($lignes->map(fn ($c) => self::exposer($c, $compteurs[$c->id] ?? null))->all()),
                 'meta' => ['page' => $page, 'par_page' => $parPage, 'total' => $filtre, 'pages' => (int) ceil($filtre / $parPage)],
                 'par_statut' => $parStatut,
             ];
@@ -64,6 +67,7 @@ final class LectureCampagnes
     {
         return WorkspaceContext::run($ws, function () use ($ws, $id): array {
             $c = DB::table('envoi_campagnes')->where('workspace_id', $ws)->where('id', $id)->first() ?? throw CampagneRefusee::introuvable();
+            $n = (new CompteursCampagne)->pour($ws, $id);
             $ids = self::boites($c->boites);
             $adresses = $ids === [] ? [] : DB::table('envoi_boites')->where('workspace_id', $ws)->whereIn('id', $ids)->pluck('adresse', 'id')->all();
             $parBoite = [];
@@ -75,11 +79,11 @@ final class LectureCampagnes
 
             return [
                 'maintenant' => CarbonImmutable::now()->toIso8601ZuluString(),
-                'campagne' => self::exposer($c),
+                'campagne' => self::exposer($c, $n),
                 'sequence' => [],
                 'derniers_evenements' => [],
-                'compteurs' => array_fill_keys(['en_file', 'partis', 'refuses', 'ont_repondu', 'exclus', 'desinscrits', 'arretes_entreprise', 'en_pause_absence'], 0)
-                    + ['taux_refus' => 0, 'limite_refus' => 0, 'taux_desinscription' => 0],
+                'compteurs' => self::compteurs($n),
+                'preparation' => $n['preparation'],
                 'par_boite' => $parBoite,
                 'par_jour' => [],
                 'ab' => null,
@@ -88,21 +92,44 @@ final class LectureCampagnes
         });
     }
 
+    /**
+     * Forme `compteurs` du contrat : les clés historiques sont reliées aux définitions de L6-A (`partis` = touches, `ont_repondu` = reponses,
+     * `desinscrits` = oppositions, `exclus` = exclus_preparation, `en_file` = actives) ; `en_pause_absence` reste 0 (l'état n'existe pas) ;
+     * `limite_refus` reste 0 (hors périmètre).
+     *
+     * @param  array<string, mixed>  $n  sortie de `CompteursCampagne`
+     * @return array<string, mixed>
+     */
+    private static function compteurs(array $n): array
+    {
+        return [
+            'en_file' => $n['actives'], 'partis' => $n['touches'], 'refuses' => $n['refuses'], 'ont_repondu' => $n['reponses'], 'exclus' => $n['exclus_preparation'],
+            'desinscrits' => $n['oppositions'], 'arretes_entreprise' => $n['arretes_entreprise'], 'en_pause_absence' => 0,
+            'taux_refus' => $n['taux_refus'], 'limite_refus' => 0, 'taux_desinscription' => $n['taux_desinscription'],
+            'inscrits' => $n['inscrits'], 'envoyes' => $n['envoyes'], 'touches' => $n['touches'], 'ouverts' => $n['ouverts'], 'suivi_ouvertures' => $n['suivi_ouvertures'],
+            'reponses' => $n['reponses'], 'rebonds_durs' => $n['rebonds_durs'], 'rebonds_mous' => $n['rebonds_mous'], 'oppositions' => $n['oppositions'],
+            'arretes_campagne' => $n['arretes_campagne'], 'exclus_preparation' => $n['exclus_preparation'], 'issues' => $n['issues'],
+        ];
+    }
+
     /** Existence vérifiée (404 sinon) ; liste vide tant que la campagne n'a pas de séquence. */
     public function existe(string $ws, string $id): void
     {
         WorkspaceContext::run($ws, fn () => DB::table('envoi_campagnes')->where('workspace_id', $ws)->where('id', $id)->exists()) || throw CampagneRefusee::introuvable();
     }
 
-    /** @return array<string, mixed> forme `CampagneSuivi` du contrat */
-    public static function exposer(\stdClass $c): array
+    /**
+     * @param  array<string, mixed>|null  $compteurs  sortie de `CompteursCampagne` ; absente = zéros (les gestes rendent toujours la forme)
+     * @return array<string, mixed> forme `CampagneSuivi` du contrat
+     */
+    public static function exposer(\stdClass $c, ?array $compteurs = null): array
     {
         $cible = (array) json_decode($c->cible, true);
 
         return [
             'id' => $c->id, 'nom' => $c->nom, 'statut' => $c->statut,
             'cible' => ['type' => $cible['type'], 'reference' => $cible['reference'], 'libelle' => $cible['libelle'], 'total' => 0],
-            'envoyes' => 0, 'total' => 0, 'reponses' => 0, 'reponses_interessees' => 0,
+            'envoyes' => (int) ($compteurs['envoyes'] ?? 0), 'total' => (int) ($compteurs['inscrits'] ?? 0), 'reponses' => (int) ($compteurs['reponses'] ?? 0), 'reponses_interessees' => 0,
             'prochain_envoi_le' => $c->envoi_prevu_le === null ? null : CarbonImmutable::parse($c->envoi_prevu_le)->utc()->toIso8601ZuluString(),
             'cree_le' => CarbonImmutable::parse($c->cree_le)->utc()->toIso8601ZuluString(),
             'boites' => self::boites($c->boites), 'etapes' => (int) $c->nb_etapes,

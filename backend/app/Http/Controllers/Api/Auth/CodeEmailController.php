@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\ApiController;
-use App\Services\Auth\CodeCourriel\CanalFermeException;
 use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use App\Services\Auth\CodeCourriel\TropDeRenvois;
 use App\Support\AuditLogger;
@@ -59,7 +58,7 @@ class CodeEmailController extends ApiController
             $this->codes->renvoyer($user, $request->ip());
         } catch (TropDeRenvois) {
             return response()->json(['error' => 'trop_de_renvois', 'message' => 'Trop de codes demandés. Réessayez dans quelques minutes.'], 429);
-        } catch (CanalFermeException|\Throwable $e) {
+        } catch (\Throwable $e) {
             Log::warning('auth.code_courriel.renvoi_echoue', ['user_id' => (string) $user->id, 'erreur' => $e::class]);
 
             return response()->json(['error' => 'canal_indisponible', 'message' => 'Envoi momentanément impossible.'], 503);

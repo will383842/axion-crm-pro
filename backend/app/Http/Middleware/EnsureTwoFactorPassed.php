@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -40,13 +41,16 @@ class EnsureTwoFactorPassed
         'api/v1/auth/2fa/setup',
         'api/v1/auth/2fa/confirm',
         'api/v1/auth/2fa/verify',
+        'api/v1/auth/code-email/verifier',
+        'api/v1/auth/code-email/renvoyer',
     ];
 
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (! $user || $user->totp_enabled_at === null) {
+        // G3-B : la méthode effective (courriel ou TOTP) décide ; `null` = rien à exiger.
+        if (! $user || CodesConnexionCourriel::methode($user) === null) {
             return $next($request);
         }
 
@@ -58,10 +62,14 @@ class EnsureTwoFactorPassed
             return $next($request);
         }
 
+        $courriel = CodesConnexionCourriel::methode($user) === 'email';
+
         return response()->json([
             'error' => 'two_factor_required',
-            'message' => 'Saisissez le code de votre application d\'authentification pour continuer.',
-            'next_step' => '/auth/2fa/verify',
+            'message' => $courriel
+                ? 'Saisissez le code reçu par courriel pour continuer.'
+                : 'Saisissez le code de votre application d\'authentification pour continuer.',
+            'next_step' => $courriel ? '/2fa' : '/auth/2fa/verify',
         ], 403);
     }
 

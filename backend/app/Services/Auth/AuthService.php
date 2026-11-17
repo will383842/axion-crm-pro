@@ -3,6 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Models\User;
+use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -178,7 +179,7 @@ class AuthService
 
         return [
             'user' => $user->fresh(),
-            'requires_2fa' => $user->totp_enabled_at !== null,
+            'requires_2fa' => CodesConnexionCourriel::methode($user) !== null,
         ];
     }
 

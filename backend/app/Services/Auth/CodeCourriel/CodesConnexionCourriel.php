@@ -36,6 +36,31 @@ final class CodesConnexionCourriel
         return new FauxCanalCodeConnexion;
     }
 
+    /**
+     * G3-B — méthode effective de double authentification : 'email' (méthode courriel ET drapeau allumé),
+     * sinon 'totp' (TOTP actif), sinon null. Seul endroit qui répond à la question (gardes, login, /auth/me).
+     */
+    public static function methode(User $u): ?string
+    {
+        if ($u->getAttribute('double_auth_methode') === 'email' && config('double_auth.actif') === true) {
+            return 'email';
+        }
+
+        return $u->totp_enabled_at !== null ? 'totp' : null;
+    }
+
+    /** Émissions `connexion` encore permises dans la fenêtre (affichage « renvois restants »). */
+    public function renvoisRestants(User $u): int
+    {
+        $depuis = CarbonImmutable::now()->subMinutes(self::FENETRE_RENVOIS_MINUTES);
+        $emises = DB::table('codes_connexion_courriel')
+            ->where('user_id', $u->id)->where('objet', 'connexion')
+            ->where('cree_le', '>', $depuis->toIso8601String())
+            ->count();
+
+        return max(0, (int) config('double_auth.renvois_max', 3) - $emises);
+    }
+
     /** @throws CanalFermeException drapeau éteint */
     public function emettre(User $u, string $objet, ?string $ip): void
     {

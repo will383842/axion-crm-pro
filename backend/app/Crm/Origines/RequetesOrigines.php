@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
  * `personne_origines_archive` (au-delà). Le cloisonnement est filtré
  * explicitement (`workspace_id`) ET garanti par la RLS.
  *
- * @phpstan-type Filtres array{famille: ?string, detail: ?string, reseau: ?string, mot: ?string, guide: ?string, oppose: string, du: ?string, au: ?string}
+ * @phpstan-type Filtres array{famille: ?string, detail: ?string, reseau: ?string, mot: ?string, guide?: ?string, oppose: string, du: ?string, au: ?string}
  */
 final class RequetesOrigines
 {

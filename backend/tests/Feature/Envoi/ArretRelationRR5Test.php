@@ -14,6 +14,7 @@ use App\Envoi\Sequence\DemandeComposition;
 use App\Envoi\Sequence\Inscriptions;
 use App\Envoi\Sequence\LecteurFicheDb;
 use App\Envoi\Sequence\ParametresExpedition;
+use App\Envoi\Sequence\RelationAvancee;
 use App\Envoi\Sequence\Sequenceur;
 use App\Envoi\Simulateur\FauxServeurEnvoi;
 use App\Socle\Espace\FonctionsEspace;
@@ -187,6 +188,15 @@ test('E4 : une entreprise cliente ou une activité de l\'Espace B n\'arrête rie
     expect($bilan)->toBe([Sequenceur::ENVOYE => 1])
         ->and(rr5Statut($ins)[0])->not->toBe('arretee')
         ->and(rr5Messages($ins))->toBe(1);
+})->with(['app', 'proprio']);
+
+test('E4 bis : RelationAvancee ne lit pas une entreprise cliente d\'un autre espace (la base fige l\'entreprise des inscriptions)', function (string $mode) {
+    $b = F::espace('zz-rr5c-b2');
+    $eB = F::fiche($b, 'ZZ Entreprise B', ['lifecycle_stage' => 'client']);
+
+    $motif = rr5Sous($mode, fn () => (new RelationAvancee)->motif($this->ws, $eB, 0, $this->lundi));
+
+    expect($motif)->toBeNull();
 })->with(['app', 'proprio']);
 
 test('E5 : entreprise opportunité ou perdue ⇒ l\'envoi part (aucun faux arrêt)', function (string $etape) {

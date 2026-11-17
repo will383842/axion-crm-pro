@@ -4,6 +4,7 @@ namespace App\Envoi\Creation;
 
 use App\Crm\Opposition\StatutOpposition;
 use App\Envoi\Campagnes\DepotCampagnes;
+use App\Envoi\Campagnes\FiltreOrigine;
 use App\Envoi\Exceptions\CampagneRefusee;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
@@ -93,6 +94,9 @@ final class AssistantCreation
             }
             if (array_key_exists('cible', $corps)) {
                 $contenu['cible'] = $this->cible($corps['cible']);
+                if (array_key_exists('origine', $contenu['cible'])) {
+                    [$contenu['cible']['origine'], $changes['filtre_origine']] = $this->filtreOrigine($ws, $contenu['cible']['origine']);
+                }
                 $this->refuserOpposes($ws, $contenu['cible']);
                 $changes['cible'] = array_intersect_key($contenu['cible'], array_flip(['type', 'reference', 'libelle']));
             }
@@ -132,11 +136,16 @@ final class AssistantCreation
         $fait = $saisie['etapes_faites'] ?? [];
         $valide = in_array($c->statut, ['a_valider', 'programmee'], true);
         $limite = $c->statut === 'programmee' ? $this->finAnnulation($c) : null;
+        $contenu = $saisie['contenu'] ?? [];
+        if (isset($contenu['cible']) && is_array($contenu['cible'])) {
+            // La COLONNE fait foi : la saisie ne sert qu'à l'écran et n'est jamais relue pour décider (ni ici, ni à la sélection).
+            $contenu['cible']['origine'] = isset($c->filtre_origine) ? json_decode((string) $c->filtre_origine, true) : null;
+        }
 
         return [
             'id' => $c->id, 'nom' => $c->nom, 'version' => (int) $c->version, 'statut' => $c->statut,
             'etape_courante' => min(self::ETAPES_MAX, ($fait === [] ? 0 : max($fait)) + 1), 'etapes_faites' => $fait,
-            'contenu' => (object) ($saisie['contenu'] ?? []),
+            'contenu' => (object) $contenu,
             'mis_a_jour_le' => Carbon::parse($c->maj_le)->toIso8601String(),
             'campagne_id' => $valide ? $c->id : null,
             'annulable_jusqua' => $limite?->toIso8601String(),
@@ -165,6 +174,29 @@ final class AssistantCreation
         $cible['libelle'] = is_string($cible['libelle'] ?? null) && trim($cible['libelle']) !== '' ? $cible['libelle'] : $cible['reference'];
 
         return $cible;
+    }
+
+    /**
+     * Filtre « réseau d'origine » de l'étape 1 : null = retrait (permis même filtre inactif, c'est un choix du fondateur) ; sinon forme
+     * exacte `{"reseaux": [...]}` ET filtre actif dans l'espace (sinon refus : ignorer un filtre élargirait la cible). La COLONNE fait foi.
+     *
+     * @return array{0: array{reseaux: list<string>}|null, 1: array{reseaux: list<string>}|null} [valeur gardée dans la saisie, valeur de la colonne]
+     */
+    private function filtreOrigine(string $ws, mixed $origine): array
+    {
+        if ($origine === null) {
+            return [null, null];
+        }
+        try {
+            $filtre = is_array($origine) ? (FiltreOrigine::depuisColonne($origine) ?? throw new \InvalidArgumentException('forme')) : throw new \InvalidArgumentException('forme');
+        } catch (\InvalidArgumentException) {
+            throw ErreurCreation::invalide('validation', 'Le filtre par réseau d\'origine est {"reseaux": [...]} : 1 à ' . FiltreOrigine::RESEAUX_MAX . ' réseaux (minuscules, chiffres, . _ -).');
+        }
+        if (! FiltreOrigine::actif($ws)) {
+            throw ErreurCreation::invalide('filtre_origine_inactif', 'Le filtre par réseau d\'origine est inactif dans cet espace : retirez-le ou attendez son ouverture.');
+        }
+
+        return [$filtre->enColonne(), $filtre->enColonne()];
     }
 
     private function sequence(mixed $sequence): int
@@ -442,7 +474,38 @@ final class AssistantCreation
             ),
         ];
 
+        array_push($liste, ...$this->controlesFiltreOrigine($ws, $c, $c7));
+
         return ['controles' => $liste, 'bloquants' => count(array_filter($liste, static fn (array $x): bool => $x['etat'] === 'bloquant'))];
+    }
+
+    /**
+     * Éléments « filtre par réseau » : AUCUN sans filtre. Filtre actif = ok ; inactif ou illisible = bloquant (la campagne ne partirait pas :
+     * mieux vaut le dire avant). L'estimation ignore le filtre : toujours signalé.
+     *
+     * @param  \Closure(string, string, string, ?string=): array<string, string|null>  $c7
+     * @return list<array<string, string|null>>
+     */
+    private function controlesFiltreOrigine(string $ws, \stdClass $c, \Closure $c7): array
+    {
+        $brut = $c->filtre_origine ?? null;
+        if ($brut === null) {
+            return [];
+        }
+        try {
+            $filtre = FiltreOrigine::depuisColonne($brut);
+            $actif = $filtre !== null && FiltreOrigine::actif($ws);
+        } catch (\InvalidArgumentException) {
+            $filtre = null;
+            $actif = false;
+        }
+
+        return [
+            $actif && $filtre !== null
+                ? $c7('filtre_origine', 'Filtre par réseau d\'origine', 'ok', 'Filtre par réseau : ' . implode(', ', $filtre->reseaux))
+                : $c7('filtre_origine', 'Filtre par réseau d\'origine', 'bloquant', 'Le filtre par réseau d\'origine est inactif : retirez-le ou attendez son ouverture'),
+            $c7('filtre_origine_estimation', 'Estimation et filtre par réseau', 'attention', 'L\'estimation affichée ne tient pas compte du filtre ; le compte exact (hors réseau) apparaît à la préparation de l\'envoi'),
+        ];
     }
 
     /**

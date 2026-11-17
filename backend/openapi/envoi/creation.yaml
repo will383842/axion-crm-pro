@@ -581,6 +581,18 @@ components:
           type: array
           description: Adresses, organisations ou domaines à exclure en plus (saisie libre).
           items: { type: string }
+        origine:
+          description: Filtre « réseau d'origine » (restreint la cible, ne l'élargit jamais). Écrit à l'étape 1 ; rendu depuis la colonne de la campagne. `null` le retire.
+          oneOf:
+            - type: object
+              required: [reseaux]
+              properties:
+                reseaux:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$' }
+            - type: 'null'
         reverifier_anciennes:
           type: boolean
           description: Revérifier les adresses vues il y a plus de 30 jours avant l'envoi.
@@ -751,7 +763,7 @@ components:
       properties:
         code:
           type: string
-          enum: [cible_non_vide, opposition_retiree, lien_desinscription, identite_expediteur, boites_pretes, domaines_sains, plafond_respecte]
+          enum: [cible_non_vide, opposition_retiree, lien_desinscription, identite_expediteur, boites_pretes, domaines_sains, plafond_respecte, filtre_origine, filtre_origine_estimation]
         libelle: { type: string }
         etat: { type: string, enum: [ok, attention, bloquant] }
         detail: { oneOf: [{ type: string }, { type: 'null' }] }

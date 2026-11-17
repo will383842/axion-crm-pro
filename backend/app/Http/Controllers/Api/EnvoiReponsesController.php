@@ -50,9 +50,32 @@ class EnvoiReponsesController extends ApiController
         if (! is_string($classement) || ! in_array($classement, ServiceReponses::CLASSEMENTS, true)) {
             return $this->erreur('validation', 'Ce classement n’existe pas.', 422);
         }
-        $r = ctype_digit($id) ? $this->service->classer($this->espace(), (string) $request->user()?->getAuthIdentifier(), (int) $id, $classement, $request->json('creer_tache') === true) : null;
+        try {
+            $r = ctype_digit($id) ? $this->service->classer($this->espace(), (string) $request->user()?->getAuthIdentifier(), (int) $id, $classement, $request->json('creer_tache') === true) : null;
+        } catch (\DomainException $e) {
+            if ($e->getMessage() === ServiceReponses::STOP_DEFINITIF) {
+                return $this->stopDefinitif();
+            }
+            throw $e;
+        }
 
         return $r === null ? $this->introuvable() : response()->json($r);
+    }
+
+    /** Annule le classement humain courant : rien n'est effacé ni défait (arrêts, tâches, opposition gardés). */
+    public function annuler(Request $request, string $id): JsonResponse
+    {
+        if (! ctype_digit($id)) {
+            return $this->introuvable();
+        }
+        [$etat, $res] = $this->service->annuler($this->espace(), (string) $request->user()?->getAuthIdentifier(), (int) $id);
+
+        return match ($etat) {
+            'ok' => response()->json($res),
+            'inconnue' => $this->introuvable(),
+            'stop_definitif' => $this->stopDefinitif(),
+            default => $this->erreur('pas_traitee', 'Cette réponse n’a pas de classement à annuler.', 409),
+        };
     }
 
     public function rattacher(Request $request, string $id): JsonResponse
@@ -119,6 +142,11 @@ class EnvoiReponsesController extends ApiController
     private function introuvable(): JsonResponse
     {
         return $this->erreur('non_trouve', 'Cette réponse n’existe pas.', 404);
+    }
+
+    private function stopDefinitif(): JsonResponse
+    {
+        return $this->erreur('stop_definitif', 'Un STOP est définitif : il ne peut être ni annulé ni corrigé.', 409);
     }
 
     private function erreur(string $code, string $message, int $statut): JsonResponse

@@ -186,6 +186,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_07_000100_envoi_ips.php',
     // Filet modifié : pourquoi — FINI-M0A : rattachement domaine → IP (colonne nullable, FK NOT VALID, fonction), AJOUT SEUL ; le retirer effacerait les rattachements posés ; down() inerte, up() rejouable.
     '2026_12_07_000110_envoi_domaines_ip.php',
+    // Filet modifié : pourquoi — envoi L0a : colonne repli_generique, CHECK une étape et gardes, AJOUTS SEULS ; il n'y a aucune donnée à défaire et les retirer rouvrirait le repli sans garde ; down() inerte, up() rejouable.
+    '2026_12_12_000100_envoi_repli_generique.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

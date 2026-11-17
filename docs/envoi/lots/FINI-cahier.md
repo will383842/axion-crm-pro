@@ -140,6 +140,12 @@ X11-A (`GardeChauffe.php`, `Seuils.php`, 1 test), C4-A (`infra/…/passerelle/sr
   `NR17_RETOUR_INERTE_VOULU`, **après la fusion de #675** (décision de pilotage, commentaire sur #680)
 - M `backend/tests/Support/SemeurTablesScopees.php` : seulement `envoi_attestations_serveur_reel` et
   `envoi_boites_codes_ajout` semées (même décision). Rien d'autre hors liste.
+- Même fichier `Nr17MigrationsTest.php` : une exception **nommée et motivée** pour le seul aller-retour de
+  `2026_11_10_000040_envoi_boites.php` (son retour réel est bloqué par la clé étrangère composite de `000130` ; les
+  inscriptions sont conservées), avec la ligne « Filet modifié : pourquoi » dans `FINI-M0B.md` (2e décision de
+  pilotage, commentaire sur #680). Le retour réel reste exigé pour toutes les autres migrations ; ni `000130` ni
+  `000040` ne sont modifiées. Relecture : l'exception ne couvre QUE ce fichier, aucune autre garde affaiblie, sinon
+  BLOQUÉ.
 
 **Comportement**
 - `000120` : `envoi_attestations_serveur_reel` : `id`, `workspace_id`, `geste TEXT CHECK (geste IN ('atteste','retire'))`,

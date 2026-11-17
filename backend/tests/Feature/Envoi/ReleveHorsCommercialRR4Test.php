@@ -213,7 +213,7 @@ test('H2 plainte et rebond dur hors espace commercial : freins comptés, inscrip
         $s = rr4Statuts($this->a);
         expect($s[ListeSuppression::empreinte($p)])->toBe('arretee', $mode)->and($s[ListeSuppression::empreinte($r)])->toBe('arretee', $mode);
         $compte = fn (string $colonne): int => WorkspaceContext::run($this->a, fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $this->a)
-            ->where('commande', 'retour_applique')->whereRaw("details->>'colonne' = ?", [$colonne])->count());
+            ->where('commande', 'retour_applique')->whereRaw("(details::jsonb)->>'colonne' = ?", [$colonne])->count());
         expect($compte('plaintes'))->toBeGreaterThanOrEqual(1, $mode)->and($compte('rebonds_durs'))->toBeGreaterThanOrEqual(1, $mode);
     }
 });

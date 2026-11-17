@@ -4,6 +4,7 @@ namespace App\Services\Auth\CodeCourriel;
 
 use App\Crm\Opposition\StatutOpposition;
 use App\Models\User;
+use App\Support\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -137,7 +138,8 @@ final class CodesConnexionCourriel
         $espaces = array_values(array_unique($espaces)) ?: ['00000000-0000-0000-0000-000000000000'];
 
         foreach ($espaces as $espace) {
-            $r = app(StatutOpposition::class)->pourLignes($espace, [0 => ['email' => (string) $u->email, 'siren' => null]]);
+            // Dans le contexte de l'espace : sous le rôle applicatif, la RLS ne rend rien sans `app.current_workspace_id`.
+            $r = WorkspaceContext::run($espace, fn (): array => app(StatutOpposition::class)->pourLignes($espace, [0 => ['email' => (string) $u->email, 'siren' => null]]));
             if (($r[0]['opposee'] ?? false) === true) {
                 return true;
             }

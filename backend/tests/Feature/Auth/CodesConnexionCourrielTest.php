@@ -1,5 +1,6 @@
 <?php
 
+use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Models\User;
 use App\Services\Auth\CodeCourriel\CanalCodeConnexion;
 use App\Services\Auth\CodeCourriel\CanalCodeConnexionCourriel;
@@ -8,6 +9,7 @@ use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use App\Services\Auth\CodeCourriel\FauxCanalCodeConnexion;
 use App\Services\Auth\CodeCourriel\TropDeRenvois;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -272,6 +274,27 @@ it('G3-A 8 : adresse de compte opposée => aucun code, aucune ligne, aucune erre
     expect(collect($journal)->contains(fn ($l) => str_contains($l, 'auth.code_courriel.adresse_opposee')))->toBeTrue();
     expect(collect($journal)->contains(fn ($l) => str_contains($l, (string) $u->email)))->toBeFalse();
 });
+
+it('G3-A 8b : opposition PROPRE À L\'ESPACE (registre, domaine) => aucun code, sous app ET proprio', function (string $mode) {
+    $u = ccUtilisateur();
+    $ws = (string) Str::uuid();
+    DB::table('workspaces')->insert(['id' => $ws, 'slug' => 'cc-' . substr($ws, 0, 8), 'name' => 'Espace fictif']);
+    DB::table('user_workspaces')->insert(['user_id' => $u->id, 'workspace_id' => $ws, 'role_slug' => 'owner']);
+    WorkspaceContext::run($ws, fn () => DB::table('envoi_oppositions_registre')->insert([
+        'workspace_id' => $ws,
+        'portee' => 'domaine',
+        'empreinte' => RegistreOppositionManuel::empreinte('example.test'),
+        'valeur' => 'example.test',
+        'motif' => 'test',
+        'source' => 'manuel',
+        'auteur' => 'test',
+    ]));
+
+    ccSous($mode, fn () => ccService()->emettre($u, 'connexion', null));
+
+    expect(ccNbLignes())->toBe(0);
+    expect(FauxCanalCodeConnexion::dernierCode((string) $u->id))->toBeNull();
+})->with(['app', 'proprio']);
 
 it('G3-A 9 : si le canal échoue, la ligne reste (rien ne s\'efface)', function () {
     $u = ccUtilisateur();

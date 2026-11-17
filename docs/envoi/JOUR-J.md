@@ -39,7 +39,7 @@ Variables de l'envoi (toutes posées dans le `.env` du serveur du CRM, jamais da
 - Commandes : `php artisan envoi:ip-inventaire <workspace>` (lot X6-A) ; `php artisan envoi:domaine-ip <workspace>` (lot X…).
 - Vérification : chaque IP d'envoi est listée, chaque domaine relié à une IP ; poser `ENVOI_LISTES_IPS`
   (`192.0.2.10@<uuid-espace>`), `ENVOI_LISTES_NON_FIABLE_BLOQUE_APRES_MINUTES`.
-- Retour arrière : vider `ENVOI_LISTES_IPS` (échec fermé : rien ne part sans surveillance).
+- Retour arrière : « Tout arrêter » (`php artisan envoi:tout-arreter <workspace>`). Ne PAS vider `ENVOI_LISTES_IPS` : une IP non déclarée n'est plus surveillée par la garde des listes noires (`GardeListes.php:12`), vider la liste ouvre la garde au lieu de la fermer.
 
 ## J-20 — attestation du serveur réel et preuves des 22 points
 - Commande : `php artisan envoi:serveur-reel-attester <workspace>` (lot X5-A), puis fournir les preuves des 22 points à l'écran.
@@ -61,16 +61,16 @@ Variables de l'envoi (toutes posées dans le `.env` du serveur du CRM, jamais da
   `ENVOI_PLAFOND_JOUR`, `ENVOI_PLAFOND_GLOBAL_JOUR`.
 
 ## J-1 — essai à blanc
-- Geste : `php artisan envoi:valider-tableau <workspace>`, campagne témoin, `ENVOI_REEL_ACTIF` toujours `false`.
+- Geste : `php artisan envoi:valider-tableau <workspace>` puis `php artisan envoi:essai-a-blanc <espace>`, campagne témoin, `ENVOI_REEL_ACTIF` toujours `false`.
 - Vérification : aucune injection réelle (journal) ; tout est « ATTENTE ».
-- Retour arrière : rien n'est parti ; supprimer rien, mettre la campagne en pause.
+- Retour arrière : rien n'est parti ; ne rien supprimer, mettre la campagne en pause.
 
 ## J0 — bascule (le responsable du projet)
 1. Relancer la batterie des preuves (moins de 15 min, lot X5-C) : tout vert.
 2. Accorder le feu vert à l'écran.
 3. Poser `ENVOI_REEL_ACTIF=true` et `ENVOI_K1_ACTIF=true` dans le `.env` du serveur du CRM, **par le responsable du projet**.
 4. Redémarrer les services (`php artisan config:clear && php artisan queue:restart`).
-5. Commande : `php artisan envoi:domaine-adaptateur <workspace> <domaine> kumo` (lot X…).
+5. Commande : `php artisan envoi:domaine-adaptateur <workspace> <domaine> kumo`.
 - Vérification : première injection de 1 message à une adresse témoin ; plafonds `ENVOI_PLAFOND_JOUR` respectés.
 - Retour arrière : voir « Coupure ».
 

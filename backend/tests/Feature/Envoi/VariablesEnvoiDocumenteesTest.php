@@ -44,10 +44,18 @@ it('documente chaque variable ENVOI_ de config/envoi.php dans docs/envoi/JOUR-J.
     $texte = (string) @file_get_contents(x9Racine() . '/docs/envoi/JOUR-J.md');
     $absentes = array_values(array_filter(
         x9VariablesConfig(),
-        fn (string $v) => ! str_contains($texte, $v),
+        fn (string $v) => preg_match('/(?<![A-Z0-9_])' . preg_quote($v, '/') . '(?![A-Z0-9_])/', $texte) !== 1,
     ));
 
     expect($texte)->not->toBe('')->and($absentes)->toBe([]);
+});
+
+it('ne recommande pas de vider ENVOI_LISTES_IPS comme retour arrière (cela ouvre la garde)', function () {
+    $texte = (string) file_get_contents(x9Racine() . '/docs/envoi/JOUR-J.md');
+
+    expect(preg_match('/Retour arrière\s*:\s*vider/u', $texte))->toBe(0)
+        ->and($texte)->toContain('envoi:tout-arreter')
+        ->and($texte)->toContain('Ne PAS vider `ENVOI_LISTES_IPS`');
 });
 
 it('garde ENVOI_REEL_ACTIF=false dans .env.example', function () {

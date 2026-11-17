@@ -16,3 +16,8 @@ Aides ajoutées au banc : `campagne(..., $secondContact)`, `inscriptionDe`, `adr
 - S3 : la relève arrête A tout de suite (`RecepteurRetoursSequence`) ; l'étape 2 n'est donc jamais présentée à la porte pour A. La porte (refus pour opposition) n'est pas exercée ici.
 - Non repris de la relecture de L7-A : `EspionneFluxBanc` reste dans `BancCampagne.php` (déplacer vers un fichier propre exige un fichier hors liste autorisée ; à décider pour L7-C).
 - À corriger dans L7-C (fichier du banc) : `BancCampagne::arf` place le VERP dans `destinataireDsn` et ne pose pas `typeArf`, il est à reprendre avant S6.
+
+## Relecture Opus (correctifs)
+
+- bebr 2 : preuve de la voie CRM ajoutée (`opt_out`, source `campagne:releve-imap`) ; comptage de `personnes` avant/après ajouté (lecture seule).
+- Reste pour L7-C (S8) : la porte (refus pour opposition à l étape 2) n est pas exercée en S3, la relève arrêtant A avant.

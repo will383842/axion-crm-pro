@@ -108,11 +108,13 @@ test('bebr 2 S3 STOP : opposition écrite, A arrêtée, 0 injection pour A, la f
         [$banc, , $a, , $adresse] = bebrMonter($mode);
         $contacts = DB::table('contacts')->where('workspace_id', $banc->ws)->count();
         $entreprises = DB::table('companies')->where('workspace_id', $banc->ws)->count();
+        $personnes = DB::table('personnes')->where('workspace_id', $banc->ws)->count();
         $mid = $banc->messageId($a->id);
         BancCampagne::sous($mode, fn () => $banc->releve($banc->stop($mid, $adresse)));
 
         $apres = bebrInscription($banc, $a);
         expect(DB::table('email_suppressions')->where('email_hash', ListeSuppression::empreinte($adresse))->exists())->toBeTrue()
+            ->and(DB::table('opt_out')->where('email_hash', ListeSuppression::empreinte($adresse))->where('source', 'campagne:releve-imap')->exists())->toBeTrue()
             ->and($apres->statut)->toBe('arretee')->and($apres->motif_arret)->toBe('opposition')
             ->and(DB::table('envoi_inscriptions_evenements')->where('workspace_id', $banc->ws)->where('inscription_id', $a->id)->where('evenement', 'opposition')->count())->toBe(1);
 
@@ -122,7 +124,8 @@ test('bebr 2 S3 STOP : opposition écrite, A arrêtée, 0 injection pour A, la f
             ->and(DB::table('envoi_messages')->where('workspace_id', $banc->ws)->where('inscription_id', $a->id)->count())->toBe(1)
             ->and(DB::table('contacts')->where('workspace_id', $banc->ws)->count())->toBe($contacts)
             ->and(DB::table('contacts')->where('workspace_id', $banc->ws)->where('company_id', $a->entreprise_id)->whereNull('deleted_at')->count())->toBe(2)
-            ->and(DB::table('companies')->where('workspace_id', $banc->ws)->count())->toBe($entreprises);
+            ->and(DB::table('companies')->where('workspace_id', $banc->ws)->count())->toBe($entreprises)
+            ->and(DB::table('personnes')->where('workspace_id', $banc->ws)->count())->toBe($personnes);
         bebrRejouer($banc, $mode);
         expect(EspionneFluxBanc::$ouvertures)->toBe(0);
     }

@@ -61,8 +61,8 @@ final class SourceExpeditionDb
         $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->where('etat', 'active')
             ->orderBy('cree_le')->orderBy('id')->get(['id', 'adresse', 'cree_le']));
 
-        return $lignes->filter(fn ($l): bool => str_ends_with(mb_strtolower((string) $l->adresse), $suffixe))
-            ->map(fn ($l): array => ['id' => (string) $l->id, 'adresse' => (string) $l->adresse, 'cree_le' => (string) $l->cree_le])->values()->all();
+        return array_values($lignes->filter(fn ($l): bool => str_ends_with(mb_strtolower((string) $l->adresse), $suffixe))
+            ->map(fn ($l): array => ['id' => (string) $l->id, 'adresse' => (string) $l->adresse, 'cree_le' => (string) $l->cree_le])->all());
     }
 
     /** @return array<string, mixed> */

@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Pest\TestSuite;
 use Tests\TestCase;
 
 /*
@@ -54,7 +55,8 @@ function g3cCompte(): User
 function g3cNavigateur(array $cookies = []): void
 {
     $t = test();
-    (new ReflectionProperty($t, 'defaultCookies'))->setValue($t, []);
+    $cas = TestSuite::getInstance()->test;
+    (new ReflectionProperty($cas, 'defaultCookies'))->setValue($cas, []);
     $t->flushSession();
     $t->withSession(['_token' => 'g3c-csrf']);
     foreach ($cookies as $nom => $valeur) {

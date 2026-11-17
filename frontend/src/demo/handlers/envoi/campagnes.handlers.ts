@@ -160,6 +160,21 @@ export function ficheDemo(campagne: Campagne) {
   return fiche(campagne);
 }
 
+/** Partition des destinataires de démo, même priorité que le serveur : chacun dans une seule case. */
+function issuesDe(dests: Destinataire[], campagneFinie: boolean) {
+  const issues = { opposition: 0, rebond_dur: 0, reponse: 0, rebond_mou: 0, arretee_autre: 0, terminee: 0, active: 0 };
+  for (const d of dests) {
+    if (d.etat === 'desinscrit' || d.etat === 'plainte') issues.opposition += 1;
+    else if (d.etat === 'rebond_dur') issues.rebond_dur += 1;
+    else if (d.etat === 'a_repondu') issues.reponse += 1;
+    else if (d.etat === 'rebond_mou') issues.rebond_mou += 1;
+    else if (d.etat === 'relances_annulees' || d.etat === 'exclu') issues.arretee_autre += 1;
+    else if (campagneFinie) issues.terminee += 1;
+    else issues.active += 1;
+  }
+  return issues;
+}
+
 function fiche(campagne: Campagne) {
   const dests = destinatairesVus(campagne);
   const compte = (groupe: Groupe) => dests.filter((d) => GROUPES[d.etat] === groupe).length;
@@ -243,6 +258,18 @@ function fiche(campagne: Campagne) {
       taux_refus: pourcent(refuses, envoyes),
       limite_refus: LIMITE_REFUS,
       taux_desinscription: pourcent(desinscrits, envoyes),
+      // L6-C : compteurs réels. Chaque destinataire tombe dans UNE seule case des issues (Σ issues = inscrits).
+      inscrits: dests.length,
+      envoyes,
+      touches: partis.length,
+      ouverts: null,
+      reponses: dests.filter((d) => d.etat === 'a_repondu').length,
+      rebonds_durs: dests.filter((d) => d.etat === 'rebond_dur').length,
+      rebonds_mous: dests.filter((d) => d.etat === 'rebond_mou').length,
+      oppositions: dests.filter((d) => d.etat === 'desinscrit' || d.etat === 'plainte').length,
+      arretes_campagne: 0,
+      exclus_preparation: compte('exclus'),
+      issues: issuesDe(dests, campagne.statut === 'terminee'),
     },
     // Démo : la préparation est toujours finie pour une campagne qui a dépassé « à valider » ; sans séquence, elle n'a pas démarré.
     preparation: campagne.statut === 'brouillon' || campagne.statut === 'a_valider' ? null : { etat: 'terminee', motif: null, inscrits: campagne.cible.total, membres: campagne.cible.total },

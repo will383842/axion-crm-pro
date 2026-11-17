@@ -324,3 +324,63 @@ describe('L5-D — bandeaux', () => {
     expect(screen.queryByText(/Envoi réel fermé/)).not.toBeInTheDocument();
   });
 });
+
+describe('L6-C — cartes des compteurs réels', () => {
+  const COMPTEURS = {
+    inscrits: 40, envoyes: 31, touches: 25, ouverts: null, suivi_ouvertures: false,
+    reponses: 6, rebonds_durs: 2, rebonds_mous: 3, oppositions: 4, arretes_campagne: 0, exclus_preparation: 1,
+    issues: { opposition: 4, rebond_dur: 2, reponse: 6, rebond_mou: 3, arretee_autre: 5, terminee: 8, active: 12 },
+  };
+  const poser = (surplus: Record<string, unknown> = {}) =>
+    fixerFiche('cmp-01', (f) => ({ ...f, compteurs: { ...(f['compteurs'] as object), ...COMPTEURS, ...surplus } }));
+  const carte = (nom: string) => screen.getByTestId(`carte-${nom}`);
+
+  it('1. affiche les valeurs de l’API, sans les recalculer', async () => {
+    poser();
+    await pret('cmp-01');
+    expect(carte('inscrits')).toHaveTextContent('40');
+    expect(carte('envoyes')).toHaveTextContent('31');
+    expect(carte('envoyes')).toHaveTextContent('25 personnes touchées');
+    expect(carte('reponses')).toHaveTextContent('6');
+    expect(carte('rebonds')).toHaveTextContent('2 durs');
+    expect(carte('rebonds')).toHaveTextContent('3 mous');
+    expect(carte('oppositions')).toHaveTextContent('4');
+    expect(carte('arretes')).toHaveTextContent('5');
+  });
+
+  it('2. ouverts null ⇒ « non suivi », jamais 0', async () => {
+    poser();
+    await pret('cmp-01');
+    expect(carte('ouverts')).toHaveTextContent('Non suivi');
+    expect(carte('ouverts')).not.toHaveTextContent(/\b0\b/);
+  });
+
+  it('3. barre des issues : 7 segments, 100 %, libellés lisibles sans couleur', async () => {
+    poser();
+    await pret('cmp-01');
+    const barre = screen.getByTestId('barre-issues');
+    const segments = within(barre).getAllByRole('listitem');
+    expect(segments).toHaveLength(7);
+    expect(segments[0]).toHaveTextContent('Oppositions');
+    for (const l of ['Oppositions', 'Rebonds durs', 'Réponses', 'Rebonds mous', 'Arrêtés', 'Terminés', 'En cours']) {
+      expect(within(barre).getByText(new RegExp(`^${l}`))).toBeInTheDocument();
+    }
+    expect(within(barre).getByText('Total : 100 %')).toBeInTheDocument();
+    const parts = segments.map((s) => Number(/\((\d+) %\)/.exec(s.textContent ?? '')?.[1]));
+    expect(parts.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+
+  it('aucune inscription ⇒ pas de barre, pas de « 0 % » trompeur', async () => {
+    poser({ inscrits: 0, issues: { opposition: 0, rebond_dur: 0, reponse: 0, rebond_mou: 0, arretee_autre: 0, terminee: 0, active: 0 } });
+    await pret('cmp-01');
+    expect(screen.queryByTestId('barre-issues')).not.toBeInTheDocument();
+    expect(screen.getByText('Aucune personne inscrite pour l’instant.')).toBeInTheDocument();
+  });
+
+  it('démo : Σ issues = inscrits pour chaque campagne', () => {
+    for (const c of demoDb.campagnes.tous()) {
+      const k = (ficheDemo(c) as { compteurs: { inscrits: number; issues: Record<string, number> } }).compteurs;
+      expect(Object.values(k.issues).reduce((a, b) => a + b, 0)).toBe(k.inscrits);
+    }
+  });
+});

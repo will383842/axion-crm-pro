@@ -51,6 +51,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_02_000170_envoi_reputation_constats.php',
     // Filet modifié : pourquoi — envoi RR-0 : élargit deux listes fermées (canal `releve`, geste `annulation`), contraintes NOT VALID, ajout seul ; down() inerte par conception (un retour arrière reposerait l'ancienne liste et échouerait dès qu'une ligne `releve` ou `annulation` existe).
     '2026_12_11_000100_envoi_retours_reactions.php',
+    // Filet modifié : pourquoi — G3-0 : double authentification par courriel, ajout seul ; down() inerte (un retour arrière désactiverait la double authentification par courriel et effacerait des données de sécurité).
+    '2026_12_08_000200_double_auth_courriel.php',
     '2026_11_10_000060_envoi_evenements.php',
     '2026_11_10_000061_envoi_curseurs_imap.php',
     '2026_11_10_000062_envoi_rattachements.php',

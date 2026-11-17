@@ -15,8 +15,9 @@ use App\Envoi\Gardes\EnvoiAutorise;
  * l'échéance est repoussée, le message reste en base (« reporte » + motif).
  *
  * Un test de réflexion échoue si un code de refus est ajouté à la porte sans être classé ici.
- * `VERDICT_ABSENT` est classé « définitif » par défaut ; il n'est reporté que si le DERNIER verdict
- * de l'adresse est « valide » mais périmé (voir `Sequenceur::passager`).
+ * `VERDICT_ABSENT` est classé « définitif » par défaut, avec deux exceptions décidées par le séquenceur : reporté avec
+ * plafond si le DERNIER verdict est « valide » mais périmé (`Sequenceur::passager`) ; reporté SANS compteur si aucun verdict
+ * n'existe encore ou si le dernier est « inconnu » (B3-B), après contrôle de l'opposition. « invalide » et « risque » restent définitifs.
  */
 final class RefusSequenceur
 {
@@ -36,7 +37,7 @@ final class RefusSequenceur
         EnvoiAutorise::PAYS_HORS_FRANCE,
         EnvoiAutorise::PAYS_INCONNU,
         EnvoiAutorise::WEBMAIL_PREMIER_CONTACT,
-        EnvoiAutorise::VERDICT_ABSENT, // sauf verdict « valide » périmé : reporté par le séquenceur
+        EnvoiAutorise::VERDICT_ABSENT, // sauf verdict « valide » périmé ou absent/« inconnu » : reporté par le séquenceur (B3-B)
         EnvoiAutorise::ART14_DEPASSE,
         EnvoiAutorise::ART14_DATE_INCONNUE,
         EnvoiAutorise::DATE_FUTURE,

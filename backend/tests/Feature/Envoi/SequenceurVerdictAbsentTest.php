@@ -7,6 +7,7 @@
  */
 
 use App\Crm\FichesProtegees;
+use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Envoi\Depot\DepotSocleDb;
 use App\Envoi\Gardes\EnvoiAutorise;
 use App\Envoi\PasserelleLocale;
@@ -22,7 +23,6 @@ use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Log\Events\MessageLogged;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -75,9 +75,9 @@ function svaSequenceur(object $t): Sequenceur
 }
 
 /** Une inscription active SANS verdict d'adresse (verdict optionnel) ; rend [id inscription, adresse]. */
-function svaInscrit(object $t, string $local, ?string $verdict = null, ?string $verifieLe = null): array
+function svaInscrit(object $t, string $local, ?string $verdict = null, ?string $verifieLe = null, string $domaine = 'zz-client.example.test'): array
 {
-    $email = $local . '@zz-client.example.test';
+    $email = $local . '@' . $domaine;
     $sequence = (string) Str::uuid();
     DB::table('envoi_sequences')->insert(['id' => $sequence, 'workspace_id' => $t->ws, 'nom' => 'Sequence B3-B', 'fenetre_debut' => 9, 'fenetre_fin' => 17]);
     DB::table('envoi_sequence_etapes')->insert(['workspace_id' => $t->ws, 'sequence_id' => $sequence, 'rang' => 1, 'delai_jours_ouvres' => 0, 'sujet' => 'Sujet', 'corps' => 'Corps']);
@@ -169,11 +169,11 @@ test('3. aucun verdict + STOP de l\'espace (envoi_oppositions) : refus DÉFINITI
 
 test('4. aucun verdict + art. 21 en cours : OPPOSITION_ART21 ; + registre manuel : OPPOSITION_REGISTRE ; jamais « reporte »', function (string $mode) {
     [$a, $mailA] = svaInscrit($this, 'art21');
-    [$r] = svaInscrit($this, 'registre');
+    [$r] = svaInscrit($this, 'registre', null, null, 'zz-registre.example.test');
     DB::table('rgpd_requests')->insert(['workspace_id' => $this->ws, 'type' => 'opposition', 'status' => 'pending', 'subject_email' => $mailA]);
-    DB::table('envoi_oppositions_registre')->insert([
-        'workspace_id' => $this->ws, 'portee' => 'adresse', 'empreinte' => ListeSuppression::empreinte('registre@zz-client.example.test'),
-        'valeur_chiffree' => Crypt::encryptString('registre@zz-client.example.test'), 'motif' => 'demande du fondateur', 'auteur' => 'zz-test',
+    DB::table('envoi_oppositions_registre')->insert([ // le registre manuel vise un DOMAINE (ou un SIREN) de l'espace
+        'workspace_id' => $this->ws, 'portee' => 'domaine', 'empreinte' => RegistreOppositionManuel::empreinte('zz-registre.example.test'),
+        'valeur' => 'zz-registre.example.test', 'motif' => 'demande du fondateur', 'auteur' => 'zz-test',
     ]);
 
     expect(svaTraiter($this, $mode, $a))->toBe(Sequenceur::REFUSE)
@@ -218,7 +218,7 @@ test('7. 30 passages sans verdict : toujours active, une seule ligne de message 
     for ($k = 0; $reportes < 30 && $k < 90; $k++) {
         $this->maintenant = $this->lundi->modify("+{$k} days");
         $r = svaTraiter($this, $mode, $ins);
-        expect($r)->toBeIn([Sequenceur::REPORTE, Sequenceur::HORS_FENETRE]);
+        expect($r)->toBeIn([Sequenceur::REPORTE, Sequenceur::HORS_FENETRE, Sequenceur::IGNORE]);
         $reportes += $r === Sequenceur::REPORTE ? 1 : 0;
     }
 
@@ -254,6 +254,7 @@ test('8. cloisonnement : un verdict « valide » de la même empreinte dans l\'e
     svaVerdict($autre, $mail, 'valide', $this->maintenant->modify('-1 hour')->format('c'));
 
     expect(svaTraiter($this, $mode, $ins))->toBe(Sequenceur::REPORTE)
+        ->and((int) svaEtat($ins)->reports)->toBe(0) // report SANS compteur : le « valide » de B n'a pas été lu
         ->and($this->faux->appels)->toBe(0);
 })->with(SVA_MODES);
 

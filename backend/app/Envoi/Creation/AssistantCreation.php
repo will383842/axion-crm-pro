@@ -5,6 +5,7 @@ namespace App\Envoi\Creation;
 use App\Crm\Opposition\StatutOpposition;
 use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Campagnes\FiltreOrigine;
+use App\Envoi\Campagnes\FiltreOrigineContenu;
 use App\Envoi\Campagnes\SelectionDestinataires;
 use App\Envoi\Campagnes\SelectionRefusee;
 use App\Envoi\Exceptions\CampagneRefusee;
@@ -100,7 +101,7 @@ final class AssistantCreation
             if (array_key_exists('cible', $corps)) {
                 $contenu['cible'] = $this->cible($corps['cible']);
                 if (array_key_exists('origine', $contenu['cible'])) {
-                    [$contenu['cible']['origine'], $changes['filtre_origine']] = $this->filtreOrigine($ws, $contenu['cible']['origine']);
+                    [$contenu['cible']['origine'], $changes['filtre_origine'], $changes['filtre_origine_contenu']] = $this->filtreOrigine($ws, $contenu['cible']['origine']);
                 }
                 $this->refuserOpposes($ws, $contenu['cible']);
                 $changes['cible'] = array_intersect_key($contenu['cible'], array_flip(['type', 'reference', 'libelle']));
@@ -144,7 +145,7 @@ final class AssistantCreation
         $contenu = $saisie['contenu'] ?? [];
         if (isset($contenu['cible']) && is_array($contenu['cible'])) {
             // La COLONNE fait foi : la saisie ne sert qu'à l'écran et n'est jamais relue pour décider (ni ici, ni à la sélection).
-            $contenu['cible']['origine'] = isset($c->filtre_origine) ? json_decode((string) $c->filtre_origine, true) : null;
+            $contenu['cible']['origine'] = $this->origineDesColonnes($c);
         }
 
         return [
@@ -182,26 +183,49 @@ final class AssistantCreation
     }
 
     /**
-     * Filtre « réseau d'origine » de l'étape 1 : null = retrait (permis même filtre inactif, c'est un choix du fondateur) ; sinon forme
-     * exacte `{"reseaux": [...]}` ET filtre actif dans l'espace (sinon refus : ignorer un filtre élargirait la cible). La COLONNE fait foi.
+     * Filtre d'origine de l'étape 1 (`cible.origine`) : null = retrait des DEUX colonnes (permis même porte fermée, c'est un choix du
+     * fondateur) ; sinon un objet de clés `reseaux` (colonne `filtre_origine`) et/ou `mots`, `guides` (colonne `filtre_origine_contenu`),
+     * forme exacte, ET porte ouverte dans l'espace (sinon refus : ignorer un filtre élargirait la cible). Les deux colonnes sont rendues
+     * ensemble pour une SEULE écriture (`version + 1`). La COLONNE fait foi.
      *
-     * @return array{0: array{reseaux: list<string>}|null, 1: array{reseaux: list<string>}|null} [valeur gardée dans la saisie, valeur de la colonne]
+     * @return array{0: array<string, list<string>>|null, 1: array{reseaux: list<string>}|null, 2: array{mots?: list<string>, guides?: list<string>}|null} [valeur gardée dans la saisie, colonne réseau, colonne contenu]
      */
     private function filtreOrigine(string $ws, mixed $origine): array
     {
         if ($origine === null) {
-            return [null, null];
+            return [null, null, null];
         }
         try {
-            $filtre = is_array($origine) ? (FiltreOrigine::depuisColonne($origine) ?? throw new \InvalidArgumentException('forme')) : throw new \InvalidArgumentException('forme');
+            if (! is_array($origine) || $origine === [] || array_diff(array_keys($origine), ['reseaux', 'mots', 'guides']) !== []) {
+                throw new \InvalidArgumentException('forme');
+            }
+            $reseaux = array_key_exists('reseaux', $origine) ? FiltreOrigine::depuisColonne(['reseaux' => $origine['reseaux']]) : null;
+            $partieContenu = array_intersect_key($origine, array_flip(['mots', 'guides']));
+            $contenu = $partieContenu === [] ? null : FiltreOrigineContenu::depuisSaisie($partieContenu);
         } catch (\InvalidArgumentException) {
-            throw ErreurCreation::invalide('validation', 'Le filtre par réseau d\'origine est {"reseaux": [...]} : 1 à ' . FiltreOrigine::RESEAUX_MAX . ' réseaux (minuscules, chiffres, . _ -).');
+            throw ErreurCreation::invalide('validation', 'Le filtre d\'origine est {"reseaux": [...], "mots": [...], "guides": [...]} (au moins une clé) : 1 à ' . FiltreOrigine::RESEAUX_MAX . ' éléments par clé (minuscules, chiffres, . _ -).');
         }
         if (! FiltreOrigine::actif($ws)) {
-            throw ErreurCreation::invalide('filtre_origine_inactif', 'Le filtre par réseau d\'origine est inactif dans cet espace : retirez-le ou attendez son ouverture.');
+            throw ErreurCreation::invalide('filtre_origine_inactif', 'Le filtre par réseau, mot ou guide d\'origine est inactif dans cet espace : retirez-le ou attendez son ouverture.');
         }
+        $colReseaux = $reseaux?->enColonne();
+        $colContenu = $contenu?->enColonne();
 
-        return [$filtre->enColonne(), $filtre->enColonne()];
+        return [($colReseaux ?? []) + ($colContenu ?? []), $colReseaux, $colContenu];
+    }
+
+    /**
+     * `cible.origine` rendu depuis les COLONNES (jamais depuis la saisie) : fusion de `filtre_origine` et `filtre_origine_contenu`, null si aucune.
+     *
+     * @return array<string, list<string>>|null
+     */
+    private function origineDesColonnes(\stdClass $c): ?array
+    {
+        $reseaux = isset($c->filtre_origine) ? json_decode((string) $c->filtre_origine, true) : null;
+        $contenu = isset($c->filtre_origine_contenu) ? json_decode((string) $c->filtre_origine_contenu, true) : null;
+        $fusion = (is_array($reseaux) ? $reseaux : []) + (is_array($contenu) ? $contenu : []);
+
+        return $fusion === [] ? null : $fusion;
     }
 
     private function sequence(mixed $sequence): int
@@ -598,21 +622,34 @@ final class AssistantCreation
     private function controlesFiltreOrigine(string $ws, \stdClass $c, \Closure $c7): array
     {
         $brut = $c->filtre_origine ?? null;
-        if ($brut === null) {
+        $brutContenu = $c->filtre_origine_contenu ?? null;
+        if ($brut === null && $brutContenu === null) {
             return [];
         }
+        // Les DEUX colonnes sont couvertes : une forme illisible ou la porte fermée = bloquant (jamais ignoré).
+        $parties = [];
+        $filtre = null;
+        $filtreContenu = null;
         try {
             $filtre = FiltreOrigine::depuisColonne($brut);
-            $actif = $filtre !== null && FiltreOrigine::actif($ws);
+            $filtreContenu = FiltreOrigineContenu::depuisColonne($brutContenu);
+            $actif = FiltreOrigine::actif($ws);
+            if ($filtre !== null) {
+                $parties[] = 'réseau ' . implode(', ', $filtre->reseaux);
+            }
+            foreach (['mots' => 'mot', 'guides' => 'guide'] as $cle => $nom) {
+                if ($filtreContenu?->{$cle} !== null) {
+                    $parties[] = $nom . ' ' . implode(', ', $filtreContenu->{$cle});
+                }
+            }
         } catch (\InvalidArgumentException) {
-            $filtre = null;
             $actif = false;
         }
 
         return [
-            $actif && $filtre !== null
-                ? $c7('filtre_origine', 'Filtre par réseau d\'origine', 'ok', 'Filtre par réseau : ' . implode(', ', $filtre->reseaux))
-                : $c7('filtre_origine', 'Filtre par réseau d\'origine', 'bloquant', 'Le filtre par réseau d\'origine est inactif : retirez-le ou attendez son ouverture'),
+            $actif && $parties !== []
+                ? $c7('filtre_origine', 'Filtre par réseau d\'origine', 'ok', $filtreContenu === null ? 'Filtre par réseau : ' . implode(', ', $filtre->reseaux ?? []) : 'Filtre : ' . implode(' ; ', $parties))
+                : $c7('filtre_origine', 'Filtre par réseau d\'origine', 'bloquant', 'Le filtre d\'origine est inactif : retirez-le ou attendez son ouverture'),
             $c7('filtre_origine_estimation', 'Estimation et filtre par réseau', 'attention', 'L\'estimation affichée ne tient pas compte du filtre ; le compte exact (hors réseau) apparaît à la préparation de l\'envoi'),
         ];
     }

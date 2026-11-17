@@ -122,7 +122,7 @@ function rr4Depot(LecteurBoiteMemoire $lecteur, string $boite, int $uid, string 
 {
     $lecteur->deposer($boite, new MessageBrut(
         $uid,
-        "retour-{$uid}@retour.example.test",
+        "retour-{$uid}-{$boite}@retour.example.test",
         $dsn === null ? $inReplyTo : null,
         [],
         $dsn === null ? $de : 'MAILER-DAEMON@retour.example.test',
@@ -215,9 +215,7 @@ test('H2 plainte et rebond dur hors espace commercial : freins comptés, inscrip
         $s = rr4Statuts($this->a);
         expect($s[ListeSuppression::empreinte($p)])->toBe('arretee', $mode)->and($s[ListeSuppression::empreinte($r)])->toBe('arretee', $mode);
         $freins = app(DepotChauffe::class)->totaux7Jours($this->a, JourEnvoi::de(now()->toDateTimeImmutable()), 'domaine');
-        $diag = $mode . ' ' . json_encode([$freins, WorkspaceContext::run($this->a, fn () => DB::table('envoi_chauffe_jours')->get()->all()),
-            WorkspaceContext::run($this->a, fn () => DB::table('envoi_journal_commandes')->where('commande', 'retour_applique')->count())]);
-        expect($freins['plaintes'])->toBeGreaterThanOrEqual(1, $diag)->and($freins['rebonds_durs'])->toBeGreaterThanOrEqual(1, $diag);
+        expect($freins['plaintes'])->toBeGreaterThanOrEqual(1, $mode)->and($freins['rebonds_durs'])->toBeGreaterThanOrEqual(1, $mode);
     }
 });
 

@@ -175,9 +175,15 @@ function aigInjectionLocale(string $ws, string $adaptateur): string
     return $id;
 }
 
-function aigMessage(string $ws, string $domaine, string $cle = 'cle-1'): MessageAEnvoyer
+/** Message RFC 5322 conforme à la sortie (E6) : List-Unsubscribe https + mailto, One-Click, aucun X-Envoi-*. */
+function aigCorpsConforme(string $domaine): string
 {
-    return new MessageAEnvoyer($ws, 'dest@client.example.test', 'from@' . $domaine, 'Sujet', 'Corps', $cle);
+    return "From: from@{$domaine}\r\nList-Unsubscribe: <https://d.{$domaine}/u/abc>, <mailto:u@{$domaine}>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\nSubject: Sujet\r\n\r\nCorps";
+}
+
+function aigMessage(string $ws, string $domaine, string $cle = 'cle-1', ?string $corps = null): MessageAEnvoyer
+{
+    return new MessageAEnvoyer($ws, 'dest@client.example.test', 'from@' . $domaine, 'Sujet', $corps ?? aigCorpsConforme($domaine), $cle);
 }
 
 /**
@@ -383,7 +389,7 @@ test('11 cycles refusés (feu vert non accordé, DNS non vert ; témoin : tout v
     {
         public function composer(DemandeComposition $d): string
         {
-            return "Message-ID: {$d->messageId}\r\nSubject: {$d->sujet}\r\n\r\n{$d->corps}";
+            return "Message-ID: {$d->messageId}\r\nList-Unsubscribe: <https://d.example.test/u/abc>, <mailto:u@example.test>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\nSubject: {$d->sujet}\r\n\r\n{$d->corps}";
         }
     };
     $dnsLe = $maintenant;
@@ -491,17 +497,17 @@ test('sante() hors contexte : ok = false et AUCUN battement noté par la passere
 // ── pause() : fonction, connexion applicative sans contexte ──────────────────
 
 /** @return array{0: string, 1: string} espace et domaine committés (connexion propriétaire) */
-function aigCommitte(): array
+function aigCommitte(string $domaine = 'k.example.test'): array
 {
     $o = DB::connection('pgsql_owner');
     $ws = (string) Str::uuid();
     $o->table('workspaces')->insert(['id' => $ws, 'name' => 'AIG', 'slug' => 'aig-' . substr($ws, 0, 8), 'created_at' => now(), 'updated_at' => now()]);
-    $o->table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => 'k.example.test', 'achete_le' => '2026-01-01']);
+    $o->table('envoi_domaines')->insert(['workspace_id' => $ws, 'nom' => $domaine, 'achete_le' => '2026-01-01']);
     $o->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', $ws]);
-    $o->selectOne('SELECT envoi_domaine_adaptateur_changer(?, ?, ?, ?)', [$ws, 'k.example.test', 'kumo', 'auteur-test']);
+    $o->selectOne('SELECT envoi_domaine_adaptateur_changer(?, ?, ?, ?)', [$ws, $domaine, 'kumo', 'auteur-test']);
     $o->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
 
-    return [$ws, 'k.example.test'];
+    return [$ws, $domaine];
 }
 
 function aigNettoyer(string $ws): void
@@ -556,7 +562,7 @@ test('garde avec témoin : un SELECT direct sur envoi_domaines (RLS) à la place
     [$ws] = aigCommitte();
     $defaut = DB::getDefaultConnection();
     try {
-        $direct = fn (): array => array_map(fn ($l) => (string) $l->adaptateur, DB::select("SELECT DISTINCT adaptateur FROM envoi_domaines WHERE adaptateur <> 'faux'"));
+        $direct = fn (): array => array_map(fn ($l) => ['workspace_id' => (string) $l->workspace_id, 'domaine' => (string) $l->nom, 'adaptateur' => (string) $l->adaptateur], DB::select("SELECT workspace_id, nom, adaptateur FROM envoi_domaines WHERE adaptateur <> 'faux'"));
         $double = aigArmerSansContexte($ws, $direct, false);
         expect($double->appels)->toBe([]); // sans contexte la RLS cache tout : la lecture directe est fausse en production
     } finally {
@@ -774,6 +780,179 @@ test('etatEnvoi smtp : le domaine de la boîte de l\'injection est passé à la 
     expect($recus)->toBe([$m['domaine']]);
 });
 
-test('M1 : pause globale tous espaces avant de lier une fabrique', function () {
-    expect(true)->toBeTrue();
-})->skip('M1 : pause globale tous espaces avant de lier une fabrique');
+/** Serveur minimal de test : `sante()` rend ce qu'on lui donne, `pause()` échoue si demandé ; tout autre appel est une erreur. */
+function aigServeurMinimal(SanteServeur $sante, bool $pauseEchoue = false): ServeurEnvoi
+{
+    return new class($sante, $pauseEchoue) implements ServeurEnvoi
+    {
+        public function __construct(private readonly SanteServeur $sante, private readonly bool $pauseEchoue) {}
+
+        public function sante(): SanteServeur
+        {
+            return $this->sante;
+        }
+
+        public function pause(): void
+        {
+            $this->pauseEchoue && throw new RuntimeException('pause refusée');
+        }
+
+        public function reprise(): void {}
+
+        public function modeTemoins(): bool
+        {
+            return true;
+        }
+
+        public function etat(): EtatServeur
+        {
+            return new EtatServeur(false, 0);
+        }
+
+        public function lireEvenements(?string $c, int $l = 100): LotEvenements
+        {
+            return new LotEvenements([], '');
+        }
+
+        public function injecter(MessageAEnvoyer $message): ResultatInjection
+        {
+            throw new LogicException('non');
+        }
+
+        public function etatEnvoi(string $i): EtatMessage
+        {
+            throw new LogicException('non');
+        }
+    };
+}
+
+/** Aiguilleur de pause : la fabrique note chaque couple (espace, domaine) reçu ; aucun contexte posé, connexion applicative. */
+function aigPauseCouples(array &$recus, ?Closure $echec = null): AiguilleurServeurEnvoi
+{
+    aigSimuler();
+    $fabrique = function (string $ws, string $domaine) use (&$recus, $echec): ServeurEnvoi {
+        $recus[] = [$ws, $domaine];
+
+        return $echec !== null && $echec($ws) ? aigServeurMinimal(new SanteServeur(true, ''), true) : new AigDouble('kumo');
+    };
+
+    return new AiguilleurServeurEnvoi(new FauxServeurEnvoi(true, 0), ['kumo' => $fabrique], fn () => false, fn () => app(ListeFeuVert::class));
+}
+
+test('M1 : pause() SANS contexte, porte fermée ⇒ les fabriques reçoivent (A, domA) ET (B, domB) (jamais \'\'), sous pgsql_app ET propriétaire', function (string $connexion) {
+    [$wsA, $dA] = aigCommitte('a-m1.example.test');
+    [$wsB, $dB] = aigCommitte('b-m1.example.test');
+    $defaut = DB::getDefaultConnection();
+    try {
+        $recus = [];
+        $aig = aigPauseCouples($recus);
+        DB::setDefaultConnection($connexion);
+        WorkspaceContext::clear();
+        $aig->pause();
+        usort($recus, fn ($x, $y) => strcmp($x[1], $y[1]));
+        expect($recus)->toBe([[$wsA, $dA], [$wsB, $dB]]);
+    } finally {
+        DB::setDefaultConnection($defaut);
+        DB::connection('pgsql_app')->disconnect();
+        aigNettoyer($wsA);
+        aigNettoyer($wsB);
+        DB::connection('pgsql_owner')->disconnect();
+    }
+})->with(['pgsql_app', 'pgsql_owner']);
+
+test('M1 : pause() appelée depuis le contexte de A atteint AUSSI le couple de B', function () {
+    [$wsA, $dA] = aigCommitte('a-m1c.example.test');
+    [$wsB, $dB] = aigCommitte('b-m1c.example.test');
+    $defaut = DB::getDefaultConnection();
+    try {
+        $recus = [];
+        $aig = aigPauseCouples($recus);
+        DB::setDefaultConnection('pgsql_app');
+        WorkspaceContext::set($wsA);
+        $aig->pause();
+        usort($recus, fn ($x, $y) => strcmp($x[1], $y[1]));
+        expect($recus)->toBe([[$wsA, $dA], [$wsB, $dB]]);
+    } finally {
+        WorkspaceContext::clear();
+        DB::setDefaultConnection($defaut);
+        DB::connection('pgsql_app')->disconnect();
+        aigNettoyer($wsA);
+        aigNettoyer($wsB);
+        DB::connection('pgsql_owner')->disconnect();
+    }
+});
+
+test('M1 : le stop gagne — un couple en erreur n\'empêche pas les autres ; la première erreur est relancée à la fin', function () {
+    [$wsA] = aigCommitte('a-m1e.example.test');
+    [$wsB] = aigCommitte('b-m1e.example.test');
+    $defaut = DB::getDefaultConnection();
+    try {
+        $recus = [];
+        $aig = aigPauseCouples($recus, fn (string $ws): bool => $ws === $wsA);
+        DB::setDefaultConnection('pgsql_app');
+        WorkspaceContext::clear();
+        expect(fn () => $aig->pause())->toThrow(RuntimeException::class, 'pause refusée');
+        expect($recus)->toHaveCount(2); // B est tenté malgré l'échec de A
+    } finally {
+        DB::setDefaultConnection($defaut);
+        DB::connection('pgsql_app')->disconnect();
+        aigNettoyer($wsA);
+        aigNettoyer($wsB);
+        DB::connection('pgsql_owner')->disconnect();
+    }
+});
+
+test('M1 : un lecteur qui rend deux fois le même couple ⇒ une seule pause (jamais moins : deux domaines ⇒ deux pauses)', function () {
+    aigSimuler();
+    $recus = [];
+    $f = function (string $ws, string $d) use (&$recus): ServeurEnvoi {
+        $recus[] = [$ws, $d];
+
+        return new AigDouble('kumo');
+    };
+    $c = fn (string $ws, string $d): array => ['workspace_id' => $ws, 'domaine' => $d, 'adaptateur' => 'kumo'];
+    $aig = new AiguilleurServeurEnvoi(new FauxServeurEnvoi(true, 0), ['kumo' => $f], fn () => false, fn () => app(ListeFeuVert::class), null, fn () => [$c('w1', 'x.example.test'), $c('w1', 'x.example.test'), $c('w1', 'y.example.test')]);
+    $aig->pause();
+    expect($recus)->toBe([['w1', 'x.example.test'], ['w1', 'y.example.test']]);
+});
+
+// ── F2 : l'espace du message est celui du contexte ───────────────────────────
+
+test('F2 : message de B dans le contexte de A, ou sans contexte ⇒ refus autre espace, fabrique jamais appelée', function (string $cas) {
+    $m = aigMontage();
+    $autre = F::espace('zz-aig-autre');
+    $message = aigMessage($autre, $m['domaine']);
+    $cas === 'sans_contexte' ? WorkspaceContext::clear() : WorkspaceContext::set($m['ws']);
+    $e = aigRaison(fn () => $m['aig']->injecter($message));
+    expect($e->getMessage())->toBe(EnvoiRefuse::autreEspace()->getMessage())->and($m['construits']->getArrayCopy())->toBe([])->and($m['kumo']->total())->toBe(0);
+})->with(['contexte_de_A', 'sans_contexte']);
+
+test('F2 (témoin) : message de A dans le contexte de A ⇒ transmis', function () {
+    $m = aigMontage();
+    expect($m['aig']->injecter(aigMessage($m['ws'], $m['domaine']))->accepte)->toBeTrue()->and($m['kumo']->appels)->toBe(['injecter' => 1]);
+});
+
+// ── F3 : sante() ne recopie jamais le detail ─────────────────────────────────
+
+test('F3 : sante() rend « kumo : ok|ko|en pause » ; le detail de l\'adaptateur (hôte) est absent', function (bool $ok) {
+    $m = aigMontage();
+    $espion = aigServeurMinimal(new SanteServeur($ok, 'connexion à hote.example.test:25 refusée'));
+    $aig = new AiguilleurServeurEnvoi($m['faux'], ['kumo' => fn () => $espion], fn (): bool => true, fn (): ListeFeuVert => app(ListeFeuVert::class));
+    $s = $aig->sante();
+    expect($s->detail)->toBe($ok ? 'kumo : ok' : 'kumo : ko')->and($s->detail)->not->toContain('example.test')->and($s->ok)->toBe($ok);
+})->with([true, false]);
+
+// ── E6 : garde de conformité de sortie, adaptateurs RÉELS seulement ─────────
+
+test('E6 : message réel sans mailto: ⇒ refus conformite_sortie, fabrique jamais appelée ; avec ⇒ transmis', function () {
+    $m = aigMontage();
+    $sans = str_replace(', <mailto:u@' . $m['domaine'] . '>', '', aigCorpsConforme($m['domaine']));
+    $e = aigRaison(fn () => $m['aig']->injecter(aigMessage($m['ws'], $m['domaine'], 'cle-sans', $sans)));
+    expect($e->getMessage())->toBe(EnvoiRefuse::conditionNonRemplie('conformite_sortie')->getMessage())->and($m['construits']->getArrayCopy())->toBe([]);
+    expect($m['aig']->injecter(aigMessage($m['ws'], $m['domaine'], 'cle-avec'))->accepte)->toBeTrue();
+});
+
+test('E6 : faux serveur ⇒ garde NON appliquée (corps quelconque accepté, parcours inchangé)', function () {
+    $m = aigMontage('faux', false, false, false);
+    expect($m['aig']->injecter(aigMessage($m['ws'], $m['domaine'], 'cle-faux', 'Corps'))->accepte)->toBeTrue();
+});

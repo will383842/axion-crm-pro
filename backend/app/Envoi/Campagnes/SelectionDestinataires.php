@@ -72,7 +72,7 @@ final class SelectionDestinataires
             throw SelectionRefusee::campagneIntrouvable();
         }
         // `to_jsonb(k) -> 'filtre_origine'` (NULLIF : un NULL SQL devient le JSON `null`) : colonne absente (code déployé avant la migration) => null => pas de filtre, ce qui est exact
-        $campagne = DB::selectOne("SELECT cible, saisie, NULLIF(to_jsonb(k) -> 'filtre_origine', 'null'::jsonb) AS filtre_origine FROM envoi_campagnes k WHERE k.workspace_id = ? AND k.id = ?", [$ws, $campagneId]);
+        $campagne = DB::selectOne("SELECT cible, saisie, NULLIF(to_jsonb(k) -> 'filtre_origine', 'null'::jsonb) AS filtre_origine, NULLIF(to_jsonb(k) -> 'filtre_origine_contenu', 'null'::jsonb) AS filtre_origine_contenu FROM envoi_campagnes k WHERE k.workspace_id = ? AND k.id = ?", [$ws, $campagneId]);
         if ($campagne === null) {
             throw SelectionRefusee::campagneIntrouvable();
         }
@@ -86,10 +86,11 @@ final class SelectionDestinataires
         // Filtre « réseau d'origine » : il ne peut que RESTREINDRE. Forme invalide ou porte fermée = refus (jamais ignoré : ce serait élargir la cible).
         try {
             $filtre = FiltreOrigine::depuisColonne($campagne->filtre_origine);
+            $contenu = FiltreOrigineContenu::depuisColonne($campagne->filtre_origine_contenu); // PONT-LINKEDIN PO-B : mots / guides (même porte)
         } catch (\InvalidArgumentException) {
             throw SelectionRefusee::filtreOrigineInactif();
         }
-        if ($filtre !== null && ! FiltreOrigine::actif($ws)) {
+        if (($filtre !== null || $contenu !== null) && ! FiltreOrigine::actif($ws)) {
             throw SelectionRefusee::filtreOrigineInactif(); // AVANT toute lecture des membres
         }
 
@@ -97,7 +98,7 @@ final class SelectionDestinataires
         $curseur = count($membres) === $taille ? (int) $membres[$taille - 1]->cle : null;
 
         $compteurs = array_fill_keys(self::MOTIFS, 0) + ['membres' => count($membres), 'retenus' => 0, 'sans_contact_generique_disponible' => 0];
-        $destinataires = $this->choisir($ws, $membres, $compteurs, $filtre);
+        $destinataires = $this->choisir($ws, $membres, $compteurs, $filtre, $contenu);
         $compteurs['retenus'] = count($destinataires);
 
         return new LotDestinataires($destinataires, $compteurs, $curseur);
@@ -184,7 +185,7 @@ final class SelectionDestinataires
      * @param  array<string, int>  $compteurs  modifié en place
      * @return list<Destinataire>
      */
-    private function choisir(string $ws, array $membres, array &$compteurs, ?FiltreOrigine $filtre = null): array
+    private function choisir(string $ws, array $membres, array &$compteurs, ?FiltreOrigine $filtre = null, ?FiltreOrigineContenu $contenu = null): array
     {
         $idsCibles = [];
         $idsEntreprises = [];
@@ -213,8 +214,8 @@ final class SelectionDestinataires
 
         // Filtre d'origine (seulement s'il y en a un) : UNE lecture ; une unité hors réseau est comptée puis sautée, sans lecture d'exclusion.
         $opposes = [];
-        if ($filtre !== null) {
-            $opposes = $this->appliquerFiltre($ws, $unites, $compteurs, $filtre);
+        if ($filtre !== null || $contenu !== null) {
+            $opposes = $this->appliquerFiltre($ws, $unites, $compteurs, $filtre, $contenu);
         }
 
         // Exclusions : UNE lecture chacune pour tout le lot ; une exception annule le lot (fermé en cas d'erreur).
@@ -290,7 +291,7 @@ final class SelectionDestinataires
      * @param  array<string, int>  $compteurs  modifié en place
      * @return array<int, true>
      */
-    private function appliquerFiltre(string $ws, array &$unites, array &$compteurs, FiltreOrigine $filtre): array
+    private function appliquerFiltre(string $ws, array &$unites, array &$compteurs, ?FiltreOrigine $filtre, ?FiltreOrigineContenu $contenu = null): array
     {
         $entreprises = [];
         $contacts = [];
@@ -307,7 +308,12 @@ final class SelectionDestinataires
             return [];
         }
         try {
-            $reseau = RequetesOrigines::reseauxDesUnites($ws, array_values(array_unique($entreprises)), array_values(array_unique($contacts)), $filtre->reseaux);
+            $ents = array_values(array_unique($entreprises));
+            $cts = array_values(array_unique($contacts));
+            // Réseau seul : chemin L2b-C inchangé. Avec mot / guide : UNE lecture « même entrée » (PO-A) ; hors origine demandée = `hors_reseau`.
+            $reseau = $contenu === null
+                ? RequetesOrigines::reseauxDesUnites($ws, $ents, $cts, $filtre?->reseaux ?? [])
+                : RequetesOrigines::unitesParOrigine($ws, $ents, $cts, $filtre?->reseaux, $contenu->mots, $contenu->guides);
         } catch (QueryException $e) {
             throw $e->getCode() === '57014' ? SelectionRefusee::lectureTropLongue() : SelectionRefusee::lectureOrigineImpossible($e);
         } catch (\Throwable $e) {

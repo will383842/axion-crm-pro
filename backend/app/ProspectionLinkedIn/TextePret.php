@@ -40,6 +40,9 @@ final class TextePret
 
             return (string) $variables[$m[1]];
         }, $gabarit);
+        if ($texte === null) {
+            throw new InvalidArgumentException('Gabarit illisible.');
+        }
 
         $plat = self::plat($texte);
         foreach (self::MOTS_REFUSES as $mot) {

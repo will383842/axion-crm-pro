@@ -24,6 +24,4 @@ Classes retirées, tests lancés : 13 échecs (classes introuvables) — avant d
 `ecarte` non absorbant ⇒ 1 échec ; contrôle STOP retiré ⇒ 1 échec ; liste de mots vidée ⇒ 1 échec.
 
 ## Limites
-Tests unitaires sans base : pas de variante `pgsql_app`/propriétaire à exécuter. Pint passé. PHPStan niveau 8 : la
-configuration locale de l'environnement échoue (chemin exclu absent), non vérifié. `bootstrap/cache` créé localement pour
-lancer Pest (non suivi par git).
+Tests unitaires sans base : pas de variante `pgsql_app`/propriétaire à exécuter. Pint passé. PHPStan (config du dépôt) : 0 erreur après correction du retour nul de `preg_replace_callback` (rouge en CI d'abord).

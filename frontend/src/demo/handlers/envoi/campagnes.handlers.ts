@@ -29,8 +29,43 @@ function suivi(c: Campagne | undefined) {
   if (c === undefined) return null;
   const reste: Partial<Campagne> = { ...c };
   delete reste.ab_objet;
-  return { ...reste, etapes: Math.min(3, c.etapes), envoi_ferme: false, version: 1 };
+  return { ...reste, etapes: Math.min(3, c.etapes), envoi_ferme: false, version: 1, blocage: BLOCAGES_DEMO[String(c.id)]?.blocage ?? null };
 }
+
+/**
+ * B8-B — une campagne de démo par code de blocage (B8-A). Elles ne figurent dans la liste que lorsqu'une
+ * recherche est saisie (« blocage ») : les comptes et listes des autres écrans de démo ne bougent pas ;
+ * la fiche s'ouvre toujours par son identifiant (`cmp-blq-<code>`).
+ */
+const BLOCAGES_DEMO: Record<string, { statut: Campagne['statut']; blocage: { code: string; message: string } }> = Object.fromEntries(
+  (
+    [
+      ['reglage_non_applique', 'programmee', 'Boîtes ou plafond choisis : l’envoi ne sait pas encore les appliquer. Renvoyez la campagne à valider et recréez-la sans eux.'],
+      ['preparation_bloquee', 'programmee', 'La préparation de la campagne est bloquée.'],
+      ['aucun_destinataire', 'programmee', 'La préparation est terminée mais aucun destinataire n’est retenu : élargissez la cible.'],
+      ['frein_arret_general', 'en_cours', 'L’arrêt général est armé pour cet espace : rien ne part tant qu’il n’est pas levé.'],
+      ['frein_pause_automatique', 'en_cours', 'Une pause automatique est active (réputation ou chauffe) : rien ne part tant qu’elle n’est pas levée.'],
+      ['sequence_en_pause', 'en_cours', 'La séquence de la campagne est en pause : reprenez la campagne pour relancer les envois.'],
+    ] as const
+  ).map(([code, statut, message]) => [`cmp-blq-${code}`, { statut, blocage: { code, message } }]),
+);
+
+function campagnesBlocageDemo(): Campagne[] {
+  const modele = demoDb.campagnes.tous()[0];
+  if (modele === undefined) return [];
+  return Object.entries(BLOCAGES_DEMO).map(([id, { statut }]) => ({
+    ...modele,
+    id,
+    nom: `Démo blocage — ${id.slice('cmp-blq-'.length).replaceAll('_', ' ')}`,
+    statut,
+    envoyes: 0,
+    reponses: 0,
+    reponses_interessees: 0,
+    prochain_envoi_le: null,
+  }));
+}
+
+const trouverCampagne = (id: string): Campagne | undefined => demoDb.campagnes.trouver(id) ?? campagnesBlocageDemo().find((c) => String(c.id) === id);
 /** Limite de refus affichée à côté du taux (en %). */
 const LIMITE_REFUS = 2;
 /** Plafond de messages par jour pour une campagne, toutes boîtes comprises. */
@@ -305,10 +340,11 @@ export const handlers: HttpHandler[] = [
     if (forcee) return forcee;
     const url = new URL(request.url);
     const statut = url.searchParams.get('statut');
-    const toutes = demoDb.campagnes.tous();
+    const recherche = lireRecherche(request);
+    const toutes = [...demoDb.campagnes.tous(), ...(recherche.trim() !== '' ? campagnesBlocageDemo() : [])];
     const par_statut: Record<string, number> = {};
     for (const c of toutes) par_statut[c.statut] = (par_statut[c.statut] ?? 0) + 1;
-    let liste = filtrerTexte(toutes, lireRecherche(request), ['nom']);
+    let liste = filtrerTexte(toutes, recherche, ['nom']);
     if (statut) liste = liste.filter((c) => c.statut === statut);
     return HttpResponse.json({ ...paginer(liste.map(suivi), request, 50), par_statut, maintenant: maintenant().toISOString() });
   }),
@@ -361,7 +397,7 @@ export const handlers: HttpHandler[] = [
       const forcee = await repondreEtatForce(request, null);
       if (forcee) return forcee;
     }
-    const campagne = demoDb.campagnes.trouver(String(params['id']));
+    const campagne = trouverCampagne(String(params['id']));
     if (!campagne) return introuvable();
     return HttpResponse.json(fiche(campagne));
   }),

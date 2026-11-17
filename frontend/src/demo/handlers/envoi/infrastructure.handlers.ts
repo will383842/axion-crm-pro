@@ -409,7 +409,9 @@ export const handlers: HttpHandler[] = [
   http.post(api('/envoi/boites'), async ({ request }) => {
     await delai();
     const corps = (await request.json().catch(() => null)) as { code?: unknown } | null;
-    if (corps?.code !== '123456') return erreur(409, 'code_invalide', 'Ce code est faux, expiré ou déjà utilisé.');
+    // Corps sans code (ancien contrat du palier 0) : le 501 historique, gardé par tests/lib/demo-envoi-f03c.test.ts.
+    if (corps === null || !('code' in corps)) return erreur(501, 'non_disponible', 'Au palier 0, une boîte s’ajoute par commande locale sur le serveur.');
+    if (corps.code !== '123456') return erreur(409, 'code_invalide', 'Ce code est faux, expiré ou déjà utilisé.');
     return HttpResponse.json({ id: crypto.randomUUID(), etat: 'en_pause', pause_motif: 'suspension_manuelle' }, { status: 201 });
   }),
 

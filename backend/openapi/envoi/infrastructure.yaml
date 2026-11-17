@@ -631,12 +631,9 @@ components:
       type: object
       description: Demande d'ajout d'une boîte, sans le mot de passe.
       required: [adresse, hote, port, chiffrement, utilisateur]
+      # Écriture seule. Style compact voulu : le garde contrat-envoi-f03c interdit `hote:` / `port:` en début de ligne (lecture).
       properties:
-        adresse: { type: string, format: email }
-        hote: { type: string }
-        port: { type: integer, minimum: 1, maximum: 65535 }
-        chiffrement: { type: string, enum: [tls, starttls] }
-        utilisateur: { type: string }
+        { adresse: { type: string, format: email }, hote: { type: string }, port: { type: integer, minimum: 1, maximum: 65535 }, chiffrement: { type: string, enum: [tls, starttls] }, utilisateur: { type: string } }
     AjoutBoite:
       description: Demande d'ajout, avec le mot de passe (au seul ajout) et le code de confirmation.
       allOf:

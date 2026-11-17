@@ -82,8 +82,8 @@ export function EtapeCible({
                 />
                 <strong className="min-w-0 break-words text-sm text-slate-900">{c.libelle}</strong>
               </span>
-              <span className="mt-1 block text-2xl font-semibold tracking-tight text-slate-900">{c.joignables.toLocaleString('fr-FR')}</span>
-              <Jauge valeur={c.joignables} max={c.total} libelle={`Joignables : ${c.joignables} sur ${c.total}`} />
+              <span className="mt-1 block text-2xl font-semibold tracking-tight text-slate-900">{c.joignables === null ? 'Non estimé' : c.joignables.toLocaleString('fr-FR')}</span>
+              {c.joignables === null ? null : <Jauge valeur={c.joignables} max={c.total} libelle={`Joignables : ${c.joignables} sur ${c.total}`} />}
             </label>
           );
         })}

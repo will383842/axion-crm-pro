@@ -6,6 +6,9 @@ use App\Envoi\Depot\DepotSocle;
 use App\Envoi\PasserelleLocale;
 use App\Envoi\Sequence\FenetreHoraire;
 use App\Envoi\Sequence\JoursOuvres;
+use App\Envoi\Verdicts\EcrivainVerdicts;
+use App\Envoi\Verdicts\PreparationVerdicts;
+use App\Envoi\Verdicts\VerdictAdresse;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -37,6 +40,7 @@ final class MaterialisationCampagne
         private readonly DepotSocle $socle,
         private readonly int $tailleLot = self::TAILLE_LOT,
         private readonly int $lotsParAppel = self::LOTS_PAR_APPEL,
+        private readonly ?PreparationVerdicts $verdicts = null,
     ) {}
 
     /** Hors de toute transaction (la sélection ouvre sa propre transaction REPEATABLE READ, READ ONLY). */
@@ -66,7 +70,7 @@ final class MaterialisationCampagne
             return $this->resultat($ligne, 0, $ligne->motif);
         }
         $contenu = json_decode((string) $c->saisie, true)['contenu'] ?? [];
-        if (trim((string) $c->boites, '{}') !== '' || (is_array($contenu) && ($contenu['plafond_jour'] ?? null) !== null)) {
+        if (RaisonBlocage::reglageNonApplique($c)) {
             throw new MaterialisationRefusee('reglage_non_applique', false, 'Boîtes ou plafond saisis : le transport ne les applique pas encore, la campagne reste programmée.');
         }
 
@@ -129,11 +133,55 @@ final class MaterialisationCampagne
                     ? new MaterialisationRefusee($e->motif, false, $e->getMessage(), $e)
                     : new MaterialisationRefusee('lecture_impossible', true, $e->getMessage(), $e);
             }
+            $lot = $this->trierParVerdict($ws, $lot, $maintenant);
             $inscrits += self::relancer(fn (): int => $this->ecrire($ws, $id, $sequenceId, $curseurLu, $lot, $fenetre, $maintenant, $auPlusTot, $p));
             $ecrit = true;
         }
 
         return $this->resultat($this->ligne($ws, $id), $inscrits, $motif);
+    }
+
+    /**
+     * Vérifie (et écrit) les verdicts du lot AVANT l'écriture : hors de toute transaction et de tout verrou, car le DNS ne doit jamais en tenir un.
+     * `invalide` et `risque` sont écartés et comptés ; `valide` récent et `null` (indéterminé : la porte reste seule juge, le séquenceur reporte) sont inscrits.
+     * `retenus` est diminué d'autant : `membres - retenus` reste le total des exclus de préparation.
+     */
+    private function trierParVerdict(string $ws, LotDestinataires $lot, DateTimeImmutable $maintenant): LotDestinataires
+    {
+        if ($lot->destinataires === []) {
+            return $lot;
+        }
+        if (! EcrivainVerdicts::schemaPret()) {
+            throw new MaterialisationRefusee('verdicts_indisponibles', true, 'Verdicts d\'adresse indisponibles : rien n\'est inscrit, réessayez.');
+        }
+        try {
+            $ids = array_map(static fn (Destinataire $d): int => $d->contactId, $lot->destinataires);
+            $trouves = WorkspaceContext::run($ws, fn (): array => ($this->verdicts ?? app(PreparationVerdicts::class))->pourContacts($ws, $ids, $maintenant));
+        } catch (\Throwable $e) {
+            throw new MaterialisationRefusee('verdicts_indisponibles', true, 'Vérification des adresses impossible : rien n\'est inscrit, réessayez.', $e);
+        }
+        $gardes = [];
+        $invalides = 0;
+        $risquees = 0;
+        foreach ($lot->destinataires as $d) {
+            $v = $trouves[$d->contactId] ?? null;
+            if ($v?->verdict === VerdictAdresse::INVALIDE) {
+                $invalides++;
+            } elseif ($v?->verdict === VerdictAdresse::RISQUE) {
+                $risquees++;
+            } else {
+                $gardes[] = $d;
+            }
+        }
+        if ($invalides === 0 && $risquees === 0) {
+            return $lot;
+        }
+        $compteurs = $lot->compteurs;
+        $compteurs['retenus'] = (int) ($compteurs['retenus'] ?? 0) - $invalides - $risquees;
+        $compteurs['adresse_invalide'] = $invalides;
+        $compteurs['adresse_risquee'] = $risquees;
+
+        return new LotDestinataires($gardes, $compteurs, $lot->curseurSuivant);
     }
 
     /** Corps d'écriture d'UN lot : une transaction, sous les verrous de l'espace, de la campagne puis de l'étalement. Rend le nombre d'inscriptions créées. */

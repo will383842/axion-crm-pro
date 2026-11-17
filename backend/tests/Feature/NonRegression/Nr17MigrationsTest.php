@@ -171,6 +171,10 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_09_000110_envoi_campagnes_filtre_origine_contenu.php',
     // Filet modifié : pourquoi — PONT-LINKEDIN PL-M0A : registre d'opposition LinkedIn en ajout seul (DELETE/UPDATE/TRUNCATE refusés) ; le retirer effacerait des oppositions ; down() inerte, up() rejouable.
     '2026_12_09_000120_envoi_oppositions_linkedin.php',
+    // Filet modifié : pourquoi — FINI-M0A : inventaire des IP d'envoi, AJOUT SEUL (table, déclencheurs, droits) ; la retirer effacerait l'inventaire ; down() inerte, up() rejouable.
+    '2026_12_07_000100_envoi_ips.php',
+    // Filet modifié : pourquoi — FINI-M0A : rattachement domaine → IP (colonne nullable, FK NOT VALID, fonction), AJOUT SEUL ; le retirer effacerait les rattachements posés ; down() inerte, up() rejouable.
+    '2026_12_07_000110_envoi_domaines_ip.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

@@ -5,6 +5,8 @@ namespace App\Envoi\Creation;
 use App\Crm\Opposition\StatutOpposition;
 use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Campagnes\FiltreOrigine;
+use App\Envoi\Campagnes\SelectionDestinataires;
+use App\Envoi\Campagnes\SelectionRefusee;
 use App\Envoi\Exceptions\CampagneRefusee;
 use App\Support\WorkspaceContext;
 use Illuminate\Database\Query\Builder;
@@ -31,6 +33,9 @@ final class AssistantCreation
 
     /** Plafond de lignes examinées pour l'estimation : au-delà, 503 explicite plutôt qu'un chiffre inventé. */
     public const LIGNES_MAX = 200000;
+
+    /** Estimation « joignables » : nombre de lots de 500 membres lus au plus (au-delà : `complet` faux, aucune extrapolation). */
+    public const LOTS_MAX = 10;
 
     /**
      * @param  (\Closure(): (int|float))|null  $horloge  nanosecondes (hrtime) ; injectable pour les tests
@@ -234,14 +239,118 @@ final class AssistantCreation
      * @param  array<string, mixed>  $cible
      * @return array<string, mixed>
      */
-    public function estimer(string $ws, array $cible): array
+    public function estimer(string $ws, array $cible, ?string $brouillonId = null): array
     {
+        if ($brouillonId !== null) {
+            $vraie = $this->estimerJoignables($ws, $cible, $brouillonId);
+            if ($vraie !== null) {
+                return $vraie;
+            }
+        }
         [$total, $opposees] = $this->mesurer($ws, (string) ($cible['type'] ?? ''), (string) ($cible['reference'] ?? ''));
 
         // Les autres exclusions ne sont pas évaluées : `exclusions_evaluees` reste faux (booléen global du contrat), jamais un zéro
         // inventé pour elles. Aucun motif par personne n'est rendu.
 
         return ['total' => $total, 'exclus' => $opposees, 'restant' => max(0, $total - $opposees), 'exclusions' => ['opposition' => $opposees], 'estimation' => true, 'exclusions_evaluees' => false];
+    }
+
+    /**
+     * B8-C — « joignables » vrais : la cible demandée est celle enregistrée dans le brouillon ; on lit les lots de la sélection réelle
+     * (500 membres, lecture seule, aucun DNS, aucun verdict écrit) jusqu'à la fin, l'échéance globale ou LOTS_MAX lots.
+     * Verdicts : lus seulement. Jamais d'extrapolation : `complet` faux = « au moins N sur M examinés ». Null = voie non applicable.
+     *
+     * @param  array<string, mixed>  $cible
+     * @return array<string, mixed>|null
+     */
+    private function estimerJoignables(string $ws, array $cible, string $id): ?array
+    {
+        $type = (string) ($cible['type'] ?? '');
+        $reference = (string) ($cible['reference'] ?? '');
+        $c = $this->lire($ws, $id);
+        $enregistree = json_decode((string) $c->cible, true);
+        if (! in_array($type, ['liste', 'audience', 'etiquette'], true) || ! is_array($enregistree)
+            || ($enregistree['type'] ?? null) !== $type || (string) ($enregistree['reference'] ?? '') !== $reference) {
+            return null;
+        }
+        $saisie = json_decode((string) $c->saisie, true);
+        $ids = is_array($saisie) && is_array($saisie['contenu'] ?? null) && is_array($saisie['contenu']['cible'] ?? null) ? ($saisie['contenu']['cible']['contact_ids'] ?? null) : null;
+        if (is_array($ids) && $ids !== []) {
+            return null;
+        }
+
+        $echeance = $this->maintenant() + self::ECHEANCE_SECONDES * 1_000_000_000;
+        $selection = new SelectionDestinataires;
+        $somme = array_fill_keys([...SelectionDestinataires::MOTIFS, 'sans_contact_generique_disponible', 'adresse_invalide', 'adresse_risquee'], 0);
+        $total = 0;
+        $retenus = 0;
+        $apres = 0;
+        $complet = false;
+        for ($n = 1; $n <= self::LOTS_MAX; $n++) {
+            if ($n > 1 && $this->maintenant() > $echeance) {
+                break;
+            }
+            try {
+                $lot = $selection->lot($ws, $id, 'entreprises', $apres, SelectionDestinataires::TAILLE_MAX);
+            } catch (SelectionRefusee $e) {
+                if ($e->motif === 'filtre_origine_inactif') {
+                    throw ErreurCreation::conflit('filtre_origine_inactif', 'Le filtre par réseau d\'origine est inactif dans cet espace : retirez-le ou attendez son ouverture.');
+                }
+                if ($e->motif === 'lecture_trop_longue') {
+                    throw new ErreurCreation('estimation_trop_longue', 'L\'estimation a pris trop de temps : réessayez ou choisissez une cible plus petite.', 503);
+                }
+                if ($e->reessayable) {
+                    throw new ErreurCreation('estimation_impossible', 'L\'estimation n\'a pas pu être lue : réessayez.', 503);
+                }
+
+                return null; // cible introuvable ou non prise en charge : ancienne estimation
+            }
+            foreach ($lot->compteurs as $cle => $v) {
+                if (isset($somme[$cle])) {
+                    $somme[$cle] += $v;
+                }
+            }
+            $total += $lot->compteurs['membres'];
+            $verdicts = $this->verdictsExistants($ws, array_map(static fn ($d): string => $d->empreinte, $lot->destinataires));
+            foreach ($lot->destinataires as $d) {
+                $v = $verdicts[$d->empreinte] ?? null;
+                if ($v === 'invalide') {
+                    $somme['adresse_invalide']++;
+                } elseif ($v === 'risque') {
+                    $somme['adresse_risquee']++;
+                } else {
+                    $retenus++;
+                }
+            }
+            if ($lot->curseurSuivant === null) {
+                $complet = true;
+                break;
+            }
+            $apres = $lot->curseurSuivant;
+        }
+
+        return ['total' => $total, 'exclus' => $total - $retenus, 'restant' => $retenus, 'exclusions' => $somme, 'estimation' => true, 'exclusions_evaluees' => true, 'complet' => $complet];
+    }
+
+    /**
+     * Dernier verdict connu par empreinte (lecture seule, aucun appel réseau).
+     *
+     * @param  list<string>  $empreintes
+     * @return array<string, string>
+     */
+    private function verdictsExistants(string $ws, array $empreintes): array
+    {
+        if ($empreintes === []) {
+            return [];
+        }
+        $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_verdicts_adresse')->where('workspace_id', $ws)->whereIn('empreinte_adresse', $empreintes)
+            ->orderByDesc('verifie_le')->orderByDesc('id')->get(['empreinte_adresse', 'verdict']));
+        $sortie = [];
+        foreach ($lignes as $l) {
+            $sortie[trim((string) $l->empreinte_adresse)] ??= $l->verdict;
+        }
+
+        return $sortie;
     }
 
     /**
@@ -528,21 +637,21 @@ final class AssistantCreation
             $listes = $filtre(DB::table('listes_manuelles')->where('workspace_id', $ws)->whereNull('deleted_at'), 'nom')->orderBy('nom')->limit(50)->get(['id', 'nom']);
             foreach ($listes as $l) {
                 $n = $this->compter($ws, 'liste', (string) $l->id);
-                $sortie[] = ['type' => 'liste', 'reference' => (string) $l->id, 'libelle' => $l->nom, 'total' => $n, 'joignables' => $n];
+                $sortie[] = ['type' => 'liste', 'reference' => (string) $l->id, 'libelle' => $l->nom, 'total' => $n, 'joignables' => null];
             }
             $audiences = $filtre(DB::table('email_audiences')->where('workspace_id', $ws)->whereNull('deleted_at')->where('is_active', true), 'name')->orderBy('name')->limit(50)->get(['id', 'name', 'member_count']);
             foreach ($audiences as $a) {
-                $sortie[] = ['type' => 'audience', 'reference' => (string) $a->id, 'libelle' => $a->name, 'total' => (int) $a->member_count, 'joignables' => (int) $a->member_count];
+                $sortie[] = ['type' => 'audience', 'reference' => (string) $a->id, 'libelle' => $a->name, 'total' => (int) $a->member_count, 'joignables' => null];
             }
             $etiquettes = $filtre(DB::table('tags')->where('workspace_id', $ws), 'name')->orderBy('name')->limit(50)->get(['slug', 'name']);
             foreach ($etiquettes as $t) {
                 $n = $this->compter($ws, 'etiquette', $t->slug);
-                $sortie[] = ['type' => 'etiquette', 'reference' => $t->slug, 'libelle' => $t->name, 'total' => $n, 'joignables' => $n];
+                $sortie[] = ['type' => 'etiquette', 'reference' => $t->slug, 'libelle' => $t->name, 'total' => $n, 'joignables' => null];
             }
             if ($entreprise !== null && ctype_digit($entreprise) && strlen($entreprise) < 18) {
                 $e = DB::table('companies')->where('workspace_id', $ws)->where('id', (int) $entreprise)->first(['id', 'denomination']);
                 if ($e !== null) {
-                    $sortie[] = ['type' => 'carnet', 'reference' => (string) $e->id, 'libelle' => $e->denomination, 'total' => 1, 'joignables' => 1];
+                    $sortie[] = ['type' => 'carnet', 'reference' => (string) $e->id, 'libelle' => $e->denomination, 'total' => 1, 'joignables' => null];
                 }
             }
 

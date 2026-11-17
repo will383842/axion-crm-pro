@@ -249,8 +249,8 @@ test('lecture seule : calculer la liste n’écrit ni journal, ni drapeau, ni co
         ->and(config('envoi.reel_actif'))->toBeFalse();
 });
 
-test('le catalogue reste en version 5 : codes inchangés, libellés inchangés', function () {
-    expect(CatalogueManuels::VERSION)->toBe(5)->and(CatalogueManuels::POINTS)->toHaveKeys([FVS_FREINS, FVS_TEMOINS]);
+test('le catalogue reste en version 6 : codes inchangés, libellés inchangés', function () {
+    expect(CatalogueManuels::VERSION)->toBe(6)->and(CatalogueManuels::POINTS)->toHaveKeys([FVS_FREINS, FVS_TEMOINS]);
 });
 
 // ── envoi:evaluer-freins : battement quotidien ────────────────────────────────

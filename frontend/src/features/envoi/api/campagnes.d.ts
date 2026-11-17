@@ -210,6 +210,16 @@ export interface components {
          *     « programmée, envoi fermé ». Les compteurs restent à 0 tant que la campagne n'a pas de séquence.
          */
         CampagneSuivi: {
+            /**
+             * @description « Bloquée, pourquoi » (B8-A) : la première raison vraie, dans l'ordre fermé reglage_non_applique, preparation_bloquee,
+             *     aucun_destinataire, frein_arret_general, frein_pause_automatique, sequence_en_pause. Nul hors des statuts
+             *     programmee, en_cours et en_pause, et quand rien ne bloque. Le message ne contient ni adresse ni nom de personne.
+             */
+            blocage?: {
+                /** @enum {string} */
+                code: "reglage_non_applique" | "preparation_bloquee" | "aucun_destinataire" | "frein_arret_general" | "frein_pause_automatique" | "sequence_en_pause";
+                message: string;
+            } | null;
             boites: components["schemas"]["Identifiant"][];
             cible: components["schemas"]["CibleCampagne"];
             cree_le: components["schemas"]["Horodatage"];

@@ -3,7 +3,7 @@
 /**
  * GARDE : LE DECOUPAGE DE LA SUITE PEST EN PARTS NE PERD ET NE DOUBLONNE RIEN.
  *
- * La CI repartit les fichiers de test en 4 parts (`tests/ci/decouper-suite.php`).
+ * La CI repartit les fichiers de test en 2 parts (`tests/ci/decouper-suite.php`).
  * Une part qui oublie un fichier = un test qui ne tourne plus nulle part, et la
  * CI reste verte : c'est le defaut meme que ce decoupage ne doit pas creer.
  * Les fonctions du script sont testees ici ; le script se verifie aussi lui-meme
@@ -113,7 +113,7 @@ test('DECOUPAGE — ci.yml : la matrice backend est sans needs, et le verdict po
 
     $backend = (array) $jobs['backend'];
     expect($backend)->not->toHaveKey('needs');
-    expect($backend['strategy']['matrix']['part'] ?? null)->toBe([1, 2, 3, 4]);
+    expect($backend['strategy']['matrix']['part'] ?? null)->toBe([1, 2]);
     expect($backend['strategy']['fail-fast'] ?? null)->toBeFalse();
     expect($backend['name'] ?? '')->not->toBe('Backend Laravel (install + PHPStan + Pint + Pest)');
 

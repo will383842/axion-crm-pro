@@ -408,19 +408,48 @@ export interface operations {
                         campagne: components["schemas"]["CampagneSuivi"];
                         /** @description Décompte des destinataires par état, et taux de la campagne. */
                         compteurs: {
+                            /** @description Inscriptions fermées parce que la campagne est arrêtée ou terminée. */
+                            arretes_campagne: number;
                             /** @description Entreprises dont la suite est arrêtée parce qu'un contact a répondu. */
                             arretes_entreprise: number;
                             desinscrits: number;
                             en_file: number;
                             /** @description Destinataires en pause (absence du bureau), reprise au retour. */
                             en_pause_absence: number;
+                            /** @description Messages réellement envoyés (un par personne et par étape). */
+                            envoyes: number;
                             exclus: number;
+                            /** @description Destinataires écartés à la préparation (membres moins retenus ; = exclus). */
+                            exclus_preparation: number;
+                            /** @description Personnes inscrites à la séquence de la campagne (tous statuts). */
+                            inscrits: number;
+                            /** @description Chaque inscription dans UNE seule case ; la somme vaut `inscrits`. */
+                            issues: {
+                                active: number;
+                                arretee_autre: number;
+                                opposition: number;
+                                rebond_dur: number;
+                                rebond_mou: number;
+                                reponse: number;
+                                terminee: number;
+                            };
                             limite_refus: number;
                             ont_repondu: number;
+                            /** @description Personnes qui s'opposent ou se désinscrivent (= desinscrits). */
+                            oppositions: number;
+                            /** @description Toujours nul : aucun suivi d'ouverture n'existe ; l'écran affiche « non suivi », jamais 0. */
+                            ouverts: number | null;
                             partis: number;
+                            rebonds_durs: number;
+                            /** @description Hors personnes déjà comptées en rebond dur. */
+                            rebonds_mous: number;
                             refuses: number;
+                            /** @description Personnes ayant répondu (= ont_repondu). */
+                            reponses: number;
                             taux_desinscription: number;
                             taux_refus: number;
+                            /** @description Personnes ayant reçu au moins un message (= partis). */
+                            touches: number;
                         };
                         derniers_evenements: components["schemas"]["EvenementEnvoi"][];
                         fin_prevue_le: components["schemas"]["Horodatage"] | null;
@@ -437,6 +466,15 @@ export interface operations {
                             /** Format: date */
                             jour: string;
                         }[];
+                        /** @description Préparation (matérialisation) de la campagne ; nul si elle n'a pas démarré. */
+                        preparation: {
+                            etat: string;
+                            /** @description Personnes déjà préparées. */
+                            inscrits: number;
+                            /** @description Personnes de la cible. */
+                            membres: number;
+                            motif: string | null;
+                        } | null;
                         sequence: {
                             delai_jours: number;
                             envoyes: number;

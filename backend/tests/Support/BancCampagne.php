@@ -6,6 +6,8 @@ use App\Crm\FichesProtegees;
 use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Campagnes\GestesCampagne;
 use App\Envoi\Campagnes\MaterialisationCampagne;
+use App\Envoi\Chauffe\ResolveurEnMemoire;
+use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Contrat\EtatMessage;
 use App\Envoi\Contrat\EtatServeur;
 use App\Envoi\Contrat\LotEvenements;
@@ -244,6 +246,7 @@ final class BancCampagne
             $this->lecteur->deposer($this->boite, $m);
         }
         app()->instance(FabriqueLecteurs::class, new FabriqueLecteurFixe($this->lecteur));
+        app()->instance(ResolveurFournisseur::class, new ResolveurEnMemoire);   // le frein résout le fournisseur de l'adresse : jamais de DNS en test
         $releve = app(ReleveImap::class);   // chaîne et registre RÉELS du conteneur
         $releve->relever($this->ws, $this->boite);
     }

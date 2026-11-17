@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Compte;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Models\User;
 use App\Services\Auth\CodeCourriel\AppareilsConfiance;
 use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use App\Support\AuditLogger;
@@ -27,14 +28,14 @@ class SecuriteCompteController extends ApiController
 
     public function appareils(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->utilisateur($request);
 
-        return $this->ok(['data' => $this->appareils->lister($user, $request->cookie(AppareilsConfiance::COOKIE))]);
+        return $this->ok(['data' => $this->appareils->lister($user, $this->jetonAppareil($request))]);
     }
 
     public function retirerAppareil(Request $request, string $id): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->utilisateur($request);
         if (CodesConnexionCourriel::methode($user) !== 'email') {
             return $this->methodeNonCourriel();
         }
@@ -60,7 +61,7 @@ class SecuriteCompteController extends ApiController
 
     public function envoyerCode(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = $this->utilisateur($request);
         if (CodesConnexionCourriel::methode($user) !== 'email') {
             return $this->methodeNonCourriel();
         }
@@ -84,6 +85,23 @@ class SecuriteCompteController extends ApiController
         }
 
         return $this->ok(['ok' => true]);
+    }
+
+    private function utilisateur(Request $request): User
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            abort(401, 'unauthenticated');
+        }
+
+        return $user;
+    }
+
+    private function jetonAppareil(Request $request): ?string
+    {
+        $jeton = $request->cookie(AppareilsConfiance::COOKIE);
+
+        return is_string($jeton) ? $jeton : null;
     }
 
     private function methodeNonCourriel(): JsonResponse

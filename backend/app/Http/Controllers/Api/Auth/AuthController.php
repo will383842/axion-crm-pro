@@ -67,7 +67,8 @@ class AuthController extends ApiController
         // réponse (la page propose « Renvoyer »). Jamais le code dans un journal.
         $requires2fa = $result['requires_2fa'];
         if (CodesConnexionCourriel::methode($result['user']) === 'email') {
-            if (app(AppareilsConfiance::class)->reconnaitre($result['user'], $request->cookie(AppareilsConfiance::COOKIE))) {
+            $jeton = $request->cookie(AppareilsConfiance::COOKIE);
+            if (app(AppareilsConfiance::class)->reconnaitre($result['user'], is_string($jeton) ? $jeton : null)) {
                 $request->session()->put('2fa_passed_at', now()->toIso8601String());
                 $requires2fa = false;
             } else {

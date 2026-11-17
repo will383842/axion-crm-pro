@@ -55,7 +55,7 @@ final class AppareilsConfiance
     {
         $hashCourant = is_string($jetonCourant) && $jetonCourant !== '' ? $this->empreinte($jetonCourant) : null;
 
-        return DB::table('appareils_confiance')
+        $lignes = DB::table('appareils_confiance')
             ->where('user_id', $u->id)
             ->whereNull('retire_le')
             ->where('expire_le', '>', CarbonImmutable::now()->toIso8601String())
@@ -71,6 +71,8 @@ final class AppareilsConfiance
                 'actuel' => $hashCourant !== null && hash_equals((string) $l->jeton_hash, $hashCourant),
             ])
             ->all();
+
+        return array_values($lignes);
     }
 
     /** Pose `retire_le` (jamais DELETE) sur un appareil de CE compte ; faux si inconnu, autre compte ou déjà retiré. */

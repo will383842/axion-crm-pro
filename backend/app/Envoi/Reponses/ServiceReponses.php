@@ -22,6 +22,9 @@ use Illuminate\Support\Facades\DB;
  */
 final class ServiceReponses
 {
+    /** Message de l'exception levée quand un classement « stop » est corrigé : une opposition ne se lève jamais depuis l'écran. */
+    public const STOP_DEFINITIF = 'stop_definitif';
+
     public const CLASSEMENTS = ['interesse', 'pas_maintenant', 'question', 'refus', 'stop', 'absence'];
 
     public function __construct(
@@ -33,7 +36,8 @@ final class ServiceReponses
     private const BASE = <<<'SQL'
         SELECT r.id, r.recue_le, r.expediteur_chiffre, r.objet_chiffre, r.extrait_chiffre, r.empreinte_expediteur,
                e.id AS evenement_id, e.statut, e.boite, e.empreinte_expediteur AS emp_evt, e.empreinte_destinataire AS emp_dest,
-               c.classement, c.auteur,
+               CASE WHEN c.geste = 'annulation' THEN COALESCE(s.classement, 'a_rattacher') ELSE c.classement END AS classement,
+               CASE WHEN c.geste = 'annulation' THEN 'classificateur' ELSE c.auteur END AS auteur,
                COALESCE(s.classement, 'a_rattacher') AS sug_classement, COALESCE(s.confiance, 0) AS sug_confiance,
                f.contact_id,
                (e.statut = 'rattache' OR f.contact_id IS NOT NULL
@@ -41,8 +45,8 @@ final class ServiceReponses
                (SELECT b.id FROM envoi_boites b WHERE b.workspace_id = r.workspace_id AND (b.adresse = e.boite OR b.id::text = e.boite) ORDER BY b.cree_le LIMIT 1) AS boite_id
         FROM envoi_reponses r
         JOIN envoi_evenements e ON e.id = r.evenement_id AND e.workspace_id = r.workspace_id
-        JOIN LATERAL (SELECT classement, auteur FROM envoi_reponses_classements
-                      WHERE reponse_id = r.id AND geste = 'classement' ORDER BY id DESC LIMIT 1) c ON true
+        JOIN LATERAL (SELECT geste, classement, auteur FROM envoi_reponses_classements
+                      WHERE reponse_id = r.id AND geste IN ('classement', 'annulation') ORDER BY id DESC LIMIT 1) c ON true
         LEFT JOIN LATERAL (SELECT classement, confiance FROM envoi_reponses_classements
                       WHERE reponse_id = r.id AND geste = 'classement' AND auteur = 'classificateur' ORDER BY id DESC LIMIT 1) s ON true
         LEFT JOIN LATERAL (SELECT contact_id FROM envoi_reponses_classements
@@ -167,7 +171,11 @@ final class ServiceReponses
      * Classement HUMAIN. « stop » : opposition d'abord (idempotente), puis la ligne de classement.
      * Rejouer le même geste ne crée ni seconde opposition ni seconde ligne ; un rejeu de « stop » refait les effets.
      *
+     * Corriger depuis « Traitées » : permis, sauf si le classement courant est « stop » et le nouveau ne l'est pas.
+     *
      * @return array<string, mixed>|null
+     *
+     * @throws \DomainException `stop_definitif` (aucune ligne écrite) ; la route RR-6B le traduit en 409
      */
     public function classer(string $ws, string $userId, int $id, string $classement, bool $creerTache = false): ?array
     {
@@ -175,6 +183,9 @@ final class ServiceReponses
             $l = $this->ligne($ws, $id);
             if ($l === null) {
                 return null;
+            }
+            if ($l->auteur === 'humain' && $l->classement === 'stop' && $classement !== 'stop') {
+                throw new \DomainException(self::STOP_DEFINITIF);
             }
             if ($classement === 'stop') {
                 foreach (array_unique(array_filter([$l->emp_evt, $l->emp_dest])) as $empreinte) {
@@ -184,8 +195,11 @@ final class ServiceReponses
             // Ligne de classement, puis arrêts, puis tâche : une seule transaction (rien d'écrit si la tâche échoue ; le rejeu refait tout).
             $tache = DB::transaction(function () use ($ws, $userId, $id, $classement, $creerTache, $l): ?string {
                 $this->verrou($ws, $id);
-                $courant = DB::table('envoi_reponses_classements')->where('reponse_id', $id)->where('geste', 'classement')->orderByDesc('id')->first();
-                if (! ($courant !== null && $courant->auteur === 'humain' && $courant->classement === $classement)) {
+                $courant = $this->courant($id);
+                if ($courant !== null && $courant->geste === 'classement' && $courant->auteur === 'humain' && $courant->classement === 'stop' && $classement !== 'stop') {
+                    throw new \DomainException(self::STOP_DEFINITIF); // course : un « stop » posé entre-temps
+                }
+                if (! ($courant !== null && $courant->geste === 'classement' && $courant->auteur === 'humain' && $courant->classement === $classement)) {
                     DB::table('envoi_reponses_classements')->insert([
                         'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'classement', 'classement' => $classement,
                         'confiance' => 100, 'auteur' => 'humain', 'auteur_id' => $userId, 'cree_le' => now(),
@@ -200,6 +214,47 @@ final class ServiceReponses
                     'lien' => '/envoi/reponses/' . $id, 'tache' => $tache, 'opposition' => $classement === 'stop'],
             ];
         });
+    }
+
+    /**
+     * Annule le classement HUMAIN courant (ajout d'une ligne `annulation`, rien n'est effacé ni défait : arrêts, tâches et avis restent).
+     *
+     * @return array{0: string, 1: ?array<string, mixed>} [état, résumé] : ok | inconnue | pas_traitee | stop_definitif
+     */
+    public function annuler(string $ws, string $userId, int $id): array
+    {
+        return WorkspaceContext::run($ws, function () use ($ws, $userId, $id): array {
+            if ($this->ligne($ws, $id) === null) {
+                return ['inconnue', null];
+            }
+
+            $etat = DB::transaction(function () use ($ws, $userId, $id): string {
+                $this->verrou($ws, $id);
+                $courant = $this->courant($id);
+                if ($courant === null || $courant->geste !== 'classement' || $courant->auteur !== 'humain') {
+                    return 'pas_traitee';
+                }
+                if ($courant->classement === 'stop') {
+                    return 'stop_definitif';
+                }
+                DB::table('envoi_reponses_classements')->insert([
+                    'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'annulation', 'classement' => $courant->classement,
+                    'confiance' => 100, 'auteur' => 'humain', 'auteur_id' => $userId, 'cree_le' => now(),
+                ]);
+
+                return 'ok';
+            });
+
+            return $etat === 'ok'
+                ? ['ok', ($this->resumeDe($ws, $id) ?? []) + ['message' => 'Classement annulé. Les arrêts et les tâches déjà créés sont conservés.']]
+                : [$etat, null];
+        });
+    }
+
+    /** Dernière ligne COURANTE (classement ou annulation) de la réponse ; à lire sous le verrou. */
+    private function courant(int $id): ?object
+    {
+        return DB::table('envoi_reponses_classements')->where('reponse_id', $id)->whereIn('geste', ['classement', 'annulation'])->orderByDesc('id')->first();
     }
 
     /** Un lien par adresse (réutilisé au rejeu) → UNE opposition, mise à l'écart sans effacement. */

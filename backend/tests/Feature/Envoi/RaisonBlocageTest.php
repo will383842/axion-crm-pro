@@ -95,8 +95,10 @@ function rblVu(string $mode, string $ws, string $id): array
 {
     return rblSous($mode, $ws, function () use ($ws, $id): array {
         $l = new LectureCampagnes;
-        $fiche = $l->fiche($ws, $id)['campagne']['blocage'] ?? 'absent';
-        $liste = collect($l->liste($ws, null, null, 1, 100)['data'])->firstWhere('id', $id)['blocage'] ?? 'absent';
+        $c = $l->fiche($ws, $id)['campagne'];
+        $fiche = array_key_exists('blocage', $c) ? $c['blocage'] : 'absent';
+        $c = collect($l->liste($ws, null, null, 1, 100)['data'])->firstWhere('id', $id);
+        $liste = array_key_exists('blocage', $c) ? $c['blocage'] : 'absent';
 
         return [$fiche, $liste];
     });
@@ -131,17 +133,20 @@ test('rbl 1 un cas par code : code et message exacts, fiche et liste accordées'
     }
 });
 
-test('rbl 1b les 4 motifs de construction et un motif inconnu ont un message sans code ; préparation en cours, ni bloquée ni vide', function () {
+test('rbl 1b les motifs de la base ont un message sans code ; motif inconnu ou absent = phrase générique ; préparation en cours, ni bloquée ni vide', function () {
     foreach (RBL_MODES as $mode) {
         $ws = rblEspace();
-        foreach (['jours_non_applicables', 'objet_b_non_applicable', 'etapes_invalides', 'sequence_incoherente', 'cible_non_supportee', 'population_non_ouverte', 'filtre_origine_inactif'] as $motif) {
+        foreach (['jours_non_applicables', 'objet_b_non_applicable', 'etapes_invalides', 'sequence_incoherente', 'cible_introuvable', 'espace_non_emetteur'] as $motif) {
             [$f] = rblVu($mode, $ws, rblCampagne($ws, 'programmee', "bloquee:$motif")[0]);
-            expect($f['code'])->toBe('preparation_bloquee')->and($f['message'])->not->toContain($motif)->and($f['message'])->not->toContain('_');
+            expect($f['code'])->toBe('preparation_bloquee')->and($f['message'])->not->toBe(RaisonBlocage::messagePreparation('inconnu'))
+                ->and($f['message'])->not->toContain($motif)->and($f['message'])->not->toContain('_');
         }
-        [$f] = rblVu($mode, $ws, rblCampagne($ws, 'programmee', 'bloquee:motif_inconnu')[0]);
-        expect($f)->toBe(['code' => 'preparation_bloquee', 'message' => 'La préparation de la campagne est bloquée.']);
         expect(rblVu($mode, $ws, rblCampagne($ws, 'programmee', 'en_cours')[0]))->toBe([null, null], $mode);
     }
+    foreach (['cible_non_supportee', 'population_non_ouverte', 'filtre_origine_inactif'] as $motif) {
+        expect(RaisonBlocage::messagePreparation($motif))->not->toBe(RaisonBlocage::messagePreparation('inconnu'))->and(RaisonBlocage::messagePreparation($motif))->not->toContain('_');
+    }
+    expect(RaisonBlocage::messagePreparation('motif_inconnu'))->toBe('La préparation de la campagne est bloquée.')->and(RaisonBlocage::messagePreparation(null))->toBe('La préparation de la campagne est bloquée.');
 });
 
 test('rbl 1c statuts hors programmee/en_cours/en_pause : null, même sous frein et avec boîtes', function () {
@@ -178,9 +183,15 @@ test('rbl 3 priorité : boîtes + préparation bloquée ⇒ reglage_non_applique
 });
 
 test('rbl 4 liste : nombre de requêtes constant (5 ou 25 campagnes), blocage ≤ 5 requêtes', function () {
+    $journal = new ArrayObject;   // un seul écouteur pour tout le test (un écouteur ne se retire pas)
+    DB::listen(function ($q) use ($journal): void {
+        if (! preg_match('/^(SELECT set_config|SET LOCAL ROLE|RESET ROLE)/', $q->sql)) {   // seules les lectures de données comptent
+            $journal[] = substr($q->sql, 0, 70);
+        }
+    });
     foreach (RBL_MODES as $mode) {
         $ws = rblEspace();
-        $compter = function (int $n) use ($mode, $ws): int {
+        $compter = function (int $n) use ($mode, $ws, $journal): int {
             while (DB::table('envoi_campagnes')->where('workspace_id', $ws)->count() < $n) {
                 $i = DB::table('envoi_campagnes')->where('workspace_id', $ws)->count();
                 $mats = [null, 'bloquee:cible_introuvable', 'terminee:0', 'en_cours'];
@@ -192,24 +203,20 @@ test('rbl 4 liste : nombre de requêtes constant (5 ou 25 campagnes), blocage �
                     default => rblCampagne($ws, 'brouillon'),
                 };
             }
-            $requetes = 0;
-            DB::listen(function () use (&$requetes): void {
-                $requetes++;
-            });
+            $avant = count($journal);
             rblSous($mode, $ws, fn () => (new LectureCampagnes)->liste($ws, null, null, 1, 100));
 
-            return $requetes;
+            return count($journal) - $avant;
         };
         $petit = $compter(5);
         $grand = $compter(25);
         expect($grand)->toBe($petit, "$mode : requêtes indépendantes de la taille de page");
         $lignes = DB::table('envoi_campagnes')->where('workspace_id', $ws)->get()->all();
-        $requetes = 0;
-        DB::listen(function () use (&$requetes): void {
-            $requetes++;
-        });
+        $avant = count($journal);
         rblSous($mode, $ws, fn () => WorkspaceContext::run($ws, fn () => (new RaisonBlocage)->pour($ws, $lignes)));
-        expect($requetes)->toBeLessThanOrEqual(5);
+        $vus = array_slice($journal->getArrayCopy(), $avant);
+        $requetes = count($vus);
+        expect($requetes)->toBeLessThanOrEqual(5, implode(' ## ', $vus));
     }
 });
 

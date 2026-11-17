@@ -6,17 +6,25 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse, type HttpHandler } from 'msw';
 import { CampagneSuiviPage } from '@/features/envoi/campagnes/CampagneSuiviPage';
-import { handlers } from '@/demo/handlers/envoi/campagnes.handlers';
+import { handlers, ficheDemo } from '@/demo/handlers/envoi/campagnes.handlers';
+import { api } from '@/demo/outils';
 import { demoDb } from '@/demo/base';
 import { definirEtatForce } from '@/demo/outils';
 import { renderScreen } from '../../helpers/renderScreen';
+
+/** Surcharges d'un test : montées AVANT les handlers de démo (`renderScreen` les empile à l'ouverture), la plus récente d'abord. */
+let surcharges: HttpHandler[] = [];
+function surcharger(...h: HttpHandler[]) {
+  surcharges = [...h, ...surcharges];
+}
 
 async function ouvrir(id: string, query = '') {
   return renderScreen(<CampagneSuiviPage />, {
     path: '/envoi/campagnes/$campagneId',
     url: `/envoi/campagnes/${id}${query}`,
-    handlers,
+    handlers: [...surcharges, ...handlers],
     landingRoutes: ['/envoi/campagnes', '/envoi/campagnes/nouvelle'],
   });
 }
@@ -25,6 +33,7 @@ describe('CampagneSuiviPage', () => {
   beforeEach(() => {
     demoDb.reinitialiser();
     definirEtatForce(null);
+    surcharges = [];
   });
 
   it('montre la progression et les réponses comme indicateur principal', async () => {
@@ -132,5 +141,186 @@ describe('CampagneSuiviPage', () => {
     definirEtatForce('erreur');
     await ouvrir('cmp-01');
     expect(await screen.findByRole('button', { name: /Réessayer/ })).toBeInTheDocument();
+  });
+});
+
+// ── L5-D : gestes Lancer / Arrêter, refus, préparation, envoi fermé ────────────
+
+beforeEach(() => {
+  demoDb.reinitialiser();
+  definirEtatForce(null);
+  surcharges = [];
+});
+
+const GESTES = /^(Lancer|Arrêter|Mettre en pause|Reprendre|Terminer)$/;
+const idDe = (statut: string): string => String(demoDb.campagnes.tous().find((x) => x.statut === statut)!.id);
+const visibles = () => screen.queryAllByRole('button').map((b) => b.textContent?.trim() ?? '').filter((t) => GESTES.test(t));
+const refuser = (geste: string, code: string) =>
+  surcharger(http.post(api(`/envoi/campagnes/:id/${geste}`), () => HttpResponse.json({ error: code, message: 'technique' }, { status: 409 })));
+
+/** Remplace la lecture de la fiche pour y injecter `preparation` ou `envoi_ferme`. */
+function fixerFiche(id: string, modif: (f: Record<string, unknown>) => Record<string, unknown>) {
+  surcharger(http.get(api(`/envoi/campagnes/${id}`), () => HttpResponse.json(modif(ficheDemo(demoDb.campagnes.trouver(id)!)))));
+}
+
+async function pret(id: string) {
+  await ouvrir(id);
+  await screen.findByRole('heading', { level: 1 });
+}
+
+describe('L5-D — boutons selon le statut', () => {
+  const ATTENDUS: Array<[string, string[]]> = [
+    ['programmee', ['Lancer', 'Arrêter']],
+    ['en_cours', ['Mettre en pause', 'Terminer', 'Arrêter']],
+    ['en_pause', ['Reprendre', 'Terminer', 'Arrêter']],
+    ['terminee', []],
+    ['brouillon', []],
+    ['a_valider', []],
+    ['arretee', []],
+  ];
+  it.each(ATTENDUS)('%s', async (statut, boutons) => {
+    if (statut === 'arretee') demoDb.campagnes.modifier(idDe('terminee'), { statut: 'arretee' });
+    await pret(idDe(statut));
+    expect(visibles().sort()).toEqual([...boutons].sort());
+  });
+});
+
+describe('L5-D — Lancer', () => {
+  it('double clic : une seule requête ; même clé si on relance après un échec réseau', async () => {
+    const user = userEvent.setup();
+    const cles: Array<string | null> = [];
+    let panne = true;
+    surcharger(
+      http.post(api('/envoi/campagnes/:id/lancer'), async ({ request, params }) => {
+        cles.push(request.headers.get('Idempotency-Key'));
+        await new Promise((r) => setTimeout(r, 60)); // le second clic tombe pendant que le premier est en vol
+        if (panne) return HttpResponse.error();
+        return HttpResponse.json(ficheDemo(demoDb.campagnes.modifier(String(params['id']), { statut: 'en_cours' })!).campagne);
+      }),
+    );
+    await pret(idDe('programmee'));
+    await user.dblClick(screen.getByRole('button', { name: 'Lancer' }));
+    await screen.findByRole('alert');
+    expect(cles).toHaveLength(1);
+    expect(cles[0]).toMatch(/^[A-Za-z0-9._-]{8,100}$/);
+    panne = false;
+    await user.click(screen.getByRole('button', { name: 'Lancer' }));
+    await waitFor(() => expect(cles).toHaveLength(2));
+    expect(cles[1]).toBe(cles[0]);
+  });
+
+  const REFUS: Array<[string, string]> = [
+    ['transition_refusee', 'Ce geste n’est pas possible dans l’état actuel'],
+    ['sans_sequence', 'n’a pas encore de séquence'],
+    ['materialisation_bloquee', 'La préparation de la liste est bloquée'],
+    ['aucun_destinataire', 'tous les destinataires ont été écartés'],
+    ['frein_arret_general', 'L’arrêt général est actif'],
+    ['frein_pause_automatique', 'Une pause automatique est active'],
+    ['reprise_refusee_base', 'refusé par la base : rien n’a été changé'],
+    ['concurrence', 'Une autre opération touche cette campagne'],
+    ['version_perimee', 'a changé depuis votre lecture'],
+    ['cle_reutilisee', 'a déjà été envoyée'],
+  ];
+  it.each(REFUS)('refus 409 « %s » : texte français propre', async (code, texte) => {
+    const user = userEvent.setup();
+    refuser('lancer', code);
+    await pret(idDe('programmee'));
+    await user.click(screen.getByRole('button', { name: 'Lancer' }));
+    const alerte = await screen.findByRole('alert');
+    expect(alerte).toHaveTextContent(texte);
+    expect(alerte.textContent).not.toContain('technique');
+  });
+
+  it('materialisation_en_cours : « 20 personnes préparées sur 30 »', async () => {
+    const user = userEvent.setup();
+    const id = idDe('programmee');
+    fixerFiche(id, (f) => ({ ...f, preparation: { etat: 'en_cours', motif: null, inscrits: 20, membres: 30 } }));
+    refuser('lancer', 'materialisation_en_cours');
+    await pret(id);
+    await user.click(screen.getByRole('button', { name: 'Lancer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('La préparation n’est pas terminée : 20 personnes préparées sur 30.');
+  });
+});
+
+describe('L5-D — Arrêter et Terminer', () => {
+  it('Arrêter sans confirmer : aucune requête ; confirmé : un seul arrêt', async () => {
+    const user = userEvent.setup();
+    let appels = 0;
+    const id = idDe('en_cours');
+    surcharger(http.post(api('/envoi/campagnes/:id/arreter'), () => (appels += 1, HttpResponse.json({ ...ficheDemo(demoDb.campagnes.modifier(id, { statut: 'arretee' })!).campagne }))));
+    await pret(id);
+    await user.click(screen.getByRole('button', { name: 'Arrêter' }));
+    const dialogue = await screen.findByRole('dialog');
+    await user.click(within(dialogue).getByRole('button', { name: 'Annuler' }));
+    expect(appels).toBe(0);
+    await user.click(screen.getByRole('button', { name: 'Arrêter' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Arrêter la campagne' }));
+    await waitFor(() => expect(appels).toBe(1));
+    expect(demoDb.campagnes.trouver(id)?.statut).toBe('arretee');
+  });
+
+  it.each(['Arrêter', 'Terminer'])('%s prévient : irréversible, les personnes déjà prévues ne recevront rien', async (geste) => {
+    await pret(idDe('en_cours'));
+    await userEvent.setup().click(screen.getByRole('button', { name: geste }));
+    const dialogue = await screen.findByRole('dialog');
+    expect(dialogue).toHaveTextContent(/irréversible/i);
+    expect(dialogue).toHaveTextContent('les personnes déjà prévues ne recevront rien');
+  });
+
+  it('refus à l’arrêt : le texte du refus est affiché dans la confirmation', async () => {
+    const user = userEvent.setup();
+    refuser('arreter', 'sans_sequence');
+    await pret(idDe('programmee'));
+    await user.click(screen.getByRole('button', { name: 'Arrêter' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Arrêter la campagne' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('n’a pas encore de séquence');
+  });
+});
+
+describe('L5-D — accessibilité', () => {
+  it('chaque bouton a un nom accessible ; la confirmation garde le focus et se ferme à Échap', async () => {
+    const user = userEvent.setup();
+    await pret(idDe('en_cours'));
+    for (const b of screen.getAllByRole('button')) expect((b.getAttribute('aria-label') ?? b.textContent ?? '').trim()).not.toBe('');
+    await user.click(screen.getByRole('button', { name: 'Arrêter' }));
+    const dialogue = await screen.findByRole('dialog');
+    expect(dialogue).toHaveAccessibleName('Arrêter définitivement ?');
+    await waitFor(() => expect(dialogue.contains(document.activeElement)).toBe(true));
+    for (let i = 0; i < 6; i += 1) {
+      await user.tab();
+      expect(dialogue.contains(document.activeElement)).toBe(true);
+    }
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('L5-D — bandeaux', () => {
+  it('préparation en cours : progression ; bloquée : motif ; terminée : rien', async () => {
+    const id = idDe('programmee');
+    const prep = (etat: string, motif: string | null, inscrits: number) => fixerFiche(id, (f) => ({ ...f, preparation: { etat, motif, inscrits, membres: 30 } }));
+    prep('en_cours', null, 20);
+    await ouvrir(id);
+    expect(await screen.findByTestId('bandeau-preparation')).toHaveTextContent('20 personnes préparées sur 30');
+    cleanup();
+    prep('bloquee', 'reglage_non_applique', 0);
+    await ouvrir(id);
+    expect(await screen.findByTestId('bandeau-preparation')).toHaveTextContent(/bloquée/);
+    cleanup();
+    prep('terminee', null, 30);
+    await pret(id);
+    expect(screen.queryByTestId('bandeau-preparation')).not.toBeInTheDocument();
+  });
+
+  it('« Envoi réel fermé : rien ne part » tant que envoi_ferme est vrai, et seulement alors', async () => {
+    const id = idDe('en_cours');
+    const ferme = (envoi_ferme: boolean) => fixerFiche(id, (f) => ({ ...f, campagne: { ...(f['campagne'] as object), envoi_ferme } }));
+    ferme(true);
+    await ouvrir(id);
+    expect(await screen.findByText('Envoi réel fermé : rien ne part.')).toBeInTheDocument();
+    cleanup();
+    ferme(false);
+    await pret(id);
+    expect(screen.queryByText(/Envoi réel fermé/)).not.toBeInTheDocument();
   });
 });

@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 4 * * 1' # lundi 04:00 UTC
+    - cron: '0 4 * * *' # chaque nuit 04:00 UTC (lot A du plan CI allégée, #680)
 
 permissions:
   contents: read
@@ -429,8 +429,49 @@ jobs:
   # Et si la mesure elle-même échoue (packagist injoignable, JSON tronqué), on
   # sort en 2 : **rouge**. Ne pas savoir n'est pas la même chose que savoir que
   # tout va bien, et c'est précisément la confusion que `|| true` installait.
+  # LOT A (plan CI allégée, #680) — les audits de dépendances ne tournent sur
+  # une PR que si une dépendance ou un Dockerfile change. Hors PR (push main,
+  # planning nocturne) la réponse est toujours « oui » : rien n'y est filtré.
+  # Sans checkout : liste des fichiers de la PR par l'API. Erreur, réponse
+  # illisible ou 3000 fichiers ou plus : « oui, tout a changé ».
+  changements:
+    name: Dépendances touchées ?
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5  # F38-008
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      deps: ${{ steps.liste.outputs.deps }}
+    steps:
+      - id: liste
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPOT: ${{ github.repository }}
+          EVENEMENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENEMENT" != "pull_request" ]; then
+            echo "deps=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! FICHIERS="$(gh api --paginate "repos/$DEPOT/pulls/$PR/files?per_page=100" --jq '.[].filename')"; then
+            echo "API en erreur : on audite."; echo "deps=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$FICHIERS" ] || [ "$(printf '%s\n' "$FICHIERS" | wc -l)" -ge 3000 ]; then
+            echo "Liste vide ou trop longue : on audite."; echo "deps=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # deps-pattern : composer.json, composer.lock, package.json, pnpm-lock.yaml, Dockerfile*, .trivyignore.yaml, security.yml
+          if printf '%s\n' "$FICHIERS" | grep -Eq '(^|/)(composer\.json|composer\.lock|package\.json|pnpm-lock\.yaml|Dockerfile[^/]*|\.trivyignore\.yaml)$|^\.github/workflows/security\.yml$'; then
+            echo "deps=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deps=false" >> "$GITHUB_OUTPUT"
+          fi
+
   composer-audit:
     name: PHP deps audit
+    needs: changements
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changements.result != 'success' || needs.changements.outputs.deps == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20  # F38-008
     steps:
@@ -493,6 +534,8 @@ jobs:
   # workers, même raison que pour la matrice `trivy`.
   pnpm-audit:
     name: Node deps audit
+    needs: changements
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.changements.result != 'success' || needs.changements.outputs.deps == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20  # F38-008
     strategy:

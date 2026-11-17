@@ -127,7 +127,7 @@ test('succès sur liste simulée : 200, décision consignée avec la photo des p
     DB::table('envoi_drapeaux')->updateOrInsert(['workspace_id' => $ws], ['mode_temoins' => true, 'feu_vert_signature' => null]);
     $avant = DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first();
     $r = fvdDecider($this, $u, 'accorde', fvdEmpreinte($this, $u))->assertOk();
-    expect($r->json('decision.decision'))->toBe('accorde')->and($r->json('decision.motif'))->toBe(FVD_MOTIF)->and($r->json('total'))->toBe(48);
+    expect($r->json('decision.decision'))->toBe('accorde')->and($r->json('decision.motif'))->toBe(FVD_MOTIF)->and($r->json('total'))->toBe(49);
     $ligne = WorkspaceContext::run($ws, fn () => DB::table('envoi_feu_vert_decisions')->where('workspace_id', $ws)->first());
     expect($ligne->decision)->toBe('accorde')->and($ligne->auteur)->toBe('Responsable Test')->and($ligne->empreinte_liste)->not->toBe('');
     $photo = json_decode($ligne->points, true);
@@ -135,7 +135,7 @@ test('succès sur liste simulée : 200, décision consignée avec la photo des p
     sort($codes);
     $attendus = CatalogueManuels::codes();
     sort($attendus);
-    expect($photo)->toHaveCount(48)->and($codes)->toBe($attendus); // jsonb ne garde pas l'ordre des clés
+    expect($photo)->toHaveCount(49)->and($codes)->toBe($attendus); // jsonb ne garde pas l'ordre des clés
     expect(DB::table('envoi_drapeaux')->where('workspace_id', $ws)->first())->toEqual($avant)->and(config('envoi.reel_actif'))->toBeFalse();
 });
 
@@ -322,7 +322,7 @@ test('v5 : auto.adaptateurs_domaines : vert sans domaine réel ; un domaine non 
     expect(fvdPoint($ws, 'auto.adaptateurs_domaines')->fait)->toBeTrue();
 });
 
-test('v5 : le catalogue passe en version 5, 48 points dont 29 manuels et trois nouveaux auto.*', function () {
-    expect(CatalogueManuels::VERSION)->toBe(5)->and(CatalogueManuels::codes())->toHaveCount(48)->and(CatalogueManuels::codesManuels())->toHaveCount(29);
+test('v5 : le catalogue passe en version 6, 49 points dont 29 manuels et trois nouveaux auto.*', function () {
+    expect(CatalogueManuels::VERSION)->toBe(6)->and(CatalogueManuels::codes())->toHaveCount(49)->and(CatalogueManuels::codesManuels())->toHaveCount(29);
     expect(CatalogueManuels::codes())->toContain('auto.essai_a_blanc_recent', 'auto.plafond_butee_base', 'auto.adaptateurs_domaines');
 });

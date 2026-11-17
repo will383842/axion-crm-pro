@@ -138,7 +138,8 @@ test('registre d\'opposition illisible ⇒ exception (échec fermé), aucune lig
         DB::statement('RESET ROLE');
         DB::statement('REVOKE SELECT ON public.envoi_oppositions_linkedin FROM ' . $app);
         DB::statement('SET LOCAL ROLE ' . $app);
-        expect(fn () => dptAjouter($ws, $exp, DPT_PROFIL))->toThrow(RuntimeException::class);
+        // Point de sauvegarde : l'erreur SQL n'avorte pas la transaction englobante du test.
+        expect(fn () => DB::transaction(fn () => dptAjouter($ws, $exp, DPT_PROFIL)))->toThrow(RuntimeException::class);
         expect(dptNbProspects($ws))->toBe(0);
     });
 });

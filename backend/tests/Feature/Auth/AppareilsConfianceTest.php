@@ -54,9 +54,7 @@ function g3cCompte(): User
 function g3cNavigateur(array $cookies = []): void
 {
     $t = test();
-    Closure::bind(function (): void {
-        $this->defaultCookies = [];
-    }, $t, Illuminate\Foundation\Testing\TestCase::class)();
+    (new ReflectionProperty($t, 'defaultCookies'))->setValue($t, []);
     $t->flushSession();
     $t->withSession(['_token' => 'g3c-csrf']);
     foreach ($cookies as $nom => $valeur) {

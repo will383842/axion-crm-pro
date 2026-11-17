@@ -242,12 +242,13 @@ jobs:
   # `ports: []` sans le tag `!override` est un no-op silencieux (Compose fusionne
   # les listes), et c'est exactement le piège qui avait rendu l'overlay
   # inopérant sur `volumes` en août. Seule la fusion dit la vérité.
-  config-prod:
-    name: La config de production ne publie que 80 et 443
+  gardes-infra:
+    name: Gardes d'infra (ports 80/443, Caddyfile, scripts)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20  # F38-008 — plafond anti-gel (lecture de fichiers + docker compose config)
+    timeout-minutes: 35  # F38-008 — plafond anti-gel (somme des trois anciens jobs : 20 + 20 + 15 min)
     steps:
       - uses: actions/checkout@v4
+      # ── Lot B (#680) : GARDE 1/3 = ancien job `config-prod` (étapes inchangées).
       - name: Inventaire des ports publiés par la configuration FUSIONNÉE
         run: |
           set -euo pipefail
@@ -446,12 +447,8 @@ jobs:
           echo "::warning::55432 et 56379 sur 0.0.0.0, et seul l'overlay prod les referme."
           echo "::warning::Toute commande qui oublie -f docker-compose.prod.yml rouvre la faille du 19/08."
 
-  caddyfile-valide:
-    name: Le Caddyfile est-il valide ?
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20  # F38-008 — plafond anti-gel (le binaire Caddy recompilé, puis les validations)
-    steps:
-      - uses: actions/checkout@v4
+      # ── Lot B (#680) : GARDE 2/3 = ancien job `caddyfile-valide` (étapes inchangées).
+      # `if: always()` sur la première étape : la garde rend son verdict même si la 1 est rouge.
 
       # 2026-10-01 — on valide avec le binaire QUI TOURNE, pas avec celui de
       # `caddy:2-alpine` : les deux conteneurs (`app` et la bordure) portent
@@ -459,6 +456,7 @@ jobs:
       # Dockerfile.frontend. La cible `caddy-bordure` contient exactement ce
       # binaire, sans le build Node : c’est l’image de validation.
       - name: Construire le Caddy recompilé (cible caddy-bordure)
+        if: always()
         run: docker build -t axion-crm/caddy-ci:valide -f Dockerfile.frontend --target caddy-bordure .
 
       # ── POURQUOI CE JOB EXISTE ────────────────────────────────────────────
@@ -556,13 +554,10 @@ jobs:
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
           echo "OK — le SPA démarrera : son Caddy interne est valide."
 
-  scripts-executables:
-    name: Les scripts d'infra sont-ils exécutables ?
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15  # F38-008 — plafond anti-gel (un `git ls-files` et des bits de mode)
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
+      # ── Lot B (#680) : GARDE 3/3 = ancien job `scripts-executables` (étapes inchangées).
+      - name: Les scripts d'infra sont-ils exécutables ?
+        if: always()
+        run: |
           set -euo pipefail
           # `git ls-files -s` donne le mode ENREGISTRÉ, pas celui du disque —
           # c'est la seule mesure qui survive à un clone.

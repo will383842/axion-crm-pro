@@ -1,5 +1,5 @@
 /**
- * Démo d'Envoi — campagnes : liste, gestes (pause, reprise, terminer, dupliquer,
+ * Démo d'Envoi — campagnes : liste, gestes (lancer, arrêter, pause, reprise, terminer, dupliquer,
  * changer la date), calendrier, suivi et état de chaque destinataire.
  * Contrat : `backend/openapi/envoi/campagnes.yaml`.
  *
@@ -155,6 +155,11 @@ function evenementsDe(campagneId: string): EvenementEnvoi[] {
   return demoDb.evenementsEnvoi.filtrer((e) => e.campagne_id === campagneId);
 }
 
+/** Exportée pour les tests de l'écran (un test remplace la lecture de la fiche pour y poser `preparation` ou `envoi_ferme`). */
+export function ficheDemo(campagne: Campagne) {
+  return fiche(campagne);
+}
+
 function fiche(campagne: Campagne) {
   const dests = destinatairesVus(campagne);
   const compte = (groupe: Groupe) => dests.filter((d) => GROUPES[d.etat] === groupe).length;
@@ -239,6 +244,8 @@ function fiche(campagne: Campagne) {
       limite_refus: LIMITE_REFUS,
       taux_desinscription: pourcent(desinscrits, envoyes),
     },
+    // Démo : la préparation est toujours finie pour une campagne qui a dépassé « à valider » ; sans séquence, elle n'a pas démarré.
+    preparation: campagne.statut === 'brouillon' || campagne.statut === 'a_valider' ? null : { etat: 'terminee', motif: null, inscrits: campagne.cible.total, membres: campagne.cible.total },
     par_boite: parBoite,
     par_jour: parJour,
     ab,
@@ -258,7 +265,7 @@ function introuvable() {
 }
 
 const STATUTS: readonly Campagne['statut'][] = ['brouillon', 'a_valider', 'programmee', 'en_cours', 'en_pause', 'terminee', 'arretee'];
-const GESTES_CLES = ['pause', 'reprise', 'terminer', 'date'] as const;
+const GESTES_CLES = ['lancer', 'pause', 'reprise', 'terminer', 'arreter', 'date'] as const;
 // Même règle que l'écran, par construction : dérivée de `gestesPermis` (aucune seconde liste à tenir à jour).
 const GESTES_OUVERTS: Record<string, readonly Campagne['statut'][]> = Object.fromEntries(
   GESTES_CLES.map((g) => [g, STATUTS.filter((s) => gestesPermis(s)[g])]),
@@ -351,6 +358,22 @@ export const handlers: HttpHandler[] = [
     }
     liste.sort((a, b) => (b.dernier_evenement_le ?? '').localeCompare(a.dernier_evenement_le ?? ''));
     return HttpResponse.json(paginer(liste, request, 25));
+  }),
+
+  http.post(api('/envoi/campagnes/:id/lancer'), async ({ params }) => {
+    await delai();
+    const c = demoDb.campagnes.trouver(String(params['id']));
+    if (!c) return introuvable();
+    if (!GESTES_OUVERTS['lancer']!.includes(c.statut)) return erreur(409, 'transition_refusee', 'Seule une campagne programmée peut être lancée.');
+    return HttpResponse.json(suivi(demoDb.campagnes.modifier(c.id, { statut: 'en_cours', prochain_envoi_le: decalage({ heures: 1 }) })));
+  }),
+
+  http.post(api('/envoi/campagnes/:id/arreter'), async ({ params }) => {
+    await delai();
+    const c = demoDb.campagnes.trouver(String(params['id']));
+    if (!c) return introuvable();
+    if (!GESTES_OUVERTS['arreter']!.includes(c.statut)) return erreur(409, 'transition_refusee', 'Cette campagne ne peut pas être arrêtée.');
+    return HttpResponse.json(suivi(demoDb.campagnes.modifier(c.id, { statut: 'arretee', prochain_envoi_le: null })));
   }),
 
   http.post(api('/envoi/campagnes/:id/pause'), async ({ params }) => {

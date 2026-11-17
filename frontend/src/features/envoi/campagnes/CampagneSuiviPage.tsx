@@ -205,6 +205,34 @@ function ParBoite({ fiche }: { fiche: FicheCampagne }) {
   );
 }
 
+/** Motifs de blocage de la préparation (liste fermée côté serveur) ; un motif inconnu garde une phrase sans code technique. */
+const MOTIF_PREPARATION: Record<string, string> = {
+  reglage_non_applique: 'les réglages de la campagne n’ont pas encore été appliqués',
+  cible_introuvable: 'la cible de la campagne est introuvable',
+  cible_non_supportee: 'ce type de cible n’est pas pris en charge',
+  population_non_ouverte: 'ce type de contacts n’est pas encore ouvert',
+  filtre_origine_inactif: 'le filtre par réseau d’origine n’est pas actif',
+};
+
+/** Préparation de la liste d'une campagne programmée : où elle en est, ou pourquoi elle est bloquée. */
+function BandeauPreparation({ fiche }: { fiche: FicheCampagne }) {
+  const p = fiche.preparation;
+  if (p === null || fiche.campagne.statut !== 'programmee' || p.etat === 'terminee') return null;
+  if (p.etat === 'bloquee') {
+    const motif = p.motif === null ? undefined : MOTIF_PREPARATION[p.motif];
+    return (
+      <p data-testid="bandeau-preparation" role="status" className="mb-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-800">
+        Préparation bloquée{motif !== undefined ? ` : ${motif}` : ''}. La campagne ne peut pas être lancée : arrêtez-la ou dupliquez-la.
+      </p>
+    );
+  }
+  return (
+    <p data-testid="bandeau-preparation" role="status" className="mb-4 rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-900">
+      Préparation en cours : {nombre(p.inscrits)} {p.inscrits > 1 ? 'personnes préparées' : 'personne préparée'} sur {nombre(p.membres)}. Le lancement est possible quand elle est terminée.
+    </p>
+  );
+}
+
 export function CampagneSuiviPage() {
   const { campagneId } = useParams({ strict: false });
   const [onglet, setOnglet] = useState<Onglet>('progression');
@@ -250,6 +278,7 @@ export function CampagneSuiviPage() {
             campagne={c}
             maintenant={fiche.maintenant}
             variante="entete"
+            preparation={fiche.preparation}
             avant={
               c.statut === 'brouillon' ? (
                 <Link
@@ -264,6 +293,12 @@ export function CampagneSuiviPage() {
           />
         }
       />
+      {c.envoi_ferme ? (
+        <p data-testid="bandeau-envoi-ferme" className="mb-4 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800">
+          Envoi réel fermé : rien ne part.
+        </p>
+      ) : null}
+      <BandeauPreparation fiche={fiche} />
       <div className="mb-4 max-w-full overflow-x-auto">
         <Tabs items={onglets} value={onglet} onChange={setOnglet} />
       </div>

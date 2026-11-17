@@ -1,21 +1,31 @@
 /**
- * DM2-CAM — les gestes sur une campagne : Pause / Reprendre, Changer la date,
- * Dupliquer, Terminer. Utilisés dans chaque ligne de la liste ET dans l'en-tête
- * du suivi. Chaque geste qui coupe quelque chose demande une confirmation ;
- * rien n'est jamais perdu (on met en pause, on termine, on duplique).
+ * DM2-CAM — les gestes sur une campagne : Lancer, Pause / Reprendre, Changer la
+ * date, Dupliquer, Terminer, Arrêter. Utilisés dans chaque ligne de la liste ET
+ * dans l'en-tête du suivi. Terminer et Arrêter sont irréversibles et demandent
+ * une confirmation ; rien n'est jamais effacé (les inscriptions sont fermées,
+ * pas supprimées). L5-D : Lancer et Arrêter, une clé de rejeu par clic, un texte
+ * français par refus du serveur.
  */
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { messageErreur as messageErreurServeur } from '../../infrastructure/composants/format';
-import { CalendarClock, Copy, Pause, Play, Square } from 'lucide-react';
+import { isAxiosError } from 'axios';
+import { Ban, CalendarClock, Copy, Pause, Play, Rocket, Square } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
 import { cn } from '@/components/ui/cn';
-import { useGestesCampagne, type Campagne } from '../api';
+import { nouvelleCleIdempotence, texteRefus, useGestesCampagne, type Campagne, type PreparationCampagne } from '../api';
 import { ajouterJours, dateRelative, jourDe, parisVersIso, prochainLundi } from './libelles';
 
-type Dialogue = 'pause' | 'reprise' | 'date' | 'dupliquer' | 'terminer' | null;
+type Dialogue = 'pause' | 'reprise' | 'date' | 'dupliquer' | 'terminer' | 'arreter' | null;
+
+/** Clés de rejeu : une par clic, gardées seulement tant que le serveur n'a pas répondu (panne réseau = on rejoue la même). */
+type Geste = 'lancer' | 'arreter';
+interface Cles {
+  prendre: (geste: Geste) => string;
+  oublier: (geste: Geste) => void;
+}
 
 export interface GestesCampagneProps {
   campagne: Campagne;
@@ -25,15 +35,20 @@ export interface GestesCampagneProps {
   variante: 'ligne' | 'entete';
   /** Un lien d'ouverture placé avant les gestes (« Relire et valider », « Ouvrir »). */
   avant?: React.ReactNode;
+  /** Préparation de la fiche : sert au texte du refus « préparation pas terminée ». Absente dans la liste. */
+  preparation?: PreparationCampagne;
 }
 
 /** Quels gestes chaque statut permet. */
 export function gestesPermis(statut: Campagne['statut']) {
   return {
+    lancer: statut === 'programmee',
     pause: statut === 'en_cours',
     reprise: statut === 'en_pause',
     date: statut === 'programmee' || statut === 'en_pause',
-    terminer: statut === 'en_cours' || statut === 'en_pause' || statut === 'programmee',
+    // Même matrice que le serveur : une campagne programmée ne se termine pas (elle se lance ou s'arrête).
+    terminer: statut === 'en_cours' || statut === 'en_pause',
+    arreter: statut === 'programmee' || statut === 'en_cours' || statut === 'en_pause',
     dupliquer: true,
   };
 }
@@ -43,8 +58,37 @@ const messageErreur = (e: unknown): string => messageErreurServeur(e, REPLI_GEST
 
 const TACTILE = 'max-md:h-11 max-md:text-sm';
 
-export function GestesCampagne({ campagne, maintenant, variante, avant }: GestesCampagneProps) {
+export function GestesCampagne({ campagne, maintenant, variante, avant, preparation = null }: GestesCampagneProps) {
   const [dialogue, setDialogue] = useState<Dialogue>(null);
+  const [refus, setRefus] = useState<string | null>(null);
+  const { lancer } = useGestesCampagne();
+  const gardees = useRef<Partial<Record<Geste, string>>>({});
+  const cles: Cles = {
+    prendre: (g) => (gardees.current[g] ??= nouvelleCleIdempotence()),
+    oublier: (g) => void delete gardees.current[g],
+  };
+  const lancerEnCours = useRef(false);
+  const lancerCampagne = () => {
+    if (lancerEnCours.current) return;
+    lancerEnCours.current = true;
+    setRefus(null);
+    lancer.mutate(
+      { id: String(campagne.id), cle: cles.prendre('lancer') },
+      {
+        onSuccess: (c) => {
+          cles.oublier('lancer');
+          toast.success(c.envoi_ferme ? `« ${campagne.nom} » est lancée. L’envoi réel est fermé : rien ne part.` : `« ${campagne.nom} » est lancée.`);
+        },
+        onError: (e) => {
+          if (isAxiosError(e) && e.response !== undefined) cles.oublier('lancer');
+          setRefus(texteRefus(e, preparation) ?? messageErreur(e));
+        },
+        onSettled: () => {
+          lancerEnCours.current = false;
+        },
+      },
+    );
+  };
   const permis = gestesPermis(campagne.statut);
   const entete = variante === 'entete';
   const nom = (court: string) => (entete ? undefined : `${court} : ${campagne.nom}`);
@@ -62,6 +106,11 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
     <>
       <div ref={conteneur} tabIndex={-1} className={cn('flex flex-wrap items-center gap-2 outline-none', entete ? 'justify-end' : 'justify-start')}>
         {avant}
+        {permis.lancer ? (
+          <Button className={TACTILE} iconLeft={<Rocket className="h-4 w-4" aria-hidden />} aria-label={nom('Lancer')} data-geste="lancer" loading={lancer.isPending} onClick={lancerCampagne}>
+            Lancer
+          </Button>
+        ) : null}
         {permis.pause ? (
           <Button variant="secondary" size="md" className={TACTILE} iconLeft={<Pause className="h-4 w-4" aria-hidden />} aria-label={nom('Pause')} data-geste="pause" onClick={() => setDialogue('pause')}>
             {entete ? 'Mettre en pause' : 'Pause'}
@@ -92,6 +141,16 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
             Terminer
           </Button>
         ) : null}
+        {permis.arreter ? (
+          <Button variant="ghost" size="md" className={TACTILE} iconLeft={<Ban className="h-4 w-4" aria-hidden />} aria-label={nom('Arrêter')} onClick={() => setDialogue('arreter')}>
+            Arrêter
+          </Button>
+        ) : null}
+        {refus !== null ? (
+          <p role="alert" className="w-full rounded-lg bg-rose-50 px-3 py-2 text-left text-sm text-rose-700">
+            {refus}
+          </p>
+        ) : null}
       </div>
 
       {dialogue !== null
@@ -102,6 +161,7 @@ export function GestesCampagne({ campagne, maintenant, variante, avant }: Gestes
               {dialogue === 'date' ? <DialogueDate campagne={campagne} maintenant={maintenant} onClose={fermer} /> : null}
               {dialogue === 'dupliquer' ? <DialogueDupliquer campagne={campagne} onClose={fermer} /> : null}
               {dialogue === 'terminer' ? <DialogueTerminer campagne={campagne} onClose={fermer} /> : null}
+              {dialogue === 'arreter' ? <DialogueArreter campagne={campagne} cles={cles} onClose={fermer} /> : null}
             </>,
             document.body,
           )
@@ -125,7 +185,7 @@ function Erreur({ erreur }: { erreur: unknown }) {
   if (!erreur) return null;
   return (
     <p role="alert" className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-      {messageErreur(erreur)}
+      {texteRefus(erreur) ?? messageErreur(erreur)}
     </p>
   );
 }
@@ -220,9 +280,57 @@ function DialogueTerminer({ campagne, onClose }: { campagne: Campagne; onClose: 
         Plus aucun message ne partira pour <strong className="font-semibold text-slate-900">{campagne.nom}</strong>, relances comprises. Les réponses restent traitées.
       </p>
       <p className="mt-2 text-sm font-medium text-slate-900">
-        On ne peut pas la relancer <span className="font-normal text-slate-600">(mais on peut la dupliquer).</span>
+        Irréversible : les personnes déjà prévues ne recevront rien. <span className="font-normal text-slate-600">On ne peut pas la relancer (mais on peut la dupliquer).</span>
       </p>
       <Erreur erreur={terminer.error} />
+    </Modal>
+  );
+}
+
+function DialogueArreter({ campagne, cles, onClose }: { campagne: Campagne; cles: Cles; onClose: () => void }) {
+  const { arreter } = useGestesCampagne();
+  const enCours = useRef(false);
+  const confirmer = () => {
+    if (enCours.current) return;
+    enCours.current = true;
+    arreter.mutate(
+      { id: String(campagne.id), cle: cles.prendre('arreter') },
+      {
+        onSuccess: () => {
+          cles.oublier('arreter');
+          toast.success(`« ${campagne.nom} » est arrêtée.`);
+          onClose();
+        },
+        onError: (e) => {
+          if (isAxiosError(e) && e.response !== undefined) cles.oublier('arreter');
+        },
+        onSettled: () => {
+          enCours.current = false;
+        },
+      },
+    );
+  };
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="sm"
+      title="Arrêter définitivement ?"
+      footer={
+        <PiedDialogue annuler={onClose}>
+          <Button variant="destructive" className={TACTILE} loading={arreter.isPending} onClick={confirmer}>
+            Arrêter la campagne
+          </Button>
+        </PiedDialogue>
+      }
+    >
+      <p className="text-sm text-slate-700">
+        Plus aucun message ne partira pour <strong className="font-semibold text-slate-900">{campagne.nom}</strong>, relances comprises. Personne n’est supprimé : les inscriptions sont seulement fermées.
+      </p>
+      <p className="mt-2 text-sm font-medium text-slate-900">
+        Irréversible : les personnes déjà prévues ne recevront rien. <span className="font-normal text-slate-600">On ne peut pas la relancer (mais on peut la dupliquer).</span>
+      </p>
+      <Erreur erreur={arreter.error} />
     </Modal>
   );
 }

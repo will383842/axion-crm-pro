@@ -4,6 +4,7 @@
  * tard, avec le vrai serveur : aucun écran ne change.
  */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { api } from '@/lib/api';
 import type { components, operations } from '@/features/envoi/api/campagnes';
 
@@ -85,12 +86,57 @@ export interface CorpsDuplication {
   exclure_deja_recus: boolean;
 }
 
-/** Les cinq gestes sur une campagne. Chacun rafraîchit tout ce qui touche aux campagnes. */
+/** Une clé de rejeu neuve (8 à 100 caractères) : générée une fois par clic, voir `GestesCampagne`. */
+export function nouvelleCleIdempotence(): string {
+  return crypto.randomUUID();
+}
+
+export type PreparationCampagne = FicheCampagne['preparation'];
+
+/**
+ * Un texte français par code de refus du contrat (`campagnes.yaml`, 409 / 404 / 422) : jamais le message technique du serveur.
+ * `materialisation_en_cours` dit où en est la préparation (`preparation` vient de la fiche lue par l'écran).
+ */
+export function texteRefus(erreur: unknown, preparation: PreparationCampagne = null): string | null {
+  if (!isAxiosError(erreur)) return null;
+  const code = (erreur.response?.data as { error?: unknown } | undefined)?.error;
+  switch (code) {
+    case 'transition_refusee': return 'Ce geste n’est pas possible dans l’état actuel de la campagne.';
+    case 'sans_sequence': return 'Cette campagne n’a pas encore de séquence de messages : elle ne peut être ni lancée ni arrêtée. Renvoyez-la à valider ou dupliquez-la.';
+    case 'materialisation_en_cours':
+      return preparation === null
+        ? 'La préparation n’est pas terminée. Réessayez quand elle sera finie.'
+        : `La préparation n’est pas terminée : ${preparation.inscrits} ${preparation.inscrits > 1 ? 'personnes préparées' : 'personne préparée'} sur ${preparation.membres}. Réessayez quand elle sera finie.`;
+    case 'materialisation_bloquee': return 'La préparation de la liste est bloquée : la campagne ne peut pas être lancée. Arrêtez-la ou dupliquez-la.';
+    case 'aucun_destinataire': return 'Personne à écrire : tous les destinataires ont été écartés. Arrêtez la campagne.';
+    case 'frein_arret_general': return 'L’arrêt général est actif : aucune campagne ne peut être lancée tant qu’il n’est pas levé.';
+    case 'frein_pause_automatique': return 'Une pause automatique est active : la campagne ne peut pas être lancée tant qu’elle n’est pas levée.';
+    case 'reprise_refusee_base': return 'Le lancement a été refusé par la base : rien n’a été changé.';
+    case 'concurrence': return 'Une autre opération touche cette campagne : réessayez dans un instant.';
+    case 'version_perimee': return 'Cette campagne a changé depuis votre lecture. Rechargez la page.';
+    case 'cle_reutilisee': return 'Cette action a déjà été envoyée. Rechargez la page.';
+    case 'pilotee_par_la_campagne': return 'Cette séquence appartient à une campagne : reprenez la campagne.';
+    case 'non_trouve': return 'Cette campagne est introuvable dans votre espace.';
+    case 'validation': return 'La demande n’a pas pu être lue. Rechargez la page puis réessayez.';
+    default: return null;
+  }
+}
+
+/** Les gestes sur une campagne. Chacun rafraîchit tout ce qui touche aux campagnes. */
 export function useGestesCampagne() {
   const client = useQueryClient();
   const apres = () => client.invalidateQueries({ queryKey: ['envoi'] });
-  const poster = async <T,>(chemin: string, corps?: unknown): Promise<T> => (await api.post<T>(chemin, corps)).data;
+  const poster = async <T,>(chemin: string, corps?: unknown, cle?: string): Promise<T> =>
+    (await api.post<T>(chemin, corps, cle === undefined ? undefined : { headers: { 'Idempotency-Key': cle } })).data;
   return {
+    lancer: useMutation({
+      mutationFn: ({ id, cle }: { id: string; cle: string }) => poster<Campagne>(`/envoi/campagnes/${encodeURIComponent(id)}/lancer`, undefined, cle),
+      onSuccess: apres,
+    }),
+    arreter: useMutation({
+      mutationFn: ({ id, cle }: { id: string; cle: string }) => poster<Campagne>(`/envoi/campagnes/${encodeURIComponent(id)}/arreter`, undefined, cle),
+      onSuccess: apres,
+    }),
     pause: useMutation({ mutationFn: (id: string) => poster<Campagne>(`/envoi/campagnes/${encodeURIComponent(id)}/pause`), onSuccess: apres }),
     reprise: useMutation({ mutationFn: (id: string) => poster<Campagne>(`/envoi/campagnes/${encodeURIComponent(id)}/reprise`), onSuccess: apres }),
     terminer: useMutation({ mutationFn: (id: string) => poster<Campagne>(`/envoi/campagnes/${encodeURIComponent(id)}/terminer`), onSuccess: apres }),

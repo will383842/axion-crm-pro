@@ -112,6 +112,45 @@ export function useReseauxOrigine() {
   });
 }
 
+/** Un mot ou un guide proposé, avec le nombre de personnes venues par lui. */
+export interface ContenuPropose {
+  valeur: string;
+  personnes: number;
+}
+export type ContenuOrigine = { etat: 'actif'; valeurs: ContenuPropose[] } | { etat: 'inactif' } | { etat: 'indisponible' };
+
+/**
+ * Mots (`par-mot`) ou guides (`par-guide`) d'origine proposables (lecture seule). Mêmes portes que les réseaux :
+ * 404 ou `actif: false` ⇒ « inactif » (liste absente) ; autre erreur ⇒ « indisponible » ; jamais de réessai.
+ */
+function useContenuOrigine(genre: 'mot' | 'guide', enabled: boolean) {
+  return useQuery<ContenuOrigine>({
+    enabled,
+    queryKey: ['envoi', 'creation', `${genre}s-origine`],
+    retry: false,
+    staleTime: 60_000,
+    queryFn: async () => {
+      try {
+        const r = (await api.get<{ actif?: boolean; data?: Array<Record<string, string | number | null>> }>(`/crm/origines/par-${genre}`)).data;
+        if (r.actif !== true) return { etat: 'inactif' };
+        const parValeur = new Map<string, number>();
+        for (const l of r.data ?? []) {
+          const v = l[genre];
+          if (typeof v !== 'string' || !JETON_RESEAU.test(v)) continue;
+          parValeur.set(v, (parValeur.get(v) ?? 0) + Number(l['personnes'] ?? 0));
+        }
+        const valeurs = [...parValeur].map(([valeur, personnes]) => ({ valeur, personnes })).sort((a, b) => b.personnes - a.personnes || a.valeur.localeCompare(b.valeur));
+        return { etat: 'actif', valeurs };
+      } catch (e) {
+        return isAxiosError(e) && e.response?.status === 404 ? { etat: 'inactif' } : { etat: 'indisponible' };
+      }
+    },
+  });
+}
+
+export const useMotsOrigine = (enabled = true) => useContenuOrigine('mot', enabled);
+export const useGuidesOrigine = (enabled = true) => useContenuOrigine('guide', enabled);
+
 export function useBrouillon(id: string | null) {
   return useQuery({
     queryKey: ['envoi', 'brouillon', id],

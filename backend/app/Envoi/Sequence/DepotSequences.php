@@ -60,6 +60,10 @@ final class DepotSequences
             if ($s === null) {
                 return null;
             }
+            if ($geste === 'reprise' && ($s->campagne_id ?? null) !== null) {
+                // La campagne pilote sa séquence : la reprendre se fait par la campagne (contrôles, freins, journal). La pause directe reste permise : le stop gagne.
+                throw CampagneRefusee::frein('pilotee_par_la_campagne', 'Cette séquence appartient à une campagne : reprenez la campagne.');
+            }
             $enPause = $this->enPause($ws, $id);
             if ($geste === 'reprise' && $enPause && ($raison = $this->blocage($ws)) !== null) {
                 throw CampagneRefusee::frein($raison[0], $raison[1]);

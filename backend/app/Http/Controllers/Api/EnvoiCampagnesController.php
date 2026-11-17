@@ -77,6 +77,18 @@ class EnvoiCampagnesController extends ApiController
         });
     }
 
+    /** Lancer (L5-C) : programmee -> en_cours. Ne fait RIEN partir : la porte d'envoi réel reste fermée tant que le drapeau est éteint. */
+    public function lancer(Request $request, string $id, GestesCampagne $gestes): JsonResponse
+    {
+        return $this->geste($request, fn (string $ws, string $par, ?string $cle) => $gestes->lancer($ws, $id, $par, $cle));
+    }
+
+    /** Arrêter (L5-C) : programmee reliée, en_cours ou en_pause -> arretee ; les inscriptions sont fermées, jamais supprimées. */
+    public function arreter(Request $request, string $id, GestesCampagne $gestes): JsonResponse
+    {
+        return $this->geste($request, fn (string $ws, string $par, ?string $cle) => $gestes->arreter($ws, $id, $par, $cle));
+    }
+
     public function pause(Request $request, string $id, GestesCampagne $gestes): JsonResponse
     {
         return $this->geste($request, fn (string $ws, string $par, ?string $cle) => $gestes->pause($ws, $id, $par, $cle));

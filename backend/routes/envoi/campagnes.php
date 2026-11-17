@@ -13,7 +13,7 @@ Route::middleware('permission:users.manage')->group(function () {
     Route::get('/envoi/campagnes/{id}/destinataires', [EnvoiCampagnesController::class, 'destinataires'])->whereUuid('id');
 });
 Route::middleware('permission:workspaces.manage')->group(function () {
-    foreach (['pause', 'reprise', 'terminer', 'dupliquer', 'date'] as $geste) {
+    foreach (['lancer', 'arreter', 'pause', 'reprise', 'terminer', 'dupliquer', 'date'] as $geste) {
         Route::post("/envoi/campagnes/{id}/{$geste}", [EnvoiCampagnesController::class, $geste])->whereUuid('id');
     }
 });

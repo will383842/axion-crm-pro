@@ -38,6 +38,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/envoi/campagnes/{id}/arreter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Arrêter une campagne (les inscriptions sont fermées, jamais supprimées)
+         * @description Réservé au propriétaire. Une campagne programmée sans séquence ne peut pas être arrêtée (`sans_sequence`). Mêmes codes
+         *     de refus 409 que `lancer` pour la concurrence et les clés ; arrêter n'est jamais bloqué par un frein.
+         */
+        post: operations["arreterCampagne"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/envoi/campagnes/{id}/date": {
         parameters: {
             query?: never;
@@ -83,6 +104,28 @@ export interface paths {
         put?: never;
         /** Dupliquer une campagne (brouillon) */
         post: operations["dupliquerCampagne"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/envoi/campagnes/{id}/lancer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lancer une campagne programmée (la préparation doit être terminée ; rien ne part tant que l'envoi réel est fermé)
+         * @description Réservé au propriétaire. Refus 409 (champ `error`) : `transition_refusee`, `sans_sequence`, `materialisation_en_cours`,
+         *     `materialisation_bloquee`, `aucun_destinataire`, `frein_arret_general`, `frein_pause_automatique`, `reprise_refusee_base`,
+         *     `concurrence`, `version_perimee`, `cle_reutilisee`. Aucun refus n'écrit quoi que ce soit.
+         */
+        post: operations["lancerCampagne"];
         delete?: never;
         options?: never;
         head?: never;
@@ -408,6 +451,30 @@ export interface operations {
             404: components["responses"]["Erreur"];
         };
     };
+    arreterCampagne: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+                 *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+                 *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+                 */
+                "Idempotency-Key"?: components["parameters"]["CleIdempotence"];
+            };
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Campagne"];
+            404: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
+        };
+    };
     changerDateCampagne: {
         parameters: {
             query?: never;
@@ -504,6 +571,30 @@ export interface operations {
         responses: {
             201: components["responses"]["Campagne"];
             404: components["responses"]["Erreur"];
+            422: components["responses"]["Erreur"];
+        };
+    };
+    lancerCampagne: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description Clé de rejeu (8 à 100 caractères, lettres, chiffres, tiret, point, souligné). Un second envoi avec la même
+                 *     clé (geste envoyé deux fois) ne refait rien : la campagne est rendue telle quelle, un seul événement au journal.
+                 *     Sans clé, le serveur en dérive une de la campagne, du geste et de sa version.
+                 */
+                "Idempotency-Key"?: components["parameters"]["CleIdempotence"];
+            };
+            path: {
+                id: components["parameters"]["Identifiant"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Campagne"];
+            404: components["responses"]["Erreur"];
+            409: components["responses"]["Erreur"];
             422: components["responses"]["Erreur"];
         };
     };

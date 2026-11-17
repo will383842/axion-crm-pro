@@ -34,6 +34,7 @@ final class GardeChauffe
         private readonly ResolveurFournisseur $resolveur,
         private readonly ?Alerte $alerte = null,
         private readonly LecteurReports $reports = new AucunReportConnu,
+        private readonly ?int $palierMax = null,
     ) {}
 
     /** Adresse expéditeur normalisée (casse, espaces) pour la retrouver dans `envoi_boites`. */
@@ -73,7 +74,7 @@ final class GardeChauffe
             return $portes;
         }
         ['ws' => $ws, 'boite' => $boite, 'humain' => $humain, 's' => $s] = $portes;
-        $quota = CourbeChauffe::quotaBoite($this->jourDeChauffe($ws, $boite, $jour, $s['jour_effectif_part']));
+        $quota = CourbeChauffe::quotaBoiteEtendu($this->jourDeChauffe($ws, $boite, $m->expediteur, $jour, $s['jour_effectif_part']));
         if ($humain === Freins::RALENTI) {
             $quota = (int) floor($quota * Seuils::HUMAIN_FACTEUR_RALENTI);
         }
@@ -254,18 +255,43 @@ final class GardeChauffe
         return array_values(array_filter($decisions, fn (DecisionFrein $d): bool => $this->declarer($ws, $d, $maintenant)));
     }
 
-    /** Jour de chauffe EFFECTIF (volume réel minimal par jour), avec « palier tenu » tant qu'une plainte récente (7 jours) est dans la fenêtre. */
-    private function jourDeChauffe(string $ws, string $boite, DateTimeImmutable $jour, float $part): int
+    /**
+     * Jour de chauffe EFFECTIF de la boîte, par la table étendue P1-P8 AVEC les reculs de son domaine, puis borné au
+     * dernier jour du palier {@see Seuils::PALIER_MAX} (ou du constructeur). « Palier tenu » tant qu'une plainte
+     * récente (7 jours) est dans la fenêtre, appliqué au même jour borné.
+     */
+    private function jourDeChauffe(string $ws, string $boite, string $expediteur, DateTimeImmutable $jour, float $part): int
     {
-        $jours = CourbeChauffe::joursEffectifs($this->depot->volumesParJour($ws, $boite, $jour, BudgetChauffe::RESSOURCE_DOMAINE), $part);
-        $jc = CourbeChauffe::jourDeChauffe($jours, $jour);
+        $reculs = $this->depot->reculsDe($ws, BudgetChauffe::RESSOURCE_DOMAINE, Fournisseur::domaine($expediteur), $jour);
+        $jours = CourbeChauffe::joursEffectifs($this->depot->volumesParJour($ws, $boite, $jour, BudgetChauffe::RESSOURCE_DOMAINE), $part, false, $reculs);
+        $jc = $this->borner(CourbeChauffe::jourDeChauffeAvecReculs($jours, $reculs, $jour));
         $plainte = $this->depot->dernierJourPlainte($ws, $jour);
         if ($plainte === null) {
             return $jc;
         }
-        $fin = CourbeChauffe::finDuPalier(CourbeChauffe::jourDeChauffe($jours, $plainte));
+        $fin = $this->finDuPalierEtendu(CourbeChauffe::jourDeChauffeAvecReculs($jours, $reculs, $plainte));
 
         return $fin === null ? $jc : min($jc, $fin);
+    }
+
+    /** Borne le jour au dernier jour du palier maximal autorisé ; palier max sans fin = pas de borne. */
+    private function borner(int $jour): int
+    {
+        $max = max(1, min($this->palierMax ?? Seuils::PALIER_MAX, count(CourbeChauffe::PALIERS_ETENDUS)));
+        $fin = CourbeChauffe::PALIERS_ETENDUS[$max - 1]['jusqua'];
+
+        return $fin === null ? $jour : min($jour, $fin);
+    }
+
+    private function finDuPalierEtendu(int $jour): ?int
+    {
+        foreach (CourbeChauffe::PALIERS_ETENDUS as $ligne) {
+            if ($ligne['jusqua'] === null || $jour <= $ligne['jusqua']) {
+                return $ligne['jusqua'];
+            }
+        }
+
+        return null;
     }
 
     private function declarer(string $ws, DecisionFrein $d, DateTimeImmutable $maintenant, ?string $auteur = null): bool

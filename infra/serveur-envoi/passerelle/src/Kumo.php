@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Passerelle;
 
-/** Appel local de KumoMTA. Les tests utilisent FauxKumo : aucun envoi réel. */
+/**
+ * Appel local de KumoMTA. Les tests utilisent FauxKumo : aucun envoi réel.
+ * Implémentations : `KumoInactif` (défaut) ; `KumoHttp` choisi par `choisirKumo()` (public/index.php, C4-B) seulement si
+ * `PASSERELLE_KUMO_URL` est posée ET `ENVOI_REEL_ACTIF` vaut exactement « true ».
+ */
 interface Kumo
 {
     /**

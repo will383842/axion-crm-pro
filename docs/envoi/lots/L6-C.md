@@ -15,5 +15,5 @@ Cahier : `docs/envoi/lots/L5-L6-cahier.md` § 9 (PR #649). Préalables fusionné
 - `package.json` et les `.d.ts` non touchés ; aucun fichier hors liste.
 
 ## Tests (`CampagneSuiviPage.test.tsx`, 40 verts ; suite frontend 1783 verts, tsc et eslint propres)
-Valeurs = API ; `ouverts: null` ⇒ « non suivi » ; 7 segments, somme 100 %, libellés ; aucune inscription ⇒ pas de barre ; démo `Σ issues = inscrits` pour chaque campagne. Rouges d'abord (4 échecs avant la page). Mutations tuées : « Ouverts » rendu 0, parts sans plus fort reste, « Arrêtés » lu sur `arretes_campagne`.
+Valeurs = API ; `ouverts: null` ⇒ « non suivi » ; 7 segments, somme 100 %, libellés ; aucune inscription ⇒ pas de barre ; démo `Σ issues = inscrits` pour chaque campagne. Rouges d'abord (4 échecs avant la page). Mutations tuées : « Ouverts » rendu 0, parts sans plus fort reste (test 3 bis : borne de boucle recalculée ⇒ somme 99), « Arrêtés » lu sur `arretes_campagne`.
 Pas de test IDOR : aucune route ni requête ajoutée (écran seul, lecture de la fiche existante).

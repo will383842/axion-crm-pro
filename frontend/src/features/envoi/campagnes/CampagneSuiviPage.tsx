@@ -42,7 +42,8 @@ function partsEntieres(valeurs: number[]): number[] {
   const brut = valeurs.map((v) => (v / somme) * 100);
   const bas = brut.map(Math.floor);
   const ordre = brut.map((b, i) => ({ i, reste: b - Math.floor(b) })).sort((a, b) => b.reste - a.reste || a.i - b.i);
-  for (let k = 0; k < 100 - bas.reduce((a, b) => a + b, 0); k++) bas[ordre[k]!.i]! += 1;
+  const manque = 100 - bas.reduce((a, b) => a + b, 0);
+  for (let k = 0; k < manque; k++) bas[ordre[k]!.i]! += 1;
   return bas;
 }
 

@@ -370,6 +370,14 @@ describe('L6-C — cartes des compteurs réels', () => {
     expect(parts.reduce((a, b) => a + b, 0)).toBe(100);
   });
 
+  it('3 bis. parts au plus fort reste : 100 % même quand il manque plusieurs points', async () => {
+    poser({ inscrits: 7, issues: { opposition: 1, rebond_dur: 1, reponse: 1, rebond_mou: 1, arretee_autre: 1, terminee: 1, active: 1 } });
+    await pret('cmp-01');
+    const segments = within(screen.getByTestId('barre-issues')).getAllByRole('listitem');
+    const parts = segments.map((s) => Number(/\((\d+) %\)/.exec(s.textContent ?? '')?.[1]));
+    expect(parts.reduce((a, b) => a + b, 0)).toBe(100);
+  });
+
   it('aucune inscription ⇒ pas de barre, pas de « 0 % » trompeur', async () => {
     poser({ inscrits: 0, issues: { opposition: 0, rebond_dur: 0, reponse: 0, rebond_mou: 0, arretee_autre: 0, terminee: 0, active: 0 } });
     await pret('cmp-01');

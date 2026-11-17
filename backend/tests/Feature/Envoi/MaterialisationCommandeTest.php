@@ -194,3 +194,24 @@ test('X1-L4-C 8 rien ne part : la commande jouée, `envoi:cycle` répond « port
         ->and(DB::table('envoi_messages')->count())->toBe(0)->and(config('envoi.reel_actif'))->toBeFalse()
         ->and(DB::table('envoi_campagnes')->where('workspace_id', $ws)->value('statut'))->toBe('programmee');
 });
+
+test('L5-B 5 commande : l\'étape clôture ferme les inscriptions d\'une campagne arrêtée, par lots de 1 000, avant le re-étalement ; rien n\'est supprimé', function () {
+    foreach (['app', 'proprio'] as $mode) {
+        $ws = l4cEspace();
+        $id = l4cProgrammee($ws, 3);
+        l4cSous('proprio', fn () => app(MaterialisationCampagne::class)->materialiser($ws, $id, l4cLundi('07:00')));
+        $seq = (string) DB::table('envoi_campagnes')->where('id', $id)->value('sequence_id');
+        DB::statement("INSERT INTO envoi_inscriptions (workspace_id, sequence_id, contact_id, entreprise_id, empreinte_adresse, prochaine_echeance, version_figee)
+                       SELECT ?::uuid, ?::uuid, 1000000 + g, 1000000 + g, md5(g::text) || md5((g + 1)::text), now() + interval '3 days', '{}' FROM generate_series(1, 2497) g", [$ws, $seq]);
+        DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => 'arretee', 'version' => DB::raw('version + 1')]);   // arrêtée SANS clôture : c'est la commande qui ferme
+
+        [$c1, $s1] = cmdLance($mode);
+        [$c2, $s2] = cmdLance($mode);
+        [$c3, $s3] = cmdLance($mode);
+
+        expect([$c1, $c2, $c3])->toBe([0, 0, 0])->and($s1)->toContain('cloturees=1000')->and($s2)->toContain('cloturees=1000')->and($s3)->toContain('cloturees=500')
+            ->and(DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('statut', 'active')->count())->toBe(0)
+            ->and(DB::table('envoi_inscriptions')->where('workspace_id', $ws)->count())->toBe(2500)
+            ->and(DB::table('envoi_inscriptions')->where('workspace_id', $ws)->where('motif_arret', 'campagne_arretee')->count())->toBe(2500);
+    }
+});

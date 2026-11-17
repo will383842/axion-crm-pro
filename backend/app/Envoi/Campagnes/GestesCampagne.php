@@ -25,6 +25,7 @@ final class GestesCampagne
         private readonly DepotCampagnes $depot,
         private readonly DepotSocle $socle,
         private readonly DepotChauffe $chauffe,
+        private readonly ClotureInscriptionsCampagne $cloture,
     ) {}
 
     public function pause(string $ws, string $id, string $auteur, ?string $cle): \stdClass
@@ -103,10 +104,19 @@ final class GestesCampagne
         DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['envoi_sequence_geste|' . $ws . '|' . $sequence]);
     }
 
-    /** Irréversible : « terminee » n'a aucune sortie dans la matrice (et la base la porte aussi). */
+    /** Irréversible : « terminee » n'a aucune sortie dans la matrice (et la base la porte aussi). Ferme les inscriptions (premier lot). */
     public function terminer(string $ws, string $id, string $auteur, ?string $cle): \stdClass
     {
-        return $this->transition($ws, $id, 'terminee', 'terminer', $auteur, $cle);
+        return $this->transition($ws, $id, 'terminee', 'terminer', $auteur, $cle, true);
+    }
+
+    /**
+     * Arrêter (L5-B) : programmee reliée, en_cours ou en_pause -> arretee ; le déclencheur met la séquence en pause, puis les inscriptions
+     * actives sont fermées (premier lot, même transaction ; le reste par la commande). Aucun frein : arrêter est toujours permis.
+     */
+    public function arreter(string $ws, string $id, string $auteur, ?string $cle): \stdClass
+    {
+        return $this->transition($ws, $id, 'arretee', 'arreter', $auteur, $cle, true);
     }
 
     /**
@@ -158,14 +168,20 @@ final class GestesCampagne
         });
     }
 
-    private function transition(string $ws, string $id, string $vers, string $geste, string $auteur, ?string $cle): \stdClass
+    private function transition(string $ws, string $id, string $vers, string $geste, string $auteur, ?string $cle, bool $clore = false): \stdClass
     {
-        return $this->sousVerrou($ws, $id, function () use ($ws, $id, $vers, $geste, $auteur, $cle): \stdClass {
+        return $this->sousVerrou($ws, $id, function () use ($ws, $id, $vers, $geste, $auteur, $cle, $clore): \stdClass {
             $c = $this->depot->lire($ws, $id) ?? throw CampagneRefusee::introuvable();
+            if ($vers === 'arretee' && $c->statut === 'programmee' && $c->sequence_id === null) {
+                throw CampagneRefusee::sansSequence($vers, 'Cette campagne n\'a pas encore de séquence : renvoyez-la à valider (annulation de la validation) au lieu de l\'arrêter.');
+            }
             if ($c->sequence_id !== null) {
                 $this->verrouSequence($ws, (string) $c->sequence_id);   // le déclencheur écrira le geste « pause » de la séquence
             }
-            $this->depot->transitionner($ws, $id, $vers, (int) $c->version, $auteur, $geste, $cle ?? "auto-{$geste}-{$id}-{$c->version}");
+            $fait = $this->depot->transitionner($ws, $id, $vers, (int) $c->version, $auteur, $geste, $cle ?? "auto-{$geste}-{$id}-{$c->version}");
+            if ($fait && $clore) {
+                $this->cloture->clore($ws, $id, new DateTimeImmutable('now'));   // rejeu (false) : déjà fait, rien à fermer ici
+            }
 
             return $this->depot->lire($ws, $id) ?? throw CampagneRefusee::introuvable();
         });

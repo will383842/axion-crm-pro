@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Envoi\Campagnes\ClotureInscriptionsCampagne;
 use App\Envoi\Campagnes\MaterialisationCampagne;
 use App\Envoi\Campagnes\MaterialisationRefusee;
 use App\Envoi\Campagnes\ReetalementStock;
@@ -27,6 +28,8 @@ class EnvoiCampagnesMaterialiser extends Command
 
     public const CAMPAGNES_PAR_TOUR = 20;
 
+    public const CLOTURES_PAR_TOUR = 20;
+
     /** Réservé aux tests : horloge injectée. */
     public static ?Closure $horloge = null;
 
@@ -50,7 +53,7 @@ class EnvoiCampagnesMaterialiser extends Command
         }
     }
 
-    public function handle(MaterialisationCampagne $materialisation, ReetalementStock $reetalement): int
+    public function handle(MaterialisationCampagne $materialisation, ReetalementStock $reetalement, ClotureInscriptionsCampagne $cloture): int
     {
         if (! self::schemaPret()) {
             $this->info('schéma P2 absent : rien à faire.');
@@ -60,7 +63,7 @@ class EnvoiCampagnesMaterialiser extends Command
         $horloge = self::$horloge ?? static fn (): DateTimeImmutable => new DateTimeImmutable('now');
         $maintenant = $horloge();
         $debut = $maintenant->getTimestamp();
-        $b = ['espaces' => 0, 'campagnes' => 0, 'inscrits' => 0, 'bloquees' => 0, 'reglage_non_applique' => 0, 'a_reessayer' => 0, 'reetalees' => 0, 'erreurs' => 0, 'hors_borne' => 0];
+        $b = ['espaces' => 0, 'campagnes' => 0, 'inscrits' => 0, 'bloquees' => 0, 'reglage_non_applique' => 0, 'a_reessayer' => 0, 'cloturees' => 0, 'reetalees' => 0, 'erreurs' => 0, 'hors_borne' => 0];
 
         foreach (DB::table('workspaces')->whereNull('deleted_at')->orderBy('id')->pluck('id') as $espace) {
             $ws = (string) $espace;
@@ -70,6 +73,19 @@ class EnvoiCampagnesMaterialiser extends Command
                 continue;
             }
             $b['espaces']++;
+            foreach ($this->aCloturer($ws) as $id) {   // 1. clôture, 2. re-étalement, 3. matérialisation
+                if (self::enRetard($horloge, $debut)) {
+                    $b['hors_borne']++;
+
+                    continue;
+                }
+                try {
+                    $b['cloturees'] += $cloture->clore($ws, $id, $maintenant);
+                } catch (Throwable $e) {
+                    $b['erreurs']++;
+                    Log::error('envoi.campagnes : clôture en erreur.', ['workspace_id' => $ws, 'campagne_id' => $id, 'exception' => $e::class]);
+                }
+            }
             try {
                 $b['reetalees'] += $reetalement->reetaler($ws, $maintenant);
             } catch (Throwable $e) {
@@ -107,6 +123,19 @@ class EnvoiCampagnesMaterialiser extends Command
         Log::info('envoi.campagnes : bilan.', $b);
 
         return $b['erreurs'] > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Campagnes arrêtées ou terminées qui gardent des inscriptions actives, par identifiant (au plus CLOTURES_PAR_TOUR).
+     *
+     * @return list<string>
+     */
+    private function aCloturer(string $ws): array
+    {
+        return WorkspaceContext::run($ws, fn (): array => array_values(array_map('strval', DB::table('envoi_campagnes as c')->where('c.workspace_id', $ws)->whereIn('c.statut', ['arretee', 'terminee'])
+            ->whereNotNull('c.sequence_id')
+            ->whereExists(fn ($q) => $q->selectRaw('1')->from('envoi_inscriptions as i')->whereColumn('i.sequence_id', 'c.sequence_id')->whereColumn('i.workspace_id', 'c.workspace_id')->where('i.statut', 'active'))
+            ->orderBy('c.id')->limit(self::CLOTURES_PAR_TOUR)->pluck('c.id')->all())));
     }
 
     /**

@@ -12,6 +12,7 @@ Route::middleware('permission:users.manage')->group(function () {
 });
 Route::middleware('permission:workspaces.manage')->group(function () {
     Route::post('/envoi/reponses/{id}/classer', [EnvoiReponsesController::class, 'classer']);
+    Route::post('/envoi/reponses/{id}/annuler', [EnvoiReponsesController::class, 'annuler']);
     Route::post('/envoi/reponses/{id}/rattacher', [EnvoiReponsesController::class, 'rattacher']);
     Route::post('/envoi/reponses/{id}/creer-fiche', [EnvoiReponsesController::class, 'creerFiche']);
     Route::post('/envoi/reponses/{id}/repondre', [EnvoiReponsesController::class, 'repondre']);

@@ -140,7 +140,7 @@ final class Affaires
     }
 
     /** @return array<string,mixed> */
-    private static function projeter(object $l): array
+    private static function projeter(\stdClass $l): array
     {
         return [
             'id' => (string) $l->id,

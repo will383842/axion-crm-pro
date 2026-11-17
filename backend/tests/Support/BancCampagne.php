@@ -6,6 +6,7 @@ use App\Crm\FichesProtegees;
 use App\Envoi\Campagnes\DepotCampagnes;
 use App\Envoi\Campagnes\GestesCampagne;
 use App\Envoi\Campagnes\MaterialisationCampagne;
+use App\Envoi\Chauffe\GardeChauffe;
 use App\Envoi\Chauffe\ResolveurEnMemoire;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Contrat\EtatMessage;
@@ -64,6 +65,9 @@ final class BancCampagne
     public array $injectes = [];
 
     public string $boite = '';
+
+    /** L7-C : vrai => la passerelle du banc applique la garde de chauffe RÉELLE (pauses, freins) ; faux (défaut) => comportement inchangé. */
+    public bool $avecChauffe = false;
 
     public ?LecteurBoiteMemoire $lecteur = null;
 
@@ -152,6 +156,31 @@ final class BancCampagne
         return $id;
     }
 
+    /**
+     * L7-C : nouvelle campagne sur la MÊME cible et les mêmes messages qu'une campagne existante (mêmes entreprises, mêmes contacts),
+     * validée puis matérialisée par le chemin légal. Aucun contact créé ici.
+     */
+    public function campagneSurMemeCible(string $modele, string $nom = 'Campagne banc bis'): string
+    {
+        $ws = $this->ws;
+        $m = DB::table('envoi_campagnes')->where('workspace_id', $ws)->where('id', $modele)->first();
+        $cible = (array) json_decode((string) $m->cible, true);
+        $contenu = (array) ((array) json_decode((string) $m->saisie, true))['contenu'];
+        $depot = app(DepotCampagnes::class);
+        $id = $depot->creer($ws, $nom, $cible, [], (int) $m->nb_etapes, ['contenu' => $contenu, 'etapes_faites' => []], 'banc');
+        $depot->transitionner($ws, $id, 'a_valider', 1, 'banc', 'banc', 'cle-banc-' . Str::random(12));
+        DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => 'programmee', 'version' => 3]);
+        DB::table('envoi_campagnes_journal')->insert(['workspace_id' => $ws, 'campagne_id' => $id, 'transition' => 'a_valider>programmee', 'auteur' => 'banc', 'motif' => 'banc', 'cle_idempotence' => 'cle-j-' . Str::random(12), 'cree_le' => DB::raw("now() - interval '10 minutes'")]);
+        MaterialisationCampagne::$niveauTolere = DB::transactionLevel();
+        try {
+            app(MaterialisationCampagne::class)->materialiser($ws, $id, self::jour('07:00'));
+        } finally {
+            MaterialisationCampagne::$niveauTolere = 0;
+        }
+
+        return $id;
+    }
+
     public function lancer(string $campagne): object
     {
         return app(GestesCampagne::class)->lancer($this->ws, $campagne, 'banc', null);
@@ -164,7 +193,7 @@ final class BancCampagne
         $horloge = $t;
         $passerelle = new PasserelleLocale($this->enregistreur(), new DepotSocleDb, fn (): bool => true, 50, function () use (&$horloge): DateTimeImmutable {
             return $horloge;
-        }, '', 300, fn (): ?string => WorkspaceContext::current());
+        }, '', 300, fn (): ?string => WorkspaceContext::current(), $this->avecChauffe ? app(GardeChauffe::class) : null);
         $identite = app(DepotReglages::class)->identite($this->ws);
         $this->sequenceur = new Sequenceur(
             $passerelle,
@@ -319,6 +348,12 @@ final class BancCampagne
     public function arf(string $verp, string $type = 'abuse'): MessageBrut
     {
         return new MessageBrut(++$this->uid, 'arf-' . $this->uid . '@mx.example.test', null, [], 'abuse@fai.example.test', self::jour('11:00'), 'Plainte ' . $type, 'Rapport de plainte.', ['X-Feedback-Type' => $type], null, null, $verp);
+    }
+
+    /** L7-C : rapport ARF (Feedback-Type `$type`) rattaché par le VERP signé ; `$adresse` = Original-Rcpt-To. (`arf()` ci-dessus est conservé tel quel.) */
+    public function plainte(string $verp, string $adresse, string $type = 'abuse'): MessageBrut
+    {
+        return new MessageBrut(++$this->uid, 'plt-' . $this->uid . '@mx.example.test', null, [], 'abuse@fai.example.test', self::jour('11:00'), 'Plainte ' . $type, 'Rapport de plainte.', [], null, null, null, typeArf: $type, destinataireArf: $adresse, adressesLocales: [$verp]);
     }
 
     public static function verp(string $idInjection): string

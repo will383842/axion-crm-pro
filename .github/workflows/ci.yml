@@ -1051,7 +1051,7 @@ jobs:
   # en ligne par `workflow_call`, push, manuel) la réponse est toujours « oui ».
   # Sans checkout : liste des fichiers de la PR par l'API. Erreur, réponse vide ou
   # 3000 fichiers ou plus : « oui, tout a changé ». Le frontend n'est PAS filtré
-  # (décision D1 du fondateur).
+  # (décision D1 du fondateur). Garde : backend/tests/Feature/Infra/CiWorkersSeulementSiWorkersChangentTest.php
   changements:
     name: Workers touchés ?
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}

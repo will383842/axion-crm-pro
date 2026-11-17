@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  * Un geste humain « stop » met l'adresse à l'écart (`EnregistrerOpposition` puis ses effets), sans rien effacer.
  * Chaque geste prend un verrou consultatif PAR RÉPONSE : deux gestes simultanés se suivent.
  *
- * @phpstan-type LigneReponse object{id: int, recue_le: string, expediteur_chiffre: string, objet_chiffre: string, extrait_chiffre: string, contact_id: int|null, boite_id: string|null, classement: string, sug_classement: string, sug_confiance: int|string, auteur: string, evenement_id: int, emp_evt: string|null, emp_dest: string|null, rattachee: bool}
+ * @phpstan-type LigneReponse object{id: int, recue_le: string, expediteur_chiffre: string, objet_chiffre: string, extrait_chiffre: string, contact_id: int|null, boite_id: string|null, empreinte_expediteur: string, classement: string, sug_classement: string, sug_confiance: int|string, auteur: string, evenement_id: int, emp_evt: string|null, emp_dest: string|null, rattachee: bool}
  */
 final class ServiceReponses
 {

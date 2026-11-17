@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\DB;
  *
  * « absence » : le report de 7 jours (RR-4C, `ReportAbsence`) n'est pas encore sur `main` ; en attendant, aucun effet.
  */
+/**
+ * @phpstan-type LigneEffets object{id: int|string, evenement_id: int|string, empreinte_expediteur: string}
+ */
 final class EffetsClassement
 {
     /** ESCALADE 3 : délai de la tâche « pas maintenant ». */
@@ -28,7 +31,7 @@ final class EffetsClassement
     public function __construct(private readonly ?Inscriptions $inscriptions = null) {}
 
     /**
-     * @param  object  $l  ligne de `ServiceReponses::BASE` (id, emp_evt, empreinte_expediteur, evenement_id, contact_id)
+     * @param  LigneEffets  $l  ligne de `ServiceReponses::BASE`
      * @return string|null titre de la tâche (créée ou déjà là), sinon null
      */
     public function appliquer(string $ws, object $l, string $classement, bool $creerTache): ?string
@@ -70,6 +73,7 @@ final class EffetsClassement
      * Inscriptions du retour (injection de l'événement, sinon rattachement), à défaut les inscriptions ACTIVES de l'espace
      * pour l'empreinte de l'expéditeur.
      *
+     * @param  LigneEffets  $l
      * @return list<string>
      */
     private function inscriptionsVisees(string $ws, object $l): array
@@ -91,6 +95,7 @@ final class EffetsClassement
      * Entreprise de la première inscription visée, sinon fiche liée (geste « fiche »), sinon aucun sujet.
      * Chaque jointure est filtrée par espace : l'entreprise ou la fiche d'un autre espace n'est jamais lue.
      *
+     * @param  LigneEffets  $l
      * @param  list<string>  $ids
      * @return array{0: string|null, 1: int|null}
      */

@@ -153,7 +153,7 @@ final class DepotCampagnes
     public function transitionner(string $ws, string $id, string $vers, int $version, string $auteur, string $motif, string $cleIdempotence): bool
     {
         return WorkspaceContext::run($ws, function () use ($ws, $id, $vers, $version, $auteur, $motif, $cleIdempotence): bool {
-            if ($this->cleDejaJournalisee($ws, $id, $vers, $cleIdempotence)) {
+            if ($this->rejeu($ws, $id, $vers, $cleIdempotence)) {
                 return false;
             }
             $c = $this->lire($ws, $id) ?? throw CampagneRefusee::introuvable();
@@ -175,7 +175,7 @@ final class DepotCampagnes
                     ]);
                 });
             } catch (QueryException $e) {
-                if ($e->getCode() === '23505' && $this->cleDejaJournalisee($ws, $id, $vers, $cleIdempotence)) {   // prise entre-temps : déjà appliqué
+                if ($e->getCode() === '23505' && $this->rejeu($ws, $id, $vers, $cleIdempotence)) {   // prise entre-temps : déjà appliqué
                     return false;
                 }
                 throw $e;
@@ -190,7 +190,7 @@ final class DepotCampagnes
      *
      * Vrai si la clé a déjà journalisé CETTE transition de CETTE campagne (rejeu) ; une clé prise ailleurs est un refus explicite.
      */
-    private function cleDejaJournalisee(string $ws, string $id, string $vers, string $cle): bool
+    public function rejeu(string $ws, string $id, string $vers, string $cle): bool
     {
         $ligne = DB::table('envoi_campagnes_journal')->where('workspace_id', $ws)->where('cle_idempotence', $cle)->first(['campagne_id', 'transition']);
         if ($ligne === null) {

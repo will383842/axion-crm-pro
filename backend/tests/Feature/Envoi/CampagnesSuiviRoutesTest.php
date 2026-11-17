@@ -50,6 +50,10 @@ function suivCampagne(string $ws, string $statut = 'brouillon', string $nom = 'C
         'boites' => '{' . (string) Str::uuid() . '}', 'nb_etapes' => 2, 'saisie' => json_encode(['objet' => 'Bonjour']), 'cree_par' => 'responsable']);
     $v = 1;
     foreach ($chemins[$statut] as $etape) {
+        if ($etape === 'en_cours') {   // L5-A : « en cours » exige une préparation terminée (chemin légal, propriétaire de la base)
+            DB::table('envoi_campagnes_materialisations')->insert(['campagne_id' => $id, 'workspace_id' => $ws, 'sequence_id' => DB::table('envoi_campagnes')->where('id', $id)->value('sequence_id')]);
+            DB::table('envoi_campagnes_materialisations')->where('campagne_id', $id)->update(['etat' => 'terminee', 'terminee_le' => now(), 'compteurs' => '{"inscrits":1,"membres":1,"retenus":1}']);
+        }
         DB::table('envoi_campagnes')->where('id', $id)->update(['statut' => $etape, 'version' => ++$v]);
         if ($etape === 'programmee') {   // chemin légal (X1-L1) : séquence créée avec campagne_id, puis lien
             $v = LienCampagneSequence::poser(DB::connection(), $ws, $id, $v, 2)['version'];

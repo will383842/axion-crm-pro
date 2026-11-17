@@ -187,3 +187,25 @@ test('C6 ni adresse ni extrait dans la tâche', function () {
     $payload = (string) $t->payload;
     expect($payload)->not->toContain('@')->not->toContain('Extrait secret')->toContain('Réponse n° ' . $m['reponse']);
 });
+
+test('C3b « absence » repousse la relance de 7 jours : inscription restée active, aucune tâche, jamais avancée ni rouverte', function () {
+    $m = ecl5Monde($this->ws->id);
+    $maintenant = now();
+    $avant = ecl5Etat($this->ws->id, $m['ins'])[2];
+    // le collègue a déjà une échéance bien plus lointaine : elle ne doit jamais être avancée (GREATEST)
+    $loin = $maintenant->copy()->addDays(30)->utc()->format('Y-m-d H:i:sP');
+    WorkspaceContext::run($this->ws->id, fn () => DB::table('envoi_inscriptions')->where('id', $m['collegue'])->update(['prochaine_echeance' => $loin]));
+    $loinLu = ecl5Etat($this->ws->id, $m['collegue'])[2];
+
+    $r = $this->actingAs($this->owner)->postJson("/api/v1/envoi/reponses/{$m['reponse']}/classer", ['classement' => 'absence'])->assertOk();
+
+    [$statut, $motif, $echeance] = ecl5Etat($this->ws->id, $m['ins']);
+    expect($statut)->toBe('active')->and($motif)->toBeNull()
+        ->and(Carbon::parse($echeance)->gte($maintenant->copy()->addDays(7)->subSecond()))->toBeTrue()
+        ->and(Carbon::parse($echeance)->gt(Carbon::parse($avant)))->toBeTrue()
+        ->and(ecl5Taches($this->ws->id))->toBeEmpty()
+        ->and($r->json('resume_crm.tache'))->toBeNull();
+    // l'inscription visée est celle de l'expéditeur seul ; l'échéance plus lointaine du collègue n'a pas bougé
+    expect(ecl5Etat($this->ws->id, $m['collegue'])[0])->toBe('active')
+        ->and(Carbon::parse(ecl5Etat($this->ws->id, $m['collegue'])[2])->equalTo(Carbon::parse($loinLu)))->toBeTrue();
+});

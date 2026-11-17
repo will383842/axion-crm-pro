@@ -45,7 +45,7 @@ final class DepotCampagnes
 
     public const CODES_PAR_CAMPAGNE_MAX = 10;
 
-    private const CHAMPS_MODIFIABLES = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie', 'filtre_origine'];
+    private const CHAMPS_MODIFIABLES = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie', 'filtre_origine', 'filtre_origine_contenu'];
 
     /** Champs exigés à la création : `filtre_origine` est facultatif (absent = NULL = pas de filtre) et ne s'écrit que par `modifier`. */
     private const CHAMPS_CREATION = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie'];
@@ -107,7 +107,7 @@ final class DepotCampagnes
     /**
      * Modifie le contenu d'un BROUILLON. Verrou optimiste : `$version` doit être celle que l'appelant a lue.
      *
-     * @param  array<string, mixed>  $changes  clés permises : nom, cible, boites, nb_etapes, saisie, filtre_origine (`{"reseaux": [...]}` ou null)
+     * @param  array<string, mixed>  $changes  clés permises : nom, cible, boites, nb_etapes, saisie, filtre_origine (`{"reseaux": [...]}` ou null), filtre_origine_contenu (`{"mots": [...], "guides": [...]}` ou null)
      * @return int la nouvelle version
      */
     public function modifier(string $ws, string $id, int $version, array $changes): int
@@ -124,8 +124,8 @@ final class DepotCampagnes
                 return $this->ecrire($ws, $id, $version, $champs);
             } catch (QueryException $e) {
                 // La base refuse (P0001) de changer le filtre d'une campagne reliée : refus propre, jamais d'erreur brute.
-                if ((string) $e->getCode() === 'P0001' && array_key_exists('filtre_origine', $champs)) {
-                    throw CampagneRefusee::contenu('le filtre par réseau d\'origine ne change plus une fois la campagne reliée à sa séquence');
+                if ((string) $e->getCode() === 'P0001' && (array_key_exists('filtre_origine', $champs) || array_key_exists('filtre_origine_contenu', $champs))) {
+                    throw CampagneRefusee::contenu('le filtre d\'origine (réseau, mot, guide) ne change plus une fois la campagne reliée à sa séquence');
                 }
                 throw $e;
             }
@@ -409,6 +409,18 @@ final class DepotCampagnes
                 throw CampagneRefusee::contenu('filtre_origine invalide (' . $e->getMessage() . ')');
             }
             $out['filtre_origine'] = $filtre === null ? null : json_encode($filtre->enColonne(), JSON_THROW_ON_ERROR);
+        }
+        if (array_key_exists('filtre_origine_contenu', $c)) {
+            // Colonne `filtre_origine_contenu` : forme EXACTE `{"mots": [...], "guides": [...]}` (l'une des clés au moins) ou NULL.
+            if ($c['filtre_origine_contenu'] !== null && ! is_array($c['filtre_origine_contenu'])) {
+                throw CampagneRefusee::contenu('filtre_origine_contenu = {"mots": [...], "guides": [...]} ou null');
+            }
+            try {
+                $contenu = FiltreOrigineContenu::depuisColonne($c['filtre_origine_contenu']);
+            } catch (\InvalidArgumentException $e) {
+                throw CampagneRefusee::contenu('filtre_origine_contenu invalide (' . $e->getMessage() . ')');
+            }
+            $out['filtre_origine_contenu'] = $contenu === null ? null : json_encode($contenu->enColonne(), JSON_THROW_ON_ERROR);
         }
         if (! $partiel && count(array_intersect_key($out, array_flip(self::CHAMPS_CREATION))) !== count(self::CHAMPS_CREATION)) {
             throw CampagneRefusee::contenu('champs obligatoires manquants');

@@ -52,7 +52,7 @@ final class SemeurTablesScopees
      *
      * @var list<string>
      */
-    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_oppositions_linkedin', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations', 'envoi_boites_acces_imap', 'envoi_retraits_demandes', 'envoi_kumo_injections', 'envoi_kumo_etat', 'envoi_kumo_5xx', 'envoi_ips',
+    public const APPEND_SEUL_AVEC_FK = ['envoi_injections_smtp', 'envoi_boites', 'envoi_oppositions', 'envoi_liens_desinscription', 'envoi_evenements', 'envoi_rattachements', 'envoi_reponses', 'envoi_reponses_classements', 'envoi_echecs_releve', 'envoi_messages_envoyes', 'envoi_chauffe_jours', 'envoi_pauses', 'envoi_inscriptions_evenements', 'envoi_feu_vert_preuves', 'envoi_temoins_journees', 'envoi_campagnes', 'envoi_campagnes_journal', 'envoi_campagne_codes', 'envoi_modeles', 'envoi_modele_versions', 'envoi_reputation_constats', 'envoi_temoins_acces', 'envoi_oppositions_registre', 'envoi_oppositions_linkedin', 'pl_prospects', 'pl_journal', 'pl_plafonds', 'pl_arret', 'envoi_regles_alerte', 'envoi_alertes_reglees', 'envoi_identite_versions', 'envoi_tentatives', 'envoi_domaines_rappels_dmarc', 'envoi_sequences_gestes', 'envoi_essais_blanc', 'envoi_feu_vert_decisions', 'envoi_injections_locales', 'envoi_oppositions_imports', 'envoi_campagnes_materialisations', 'envoi_boites_acces_imap', 'envoi_retraits_demandes', 'envoi_kumo_injections', 'envoi_kumo_etat', 'envoi_kumo_5xx', 'envoi_ips',
         'envoi_attestations_serveur_reel',
         'envoi_boites_codes_ajout',
     ];
@@ -222,6 +222,11 @@ final class SemeurTablesScopees
         'envoi_oppositions_registre',
         // PONT-LINKEDIN PL-M0A : registre d'opposition LinkedIn, ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
         'envoi_oppositions_linkedin',
+        // PONT-LINKEDIN PL-M0B : prospects (parent) puis journal (FK composite), plafonds, arrêt : ajout seul + FK workspaces : APPEND_SEUL_AVEC_FK.
+        'pl_prospects',
+        'pl_journal',
+        'pl_plafonds',
+        'pl_arret',
         // Envoi R17 : constats de réputation (ajout seul + FK workspaces) : APPEND_SEUL_AVEC_FK.
         'envoi_reputation_constats',
         // Envoi R08 : campagnes (parent) puis journal et codes (FK composite) : APPEND_SEUL_AVEC_FK.
@@ -949,6 +954,31 @@ final class SemeurTablesScopees
             'source' => 'manuel',
             'motif' => 'zz-motif',
             'auteur' => 'zz',
+        ]);
+        $idProspectPl = (string) Str::uuid();
+        $inserer('pl_prospects', [
+            'id' => $idProspectPl,
+            'expediteur_user_id' => $user,
+            'linkedin_slug' => 'exemple-prenom-nom-0a1b2c',
+            'source' => 'recherche',
+            'source_le' => '2026-12-09',
+        ]);
+        $inserer('pl_journal', [
+            'prospect_id' => $idProspectPl,
+            'evenement' => 'ajout',
+            'origine' => 'systeme',
+            'auteur' => 'zz',
+            'cle_idempotence' => 'zz-cle-journal-' . $marque,
+        ]);
+        $inserer('pl_plafonds', [
+            'expediteur_user_id' => $user,
+            'auteur' => 'zz',
+        ]);
+        $inserer('pl_arret', [
+            'geste' => 'arret',
+            'motif' => 'zz-arret-de-test',
+            'auteur' => 'zz',
+            'declencheur' => 'humain',
         ]);
         $inserer('envoi_reputation_constats', [
             'source' => 'google_postmaster',

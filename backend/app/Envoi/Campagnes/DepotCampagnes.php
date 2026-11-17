@@ -45,7 +45,10 @@ final class DepotCampagnes
 
     public const CODES_PAR_CAMPAGNE_MAX = 10;
 
-    private const CHAMPS_MODIFIABLES = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie'];
+    private const CHAMPS_MODIFIABLES = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie', 'filtre_origine'];
+
+    /** Champs exigés à la création : `filtre_origine` est facultatif (absent = NULL = pas de filtre) et ne s'écrit que par `modifier`. */
+    private const CHAMPS_CREATION = ['nom', 'cible', 'boites', 'nb_etapes', 'saisie'];
 
     /** Clé du verrou consultatif de l'ESPACE : toute écriture de création (brouillon, étape, code, validation) le prend d'abord. */
     public static function cleVerrouEspace(string $ws): string
@@ -104,7 +107,7 @@ final class DepotCampagnes
     /**
      * Modifie le contenu d'un BROUILLON. Verrou optimiste : `$version` doit être celle que l'appelant a lue.
      *
-     * @param  array<string, mixed>  $changes  clés permises : nom, cible, boites, nb_etapes, saisie
+     * @param  array<string, mixed>  $changes  clés permises : nom, cible, boites, nb_etapes, saisie, filtre_origine (`{"reseaux": [...]}` ou null)
      * @return int la nouvelle version
      */
     public function modifier(string $ws, string $id, int $version, array $changes): int
@@ -117,7 +120,15 @@ final class DepotCampagnes
                 throw CampagneRefusee::contenu("seul un brouillon se modifie (statut {$c->statut})");
             }
 
-            return $this->ecrire($ws, $id, $version, $champs);
+            try {
+                return $this->ecrire($ws, $id, $version, $champs);
+            } catch (QueryException $e) {
+                // La base refuse (P0001) de changer le filtre d'une campagne reliée : refus propre, jamais d'erreur brute.
+                if ((string) $e->getCode() === 'P0001' && array_key_exists('filtre_origine', $champs)) {
+                    throw CampagneRefusee::contenu('le filtre par réseau d\'origine ne change plus une fois la campagne reliée à sa séquence');
+                }
+                throw $e;
+            }
         });
     }
 
@@ -387,7 +398,19 @@ final class DepotCampagnes
             }
             $out['saisie'] = json_encode($saisie === [] ? new \stdClass : $saisie, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         }
-        if (! $partiel && count($out) !== count(self::CHAMPS_MODIFIABLES)) {
+        if (array_key_exists('filtre_origine', $c)) {
+            // La colonne fait foi : forme EXACTE `{"reseaux": [...]}` (triée, dédoublonnée) ou NULL ; une chaîne JSON n'est pas acceptée ici.
+            if ($c['filtre_origine'] !== null && ! is_array($c['filtre_origine'])) {
+                throw CampagneRefusee::contenu('filtre_origine = {"reseaux": [...]} ou null');
+            }
+            try {
+                $filtre = FiltreOrigine::depuisColonne($c['filtre_origine']);
+            } catch (\InvalidArgumentException $e) {
+                throw CampagneRefusee::contenu('filtre_origine invalide (' . $e->getMessage() . ')');
+            }
+            $out['filtre_origine'] = $filtre === null ? null : json_encode($filtre->enColonne(), JSON_THROW_ON_ERROR);
+        }
+        if (! $partiel && count(array_intersect_key($out, array_flip(self::CHAMPS_CREATION))) !== count(self::CHAMPS_CREATION)) {
             throw CampagneRefusee::contenu('champs obligatoires manquants');
         }
 

@@ -502,6 +502,10 @@ export interface components {
             /** @description Adresses, organisations ou domaines à exclure en plus (saisie libre). */
             exclusions_libres?: string[];
             libelle?: string;
+            /** @description Filtre « réseau d'origine » (restreint la cible, ne l'élargit jamais). Écrit à l'étape 1 ; rendu depuis la colonne de la campagne. `null` le retire. */
+            origine?: {
+                reseaux: string[];
+            } | null;
             reference: string;
             /** @description Revérifier les adresses vues il y a plus de 30 jours avant l'envoi. */
             reverifier_anciennes?: boolean;
@@ -543,7 +547,7 @@ export interface components {
         };
         Controle: {
             /** @enum {string} */
-            code: "cible_non_vide" | "opposition_retiree" | "lien_desinscription" | "identite_expediteur" | "boites_pretes" | "domaines_sains" | "plafond_respecte";
+            code: "cible_non_vide" | "opposition_retiree" | "lien_desinscription" | "identite_expediteur" | "boites_pretes" | "domaines_sains" | "plafond_respecte" | "filtre_origine" | "filtre_origine_estimation";
             detail: string | null;
             /** @enum {string} */
             etat: "ok" | "attention" | "bloquant";

@@ -100,7 +100,11 @@ test('G4-0 mot de passe applicatif vide : non configurée, sans tentative de con
 });
 
 test('G4-0 connexion applicative refusée : « refusee » sans message d’erreur', function () {
-    config(['database.connections.pgsql_app.password' => 'mauvais_mdp_g40_example']);
+    // Rôle inexistant : refusé même si le serveur de CI accepte tout mot de passe (auth « trust »).
+    config([
+        'database.connections.pgsql_app.username' => 'role_inexistant_g40',
+        'database.connections.pgsql_app.password' => 'mauvais_mdp_g40_example',
+    ]);
     DB::purge('pgsql_app');
 
     $code = Artisan::call('crm:role-applicatif:diagnostic');
@@ -110,6 +114,7 @@ test('G4-0 connexion applicative refusée : « refusee » sans message d’erreu
         ->and($sortie)->toContain('ROLE_APP_CONNEXION=refusee')
         ->and($sortie)->not->toContain('mauvais_mdp_g40_example')
         ->and($sortie)->not->toContain('password authentication')
+        ->and($sortie)->not->toContain('does not exist')
         ->and($sortie)->not->toContain('SQLSTATE');
 });
 

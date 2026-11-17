@@ -2,9 +2,14 @@
 
 namespace App\Crm\Opposition;
 
+use App\Envoi\Conformite\RegistreOppositionLinkedin;
 use App\Envoi\Conformite\RegistreOppositionManuel;
+use App\Support\LinkedinSlug;
 use App\Support\ListeSuppression;
+use App\Support\WorkspaceContext;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
  * G4-API (D14) — « cette adresse est-elle opposée ? », LECTURE SEULE, par LOTS.
@@ -132,6 +137,53 @@ final class StatutOpposition
             }
             $liste = array_values(array_filter(['stop', 'art21', 'liste_refus'], static fn (string $x): bool => isset($m[$x])));
             $sortie[$cle] = ['opposee' => $liste !== [], 'motifs' => $liste];
+        }
+
+        return $sortie;
+    }
+
+    /**
+     * PONT-LINKEDIN LI-L3 — « ce profil LinkedIn est-il opposé ? », LECTURE SEULE, UNE requête pour toute la liste.
+     *
+     * Clé = le profil tel que reçu. Un profil non normalisable (page d'entreprise, URL étrangère…) est compté OPPOSÉ : on ne
+     * contacte pas ce qu'on ne sait pas vérifier. Toute erreur de lecture lève une exception (échec fermé : l'appelant
+     * refuse). `pourLignes()` n'est pas modifiée.
+     *
+     * @param  list<string>  $slugs
+     * @return array<string, bool>
+     *
+     * @throws RuntimeException
+     */
+    public function profilsOpposes(string $workspaceId, array $slugs): array
+    {
+        $sortie = [];
+        $parEmpreinte = []; // empreinte => list<profil reçu>
+        foreach ($slugs as $profil) {
+            $profil = (string) $profil;
+            $slug = LinkedinSlug::normalize($profil);
+            if ($slug === null) {
+                $sortie[$profil] = true;
+
+                continue;
+            }
+            $sortie[$profil] = false;
+            $parEmpreinte[RegistreOppositionLinkedin::empreinte($slug)][] = $profil;
+        }
+        if ($parEmpreinte === []) {
+            return $sortie;
+        }
+
+        try {
+            $presentes = WorkspaceContext::run($workspaceId, static fn () => DB::table('envoi_oppositions_linkedin')
+                ->where('workspace_id', $workspaceId)->whereIn('empreinte', array_keys($parEmpreinte))->pluck('empreinte')->all());
+        } catch (QueryException) {
+            // Le message SQL embarque les valeurs liées (empreintes) : jamais propagé.
+            throw new RuntimeException('Registre d’opposition LinkedIn illisible.');
+        }
+        foreach ($presentes as $e) {
+            foreach ($parEmpreinte[trim((string) $e)] ?? [] as $profil) {
+                $sortie[$profil] = true;
+            }
         }
 
         return $sortie;

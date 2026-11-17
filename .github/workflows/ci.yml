@@ -962,7 +962,7 @@ jobs:
       # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
       # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
       - name: Brouillon — contrôles non joués
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        if: github.event.pull_request.draft == true
         run: |
           echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
           exit 1
@@ -1053,7 +1053,7 @@ jobs:
       # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
       # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
       - name: Brouillon — contrôles non joués
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        if: github.event.pull_request.draft == true
         run: |
           echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
           exit 1
@@ -1092,7 +1092,7 @@ jobs:
       # Lot G (#680) — contrôle EXIGÉ : jamais vert sans avoir tourné. En brouillon il ÉCHOUE
       # tout de suite (les étapes suivantes sont sautées) ; au « prêt pour relecture » il tourne.
       - name: Brouillon — contrôles non joués
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == true
+        if: github.event.pull_request.draft == true
         run: |
           echo "::error::PR en brouillon : contrôles non joués, passez-la en prête pour relecture."
           exit 1

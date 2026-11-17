@@ -356,6 +356,12 @@ final class Passerelle
             ($this->dormir)(self::PAUSE_MS);
         }
 
+        if ($this->stockage()->estRetire($ws, $id)) { // retrait arrivé pendant l'attente : refus, jamais le moteur
+            $this->stockage()->rendreInjection($ws, $id);
+
+            return Reponse::erreur(409, 'retire');
+        }
+
         $debut = ($this->horloge)();
         try {
             $this->kumo->executer($ws, 'injecter', ['mail_from' => $d['mail_from'], 'rcpt_to' => $d['rcpt_to'], 'message' => $d['message']]);

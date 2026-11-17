@@ -93,6 +93,20 @@ final class RetraitTest extends PasserelleTestCase
         $this->assertCount(2, $this->kumo->appels, 'injecter puis retrait, rien de plus');
     }
 
+    public function test_retrait_arrive_pendant_l_attente_de_reservation_donne_409_et_aucun_appel_du_moteur(): void
+    {
+        $req = $this->injection(self::INJ_1);
+        $this->assertSame('executer', $this->stockage->reserverInjection(self::WS_A, self::INJ_1, hash('sha256', $req->corps))['action']);
+        $this->passerelle = $this->passerelleAvecAttente(function (): void {
+            $this->stockage->inscrireRetraits(self::WS_A, [self::INJ_1]);
+            $this->stockage->rendreInjection(self::WS_A, self::INJ_1);
+        });
+        $r = $this->envoyer($req);
+        $this->assertSame(409, $r->statut);
+        $this->assertSame('retire', $this->json($r)['erreur']);
+        $this->assertSame([], $this->operations(), 'un retrait arrivé pendant l\'attente ne laisse jamais partir le message');
+    }
+
     public function test_retrait_sans_cibles_donne_400_cibles_exigees(): void
     {
         $r = $this->envoyer($this->retrait(['commande_id' => self::CMD_1, 'commande' => 'retrait']));

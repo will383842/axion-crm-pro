@@ -94,6 +94,7 @@ final class Sequenceur
         private readonly RegistreInjectionsSequence $registre = new RegistreInjectionsSequence,
         private ?LecteurVariables $variables = null,
         private ?RelationAvancee $relation = null,
+        private readonly ?ChoixBoite $choixBoite = null,
     ) {}
 
     /** @var list<array{0: string, 1: array<string, mixed>}> alertes critiques en attente du COMMIT de la transaction en cours */
@@ -303,6 +304,20 @@ final class Sequenceur
         $references = $ins->fil_references === null || trim((string) $ins->fil_references) === '' ? [] : explode(' ', trim((string) $ins->fil_references));
         $inReplyTo = $references === [] ? null : $references[array_key_last($references)];
 
+        // X11-B : boîte du fil (rotation à la 1re étape, figée ensuite). Sans `ChoixBoite` (tests, ouvriers) : expéditeur fixe d'origine.
+        $expediteur = $this->expedition->expediteur;
+        if ($this->choixBoite !== null) {
+            try {
+                $expediteur = $this->choixBoite->pour($ws, $ins, $this->expedition->domaine, $maintenant)['adresse'];
+            } catch (EnvoiRefuse $e) {
+                if (! $e->estAttente()) {
+                    throw $e;
+                }
+
+                return $this->reporter($ins, $rang, $e->getMessage(), $fenetre, $maintenant); // rien n'est réservé, aucun compteur
+            }
+        }
+
         $reservation = $this->reserver($ins, $rang, $inReplyTo, $maintenant);
         if ($reservation === null) {
             // Ligne « reserve » récente (une autre exécution est en cours) : on REPOUSSE l'échéance au lieu d'occuper une des
@@ -359,7 +374,7 @@ final class Sequenceur
         $brut = $this->composeur->composer(new DemandeComposition(
             $ws,
             $fiche->email,
-            $this->expedition->expediteur,
+            $expediteur,
             $sujet,
             (string) $etape['corps'],
             $messageId,
@@ -370,7 +385,7 @@ final class Sequenceur
 
         return [
             'ins' => $ins, 'rang' => $rang, 'version' => $version, 'messageId' => $messageId, 'references' => $references, 'fenetre' => $fenetre,
-            'message' => new MessageAEnvoyer($ws, $fiche->email, $this->expedition->expediteur, $sujet, $brut, $cle, $inj['id'] ?? null, $inj['cheminRetour'] ?? null),
+            'message' => new MessageAEnvoyer($ws, $fiche->email, $expediteur, $sujet, $brut, $cle, $inj['id'] ?? null, $inj['cheminRetour'] ?? null),
             'idRegistre' => $inj['id'] ?? null,
         ];
     }

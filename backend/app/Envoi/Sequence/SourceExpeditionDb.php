@@ -2,6 +2,7 @@
 
 namespace App\Envoi\Sequence;
 
+use App\Envoi\Chauffe\DepotChauffe;
 use App\Envoi\Contrat\ServeurEnvoi;
 use App\Envoi\Message\ComposeurMessage;
 use App\Envoi\Message\SignatureDkim;
@@ -46,7 +47,22 @@ final class SourceExpeditionDb
      */
     public function sequenceurPour(string $ws, ServeurEnvoi $serveur, LecteurFiche $fiches, ?string $flux = null): Sequenceur
     {
-        return new Sequenceur($serveur, $fiches, $this->composeurPour($ws, $flux), $this->parametresPour($ws, $flux));
+        return new Sequenceur($serveur, $fiches, $this->composeurPour($ws, $flux), $this->parametresPour($ws, $flux), choixBoite: new ChoixBoite(new DepotChauffe, $this));
+    }
+
+    /**
+     * Boîtes ACTIVES de l'espace sur ce domaine (X11-B), dans l'ordre de création.
+     *
+     * @return list<array{id: string, adresse: string, cree_le: string}>
+     */
+    public function boitesActivesDuDomaine(string $ws, string $domaine): array
+    {
+        $suffixe = '@' . mb_strtolower($domaine);
+        $lignes = WorkspaceContext::run($ws, fn () => DB::table('envoi_boites')->where('workspace_id', $ws)->where('etat', 'active')
+            ->orderBy('cree_le')->orderBy('id')->get(['id', 'adresse', 'cree_le']));
+
+        return $lignes->filter(fn ($l): bool => str_ends_with(mb_strtolower((string) $l->adresse), $suffixe))
+            ->map(fn ($l): array => ['id' => (string) $l->id, 'adresse' => (string) $l->adresse, 'cree_le' => (string) $l->cree_le])->values()->all();
     }
 
     /** @return array<string, mixed> */

@@ -144,7 +144,7 @@ final class DepotBoites
             'envoyes_aujourdhui' => (int) DB::table('envoi_injections_smtp')->where('workspace_id', $workspaceId)->where('boite_id', $l->id)
                 ->where('etat', 'accepte')->whereRaw("(cree_le AT TIME ZONE 'Europe/Paris')::date = (now() AT TIME ZONE 'Europe/Paris')::date")->count(),
             'taux_refus' => null,
-            'reponses_7j' => (int) DB::table('envoi_evenements')->where('workspace_id', $workspaceId)->where('boite', $l->adresse)
+            'reponses_7j' => (int) DB::table('envoi_evenements')->where('workspace_id', $workspaceId)->whereIn('boite', [(string) $l->id, (string) $l->adresse])
                 ->where('classe', 'like', 'reponse%')->where('recu_le', '>=', now()->subDays(7))->count(),
         ];
     }

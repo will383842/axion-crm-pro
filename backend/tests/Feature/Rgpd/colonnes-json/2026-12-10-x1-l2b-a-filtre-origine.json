@@ -1,0 +1,3 @@
+{
+    "envoi_campagnes.filtre_origine": "hors-portee: liste de noms de réseaux d'origine (jetons [a-z0-9._-], 10 au plus), jamais une valeur de personne ; une contrainte en base refuse tout autre contenu (aucune adresse e-mail), 1 024 octets au plus"
+}

@@ -1043,10 +1043,56 @@ jobs:
           VITE_API_BASE_URL: https://api.localhost
         run: pnpm build
 
+  # LOT C (plan CI allégée, #680) — le contrôle exigé « Workers Node + Playwright »
+  # est SAUTÉ (un job sauté par un `if:` de job rend un verdict vert, jamais « en
+  # attente ») quand la PR ne touche ni `workers/`, ni `Dockerfile.worker`, ni ce
+  # workflow. JAMAIS de `paths:` sur ce fichier : un workflow non déclenché
+  # laisserait les 4 contrôles exigés « en attente » pour toujours. Hors PR (mise
+  # en ligne par `workflow_call`, push, manuel) la réponse est toujours « oui ».
+  # Sans checkout : liste des fichiers de la PR par l'API. Erreur, réponse vide ou
+  # 3000 fichiers ou plus : « oui, tout a changé ». Le frontend n'est PAS filtré
+  # (décision D1 du fondateur).
+  changements:
+    name: Workers touchés ?
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5  # F38-008
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      workers: ${{ steps.liste.outputs.workers }}
+    steps:
+      - id: liste
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPOT: ${{ github.repository }}
+          EVENEMENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENEMENT" != "pull_request" ]; then
+            echo "workers=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if ! FICHIERS="$(gh api --paginate "repos/$DEPOT/pulls/$PR/files?per_page=100" --jq '.[].filename')"; then
+            echo "API en erreur : on joue les workers."; echo "workers=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ -z "$FICHIERS" ] || [ "$(printf '%s\n' "$FICHIERS" | wc -l)" -ge 3000 ]; then
+            echo "Liste vide ou trop longue : on joue les workers."; echo "workers=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # workers-pattern : workers/**, Dockerfile.worker, .github/workflows/ci.yml
+          if printf '%s\n' "$FICHIERS" | grep -Eq '^workers/|^Dockerfile\.worker$|^\.github/workflows/ci\.yml$'; then
+            echo "workers=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "workers=false" >> "$GITHUB_OUTPUT"
+          fi
+
   workers:
     name: Workers Node + Playwright
-    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    needs: changements
+    # Lots G + C (#680) : sauté (donc vert) en brouillon, ou sur PR sans fichier workers ;
+    # `always()` : si `changements` échoue ou est annulé, on joue (jamais de saut par erreur).
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && (github.event_name != 'pull_request' || needs.changements.result != 'success' || needs.changements.outputs.workers == 'true') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45  # F38-008 — plafond anti-gel (téléchargement des navigateurs Playwright compris)
     steps:

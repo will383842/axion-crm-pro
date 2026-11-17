@@ -196,10 +196,10 @@ final class ServiceReponses
             $tache = DB::transaction(function () use ($ws, $userId, $id, $classement, $creerTache, $l): ?string {
                 $this->verrou($ws, $id);
                 $courant = $this->courant($id);
-                if ($courant !== null && $courant->geste === 'classement' && $courant->auteur === 'humain' && $courant->classement === 'stop' && $classement !== 'stop') {
+                if ($courant !== null && $courant['geste'] === 'classement' && $courant['auteur'] === 'humain' && $courant['classement'] === 'stop' && $classement !== 'stop') {
                     throw new \DomainException(self::STOP_DEFINITIF); // course : un « stop » posé entre-temps
                 }
-                if (! ($courant !== null && $courant->geste === 'classement' && $courant->auteur === 'humain' && $courant->classement === $classement)) {
+                if (! ($courant !== null && $courant['geste'] === 'classement' && $courant['auteur'] === 'humain' && $courant['classement'] === $classement)) {
                     DB::table('envoi_reponses_classements')->insert([
                         'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'classement', 'classement' => $classement,
                         'confiance' => 100, 'auteur' => 'humain', 'auteur_id' => $userId, 'cree_le' => now(),
@@ -231,14 +231,14 @@ final class ServiceReponses
             $etat = DB::transaction(function () use ($ws, $userId, $id): string {
                 $this->verrou($ws, $id);
                 $courant = $this->courant($id);
-                if ($courant === null || $courant->geste !== 'classement' || $courant->auteur !== 'humain') {
+                if ($courant === null || $courant['geste'] !== 'classement' || $courant['auteur'] !== 'humain') {
                     return 'pas_traitee';
                 }
-                if ($courant->classement === 'stop') {
+                if ($courant['classement'] === 'stop') {
                     return 'stop_definitif';
                 }
                 DB::table('envoi_reponses_classements')->insert([
-                    'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'annulation', 'classement' => $courant->classement,
+                    'workspace_id' => $ws, 'reponse_id' => $id, 'geste' => 'annulation', 'classement' => $courant['classement'],
                     'confiance' => 100, 'auteur' => 'humain', 'auteur_id' => $userId, 'cree_le' => now(),
                 ]);
 
@@ -251,10 +251,16 @@ final class ServiceReponses
         });
     }
 
-    /** Dernière ligne COURANTE (classement ou annulation) de la réponse ; à lire sous le verrou. */
-    private function courant(int $id): ?object
+    /**
+     * Dernière ligne COURANTE (classement ou annulation) de la réponse ; à lire sous le verrou.
+     *
+     * @return array{geste: string, classement: string, auteur: string}|null
+     */
+    private function courant(int $id): ?array
     {
-        return DB::table('envoi_reponses_classements')->where('reponse_id', $id)->whereIn('geste', ['classement', 'annulation'])->orderByDesc('id')->first();
+        $l = DB::table('envoi_reponses_classements')->where('reponse_id', $id)->whereIn('geste', ['classement', 'annulation'])->orderByDesc('id')->first(['geste', 'classement', 'auteur']);
+
+        return $l === null ? null : ['geste' => (string) $l->geste, 'classement' => (string) $l->classement, 'auteur' => (string) $l->auteur];
     }
 
     /** Un lien par adresse (réutilisé au rejeu) → UNE opposition, mise à l'écart sans effacement. */

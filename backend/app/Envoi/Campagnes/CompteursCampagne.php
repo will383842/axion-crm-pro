@@ -92,7 +92,7 @@ final class CompteursCampagne
             LEFT JOIN envoi_campagnes_materialisations mat ON mat.campagne_id = camp.cid AND mat.workspace_id = :ws
         SQL;
 
-    /** @return array<string, int|bool|null|array> une campagne ; toutes clés présentes ; zéros si la campagne n'a pas de séquence */
+    /** @return array<string, mixed> une campagne ; toutes clés présentes ; zéros si la campagne n'a pas de séquence */
     public function pour(string $ws, string $campagneId): array
     {
         return $this->pourListe($ws, [$campagneId])[$campagneId] ?? self::zeros();
@@ -100,7 +100,7 @@ final class CompteursCampagne
 
     /**
      * @param  list<string>  $ids
-     * @return array<string, array<string, int|bool|null|array>> une requête pour toute une page
+     * @return array<string, array<string, mixed>> une requête pour toute une page
      */
     public function pourListe(string $ws, array $ids): array
     {
@@ -108,7 +108,7 @@ final class CompteursCampagne
         foreach ($ids as $id) {
             $sortie[$id] = self::zeros();
         }
-        $valides = array_values(array_unique(array_filter($ids, fn ($i) => is_string($i) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $i) === 1)));
+        $valides = array_values(array_unique(array_filter($ids, fn ($i) => preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $i) === 1)));
         if ($valides === []) {
             return $sortie;
         }
@@ -152,24 +152,32 @@ final class CompteursCampagne
         return [(string) $sql, $liaisons];
     }
 
-    /** @return array<string, int|bool|null|array> */
+    /** @return array<string, mixed> */
     private static function zeros(): array
     {
         return self::forme(array_fill_keys(self::CLES, 0), null);
     }
 
+    /**
+     * @param  object{prep_etat: ?string, prep_motif: ?string, prep_inscrits: ?string, prep_membres: ?string, prep_retenus: ?string}  $l
+     * @return array<string, mixed>
+     */
     private static function exposer(object $l): array
     {
         $preparation = $l->prep_etat === null ? null : ['etat' => $l->prep_etat, 'motif' => $l->prep_motif, 'inscrits' => (int) $l->prep_inscrits, 'membres' => (int) $l->prep_membres];
         $n = [];
         foreach (self::CLES as $k) {
-            $n[$k] = (int) ($l->{$k} ?? 0);
+            $n[$k] = (int) (((array) $l)[$k] ?? 0);
         }
 
         return self::forme($n, $preparation, max((int) $l->prep_membres - (int) $l->prep_retenus, 0));
     }
 
-    /** @param array<string, int> $n */
+    /**
+     * @param  array<string, int>  $n
+     * @param  array<string, mixed>|null  $preparation
+     * @return array<string, mixed>
+     */
     private static function forme(array $n, ?array $preparation, int $exclus = 0): array
     {
         return [

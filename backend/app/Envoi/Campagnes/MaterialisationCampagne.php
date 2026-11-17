@@ -143,7 +143,8 @@ final class MaterialisationCampagne
 
     /**
      * Vérifie (et écrit) les verdicts du lot AVANT l'écriture : hors de toute transaction et de tout verrou, car le DNS ne doit jamais en tenir un.
-     * `invalide` et `risque` sont écartés et comptés ; `valide` récent et `null` (indéterminé : la porte reste seule juge, le séquenceur reporte) sont inscrits.
+     * `invalide` et `risque` sont écartés et comptés ; seule exception (L4) : un destinataire de repli sur l'adresse générale garde un `risque` de motif
+     * `generique` (jamais un autre motif, jamais un `invalide`). `valide` récent et `null` (indéterminé : la porte reste seule juge, le séquenceur reporte) sont inscrits.
      * `retenus` est diminué d'autant : `membres - retenus` reste le total des exclus de préparation.
      */
     private function trierParVerdict(string $ws, LotDestinataires $lot, DateTimeImmutable $maintenant): LotDestinataires
@@ -167,7 +168,7 @@ final class MaterialisationCampagne
             $v = $trouves[$d->contactId] ?? null;
             if ($v?->verdict === VerdictAdresse::INVALIDE) {
                 $invalides++;
-            } elseif ($v?->verdict === VerdictAdresse::RISQUE) {
+            } elseif ($v?->verdict === VerdictAdresse::RISQUE && ! ($d->repliGenerique && $v->motif === 'generique')) {
                 $risquees++;
             } else {
                 $gardes[] = $d;
@@ -204,30 +205,51 @@ final class MaterialisationCampagne
             }
 
             $cles = [];
+            $replis = [];
             foreach ($lot->destinataires as $d) {
-                $cles[$id . '|' . $d->contactId] = $d;
+                $cle = $id . '|' . $d->contactId;
+                if ($d->repliGenerique) {
+                    $replis[$cle] = $d;
+                } else {
+                    $cles[$cle] = $d;
+                }
             }
-            $echeances = EtalementEcheances::repartir($fenetre, $maintenant, $auPlusTot, $p, $this->dejaParJour($ws, $maintenant, $auPlusTot), array_keys($cles), $id);
+            $dejaGeneral = $this->dejaParJour($ws, $maintenant, $auPlusTot);
+            $compteursLot = $lot->compteurs;
+            $echeancesRepli = [];
+            if ($replis !== []) {
+                // Échec fermé : interrupteur éteint ou illisible = rien n'est écrit (la base le refuse aussi, par déclencheur).
+                if (! RepliGenerique::ouvert($ws)) {
+                    throw new MaterialisationRefusee('repli_generique_ferme', false, 'Le repli sur l\'adresse générale est éteint : rien n\'est inscrit.');
+                }
+                $echeancesRepli = $this->echeancesRepli($ws, $fenetre, $maintenant, $auPlusTot, $p, $dejaGeneral, array_keys($replis), $id);
+                $ecartes = count($replis) - count($echeancesRepli);
+                if ($ecartes > 0) { // plafond ou horizon plein : écarté et compté, sans file d'attente
+                    $compteursLot['retenus'] = (int) ($compteursLot['retenus'] ?? 0) - $ecartes;
+                    $compteursLot['repli_generique_plafond'] = $ecartes;
+                }
+                foreach ($echeancesRepli as $e) { // compris dans le plafond général
+                    $jour = $e->setTimezone(new DateTimeZone(JoursOuvres::FUSEAU))->format('Y-m-d');
+                    $dejaGeneral[$jour] = ($dejaGeneral[$jour] ?? 0) + 1;
+                }
+            }
+            $echeances = EtalementEcheances::repartir($fenetre, $maintenant, $auPlusTot, $p, $dejaGeneral, array_keys($cles), $id);
             if (count($echeances) !== count($cles)) {
                 throw new MaterialisationRefusee('concurrence', true, 'La place a été prise sur l\'horizon : réessayez.');
             }
             $inseres = 0;
+            $inseresRepli = 0;
             if ($cles !== []) {
-                $lignes = [];
-                foreach ($cles as $cle => $d) {
-                    $lignes[] = ['contact_id' => $d->contactId, 'entreprise_id' => $d->entrepriseId, 'empreinte' => $d->empreinte, 'echeance' => $echeances[$cle]->format('c')];
-                }
-                $inseres = count(DB::select(
-                    'INSERT INTO envoi_inscriptions (workspace_id, sequence_id, population, contact_id, entreprise_id, empreinte_adresse, prochaine_echeance, version_figee)
-                     SELECT ?, ?, \'entreprises\', x.contact_id, x.entreprise_id, x.empreinte, x.echeance, ?::jsonb
-                       FROM jsonb_to_recordset(?::jsonb) AS x(contact_id bigint, entreprise_id bigint, empreinte char(64), echeance timestamptz)
-                     ON CONFLICT DO NOTHING RETURNING contact_id',
-                    [$ws, $sequenceId, $this->versionFigee($ws, $sequenceId), json_encode($lignes, JSON_THROW_ON_ERROR)],
-                ));
+                $inseres = $this->inserer($ws, $sequenceId, $cles, $echeances, $this->versionFigee($ws, $sequenceId), false);
             }
+            if ($echeancesRepli !== []) {
+                $inseresRepli = $this->inserer($ws, $sequenceId, array_intersect_key($replis, $echeancesRepli), $echeancesRepli, $this->versionFigee($ws, $sequenceId, true), true);
+            }
+            $inseres += $inseresRepli;
+            $cles += array_intersect_key($replis, $echeancesRepli);
 
             $compteurs = json_decode((string) $m->compteurs, true) ?: [];
-            foreach ($lot->compteurs + ['inscrits' => $inseres, 'ecartes_insertion' => count($cles) - $inseres] as $k => $v) {
+            foreach ($compteursLot + ['inscrits' => $inseres, 'ecartes_insertion' => count($cles) - $inseres] as $k => $v) {
                 $compteurs[$k] = (int) ($compteurs[$k] ?? 0) + (int) $v;
             }
             $fin = $lot->curseurSuivant === null;
@@ -245,11 +267,60 @@ final class MaterialisationCampagne
         });
     }
 
+    /**
+     * Écrit les inscriptions d'un groupe (nominatifs ou repli). Rend le nombre de lignes créées.
+     *
+     * @param  array<string, Destinataire>  $destinataires
+     * @param  array<string, DateTimeImmutable>  $echeances
+     */
+    private function inserer(string $ws, string $sequenceId, array $destinataires, array $echeances, string $versionFigee, bool $repli): int
+    {
+        $lignes = [];
+        foreach ($destinataires as $cle => $d) {
+            $lignes[] = ['contact_id' => $d->contactId, 'entreprise_id' => $d->entrepriseId, 'empreinte' => $d->empreinte, 'echeance' => $echeances[$cle]->format('c')];
+        }
+
+        return count(DB::select(
+            'INSERT INTO envoi_inscriptions (workspace_id, sequence_id, population, contact_id, entreprise_id, empreinte_adresse, prochaine_echeance, version_figee, repli_generique)
+             SELECT ?, ?, \'entreprises\', x.contact_id, x.entreprise_id, x.empreinte, x.echeance, ?::jsonb, ?
+               FROM jsonb_to_recordset(?::jsonb) AS x(contact_id bigint, entreprise_id bigint, empreinte char(64), echeance timestamptz)
+             ON CONFLICT DO NOTHING RETURNING contact_id',
+            [$ws, $sequenceId, $versionFigee, $repli ? 'true' : 'false', json_encode($lignes, JSON_THROW_ON_ERROR)],
+        ));
+    }
+
+    /**
+     * Échéances des replis : plafond de repli (réglage borné 0 à 5, compris dans le plafond général $p). Pour chaque jour, la place est le plus petit de
+     * « plafond de repli - replis déjà prévus » et « plafond général - inscriptions déjà prévues » ; les clés sans place sont ABSENTES du résultat.
+     *
+     * @param  array<string, int>  $dejaGeneral
+     * @param  list<string>  $cles
+     * @return array<string, DateTimeImmutable>
+     */
+    private function echeancesRepli(string $ws, FenetreHoraire $fenetre, DateTimeImmutable $maintenant, DateTimeImmutable $auPlusTot, int $p, array $dejaGeneral, array $cles, string $graine): array
+    {
+        $pr = RepliGenerique::plafondJour($ws, $p);
+        if ($pr <= 0) {
+            return [];
+        }
+        $dejaRepli = $this->dejaParJour($ws, $maintenant, $auPlusTot, true);
+        $deja = [];
+        foreach ($dejaGeneral as $jour => $n) {
+            $place = max(0, min($pr - ($dejaRepli[$jour] ?? 0), $p - $n));
+            $deja[$jour] = $pr - $place;
+        }
+
+        return EtalementEcheances::repartir($fenetre, $maintenant, $auPlusTot, $pr, $deja, $cles, $graine . '|repli');
+    }
+
     /** Version figée au format EXACT de Inscriptions::inscrire (même séquence, mêmes étapes). */
-    private function versionFigee(string $ws, string $sequenceId): string
+    private function versionFigee(string $ws, string $sequenceId, bool $uneEtape = false): string
     {
         $seq = DB::selectOne('SELECT fenetre_debut, fenetre_fin FROM envoi_sequences WHERE workspace_id = ? AND id = ?', [$ws, $sequenceId]);
         $etapes = DB::select('SELECT rang, delai_jours_ouvres, sujet, corps FROM envoi_sequence_etapes WHERE workspace_id = ? AND sequence_id = ? ORDER BY rang', [$ws, $sequenceId]);
+        if ($uneEtape) { // repli sur l'adresse générale : un seul message, jamais de relance
+            $etapes = array_slice($etapes, 0, 1);
+        }
 
         return json_encode([
             'fenetre' => ['debut' => (int) $seq->fenetre_debut, 'fin' => (int) $seq->fenetre_fin],
@@ -277,13 +348,14 @@ final class MaterialisationCampagne
      *
      * @return array<string, int>
      */
-    private function dejaParJour(string $ws, DateTimeImmutable $maintenant, DateTimeImmutable $auPlusTot): array
+    private function dejaParJour(string $ws, DateTimeImmutable $maintenant, DateTimeImmutable $auPlusTot, bool $repliSeul = false): array
     {
         $debut = max($maintenant, $auPlusTot)->setTimezone(new DateTimeZone(JoursOuvres::FUSEAU))->setTime(0, 0);
         $par = [];
         $lignes = WorkspaceContext::run($ws, fn (): array => DB::select(
             "SELECT to_char(prochaine_echeance AT TIME ZONE 'Europe/Paris', 'YYYY-MM-DD') AS jour, count(*) AS n
-               FROM envoi_inscriptions WHERE workspace_id = ? AND statut = 'active' AND prochaine_echeance >= ? AND prochaine_echeance < ? GROUP BY 1",
+               FROM envoi_inscriptions WHERE workspace_id = ? AND statut = 'active' AND prochaine_echeance >= ? AND prochaine_echeance < ?"
+               . ($repliSeul ? ' AND repli_generique' : '') . ' GROUP BY 1',
             [$ws, $debut->format('c'), $debut->modify('+60 days')->format('c')],
         ));
         foreach ($lignes as $l) {

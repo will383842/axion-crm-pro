@@ -7,12 +7,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
     # Filtre conservateur (workflow NON exige par la protection de main) :
-    # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou ce
-    # workflow changent. push main / schedule / dispatch restent sans filtre.
+    # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou les
+    # workflows (`.github/**`, dont e2e.yml appelé d'ici) changent. push main / schedule / dispatch restent sans filtre.
     paths:
       - 'frontend/**'
       - 'backend/openapi/**'
-      - '.github/workflows/a11y.yml'
+      - '.github/**'
 
 permissions:
   contents: read
@@ -23,6 +23,51 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # CI-F1 (#680) : UN SEUL build du frontend pour axe ET e2e. GitHub ne
+  # partage un artefact qu'au sein d'un même run : e2e.yml est donc appelé
+  # d'ici (`workflow_call`), et ne se déclenche plus seul.
+  build-frontend:
+    name: Build frontend unique (axe + e2e)
+    # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30  # F38-008
+    outputs:
+      empreinte: ${{ steps.empreinte.outputs.empreinte }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v7
+        with: { node-version: '22', cache: 'pnpm', cache-dependency-path: frontend/pnpm-lock.yaml }
+      - name: Install deps (BLOQUANT — lockfile figé)
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Build frontend (la cible que axe et e2e doivent mesurer)
+        working-directory: frontend
+        run: pnpm build
+      - name: Empreinte du build
+        id: empreinte
+        run: |
+          set -euo pipefail
+          test -f frontend/dist/index.html
+          e=$(cd frontend/dist && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          echo "empreinte=$e" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          include-hidden-files: true
+          if-no-files-found: error
+
+  e2e:
+    needs: build-frontend
+    permissions:
+      contents: read
+    uses: ./.github/workflows/e2e.yml
+    with:
+      empreinte: ${{ needs.build-frontend.outputs.empreinte }}
+
   # 🔴 F38-008 — plafonds anti-gel, poses le 2026-08-22. Aucun job de la
   # chaine qualite n'avait de borne : sans elle un job herite du plafond
   # GitHub de 6 h, et SIX executions etaient figees entre 1 h 28 et 2 h 25
@@ -33,6 +78,7 @@ jobs:
   # Garde : backend/tests/Feature/Infra/WorkflowsBornesDeDureeTest.php
   axe-playwright:
     name: axe-core Playwright
+    needs: build-frontend
     # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-24.04
@@ -60,17 +106,23 @@ jobs:
       - name: Install Playwright browsers
         working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium
-      # La cible doit EXISTER sur le runner. `http://app:5173` était le nom de
-      # service du docker-compose local : sur un runner GitHub il ne résout pas
-      # (`net::ERR_NAME_NOT_RESOLVED`), et `webServer` est neutralisé quand
-      # `CI=true`. Depuis la création de ce job, les 4 pages échouaient donc
-      # AVANT le premier contrôle axe : la porte n'a jamais mesuré une seule
-      # règle d'accessibilité, elle a seulement toujours rougi.
-      # On construit l'application et on la sert réellement ; c'est
-      # `playwright.config.ts` qui démarre et arrête `vite preview`.
-      - name: Build frontend (la cible que la porte doit mesurer)
-        working-directory: frontend
-        run: pnpm build
+      # CI-F1 : on ne reconstruit PAS le frontend ici. On lit le build unique
+      # produit par `build-frontend`, et on refuse de mesurer s'il est absent
+      # ou différent de celui qui a été empreinté (jamais « vert sans mesure »).
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+      - name: Vérifier le build unique (absent ou différent ⇒ ÉCHEC)
+        env:
+          EMPREINTE_ATTENDUE: ${{ needs.build-frontend.outputs.empreinte }}
+        run: |
+          set -euo pipefail
+          test -n "$EMPREINTE_ATTENDUE" || { echo "::error::empreinte attendue absente"; exit 1; }
+          test -f frontend/dist/index.html || { echo "::error::build frontend absent (index.html introuvable)"; exit 1; }
+          calculee=$(cd frontend/dist && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          echo "attendue=$EMPREINTE_ATTENDUE calculee=$calculee"
+          test "$calculee" = "$EMPREINTE_ATTENDUE" || { echo "::error::le build lu n'est pas celui qui a été construit"; exit 1; }
       - name: Run a11y E2E
         working-directory: frontend
         env:

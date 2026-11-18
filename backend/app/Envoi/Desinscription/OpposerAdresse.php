@@ -40,6 +40,19 @@ final class OpposerAdresse
         $this->opposerLesEntreprisesDeRepli($ws, $empreinte);
     }
 
+    /**
+     * Clic sur le lien de désinscription (L6b) : l'adresse du lien est DÉJÀ opposée par `EnregistrerOpposition` ; il reste l'écriture des SIREN
+     * de repli, la même que pour le STOP (une seule implémentation). Référence inconnue de l'espace : rien. Une erreur remonte (échec fermé).
+     */
+    public function pourReference(string $ws, string $reference): void
+    {
+        $empreinte = WorkspaceContext::run($ws, fn () => DB::table('envoi_liens_desinscription')
+            ->where('workspace_id', $ws)->where('reference', $reference)->value('empreinte_adresse'));
+        if ($empreinte !== null) {
+            $this->opposerLesEntreprisesDeRepli($ws, (string) $empreinte);
+        }
+    }
+
     /** SIREN des entreprises dont CETTE adresse est une inscription de repli (tous statuts), inscrits au registre en une transaction. */
     private function opposerLesEntreprisesDeRepli(string $ws, string $empreinte): void
     {

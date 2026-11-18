@@ -62,6 +62,9 @@ final class DesinscriptionController
         if (! $connu) {
             return $this->refus();
         }
+        // Adresse de repli (D6) : le SIREN de l'entreprise est opposé aussi. L'adresse l'est déjà ; une erreur ici remonte (500),
+        // jamais une page de succès, et le nouveau clic (même lien) reprend l'écriture. Adresse ordinaire : rien ne change.
+        (new OpposerAdresse($opposition))->pourReference($verifie['workspace_id'], $verifie['reference']);
         if ($unClic) {
             return $this->entetes(response('', 200));
         }

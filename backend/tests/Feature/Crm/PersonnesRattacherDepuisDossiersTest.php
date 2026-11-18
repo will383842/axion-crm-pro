@@ -167,11 +167,20 @@ test('5. liée ailleurs, ou clé présente dans deux fiches : rien, jamais de d�
     c3Contact($b, $cle3, 'zz.c3c@example.invalid', 'ZZ C2');
     c3Personne($cle3, 'zz.c3c@example.invalid', ['contact_id' => $morte, 'company_id' => $a, 'rattachee_at' => now()]);
     $avant = c3Etat();
+    $demandesAvant = fn (string $cle): array => DB::table('activities')->where('person_key', $cle)->get()->map(fn ($l) => (array) $l)->all();
+    $cles2et3 = [$demandesAvant($cle2), $demandesAvant($cle3)];
 
     $sortie = c3Lancer(['--appliquer' => true]);
 
+    // Aucun lien ne bouge (personnes et contacts identiques). Seule la demande de la
+    // personne DÉJÀ liée à un contact actif est soldée (second passage, vers ce contact) ;
+    // celles des deux autres restent exactement en l'état. Le contact A reçoit seulement
+    // l'horodatage de l'échange (effet normal du solde) : tous les autres contacts sont identiques.
     expect($sortie)->toContain('personnes à lier : 0')
-        ->and(c3Etat())->toBe($avant);
+        ->and(c3Etat()[0])->toBe($avant[0])
+        ->and(array_values(array_filter(c3Etat()[2], fn (array $c): bool => $c['id'] !== $contactA)))
+        ->toBe(array_values(array_filter($avant[2], fn (array $c): bool => $c['id'] !== $contactA)))
+        ->and([$demandesAvant($cle2), $demandesAvant($cle3)])->toBe($cles2et3);
 });
 
 test('6. contact d une autre clé pour la même adresse : rien (clé divergente)', function () {
@@ -221,4 +230,146 @@ test('9. --a-blanc et --appliquer ensemble : refusé, rien n est écrit', functi
 
     expect($code)->not->toBe(0)
         ->and(c3Etat())->toBe($avant);
+});
+
+test('10. personne DÉJÀ liée, drapeau fermé puis ouvert, puis relance : la demande est soldée une seule fois', function () {
+    config(['crm.ingest.demandes_personne_enabled' => false]);
+    $fiche = c3Fiche('900000901');
+    $contact = c3Contact($fiche, C3_CLE);
+    [$personne, $demande] = c3Personne(C3_CLE);
+    c3Lancer(['--appliquer' => true]);
+    expect(DB::table('personnes')->where('id', $personne)->value('contact_id'))->toBe($contact)
+        ->and(DB::table('activities')->where('id', $demande)->value('subject_id'))->toBeNull();
+
+    config(['crm.ingest.demandes_personne_enabled' => true]);
+    $sortie = c3Lancer(['--appliquer' => true]);
+
+    $a = DB::table('activities')->where('id', $demande)->first();
+    $apres = c3Etat();
+    expect($sortie)->toContain('demandes de personnes déjà liées soldées : 1')
+        ->and($a->subject_type)->toBe('company')
+        ->and($a->subject_id)->toBe($fiche)
+        ->and($a->contact_id)->toBe($contact)
+        ->and(json_decode($a->payload, true)['arbitrage']['attached_by'])->toBe('rattrapage:dossiers')
+        ->and(json_decode($a->payload, true))->toHaveKey('pending_match')
+        ->and(DB::table('personnes')->where('id', $personne)->value('contact_id'))->toBe($contact);
+
+    $relance = c3Lancer(['--appliquer' => true]);
+    expect($relance)->toContain('demandes de personnes déjà liées soldées : 0')
+        ->and(c3Etat())->toBe($apres);
+});
+
+test('11. personne liée à un contact ou une fiche à la corbeille : aucune demande soldée, lien intact', function () {
+    $a = c3Fiche('900000901');
+    $b = c3Fiche('900000902');
+    $morte = c3Contact($a, C3_CLE, 'zz.c3@example.invalid', 'ZZ M1');
+    c3Contact($b, C3_CLE, 'zz.c3@example.invalid', 'ZZ M2');
+    c3Personne(C3_CLE, en: ['contact_id' => $morte, 'company_id' => $a, 'rattachee_at' => now()]);
+    DB::table('contacts')->where('id', $morte)->update(['deleted_at' => now()]);
+
+    $cle2 = str_repeat('b', 64);
+    $c = c3Fiche('900000903');
+    $contact2 = c3Contact($c, $cle2, 'zz.c3b@example.invalid', 'ZZ M3');
+    c3Personne($cle2, 'zz.c3b@example.invalid', ['contact_id' => $contact2, 'company_id' => $c, 'rattachee_at' => now()]);
+    DB::table('companies')->where('id', $c)->update(['deleted_at' => now()]);
+    $avant = c3Etat();
+
+    $sortie = c3Lancer(['--appliquer' => true]);
+
+    expect($sortie)->toContain('demandes de personnes déjà liées soldées : 0')
+        ->and(c3Etat())->toBe($avant);
+});
+
+test('12. à blanc : les demandes de personnes déjà liées sont comptées, rien n est écrit', function () {
+    $fiche = c3Fiche('900000901');
+    $contact = c3Contact($fiche, C3_CLE);
+    c3Personne(C3_CLE, en: ['contact_id' => $contact, 'company_id' => $fiche, 'rattachee_at' => now()]);
+    $avant = c3Etat();
+
+    DB::enableQueryLog();
+    $sortie = c3Lancer();
+    $requetes = array_column(DB::getQueryLog(), 'query');
+    DB::disableQueryLog();
+
+    expect($sortie)->toContain('À BLANC')
+        ->and($sortie)->toContain('demandes de personnes déjà liées : 1')
+        ->and($sortie)->not->toContain(C3_CLE)
+        ->and(c3Etat())->toBe($avant)
+        ->and(array_filter($requetes, static fn (string $q): bool => preg_match('/^\s*(insert|update|delete)\b/i', $q) === 1))->toBe([]);
+});
+
+test('13. personne déjà liée, opposée ou clé dans deux entreprises : demande laissée en attente', function () {
+    $a = c3Fiche('900000901');
+    $b = c3Fiche('900000902');
+    $contactA = c3Contact($a, C3_CLE);
+    c3Personne(C3_CLE, en: ['contact_id' => $contactA, 'company_id' => $a, 'rattachee_at' => now(), 'opposition_at' => now()]);
+    $cle2 = str_repeat('c', 64);
+    $c2a = c3Contact($a, $cle2, 'zz.c3b@example.invalid', 'ZZ D1');
+    c3Contact($b, $cle2, 'zz.c3b@example.invalid', 'ZZ D2');
+    c3Personne($cle2, 'zz.c3b@example.invalid', ['contact_id' => $c2a, 'company_id' => $a, 'rattachee_at' => now()]);
+    $avant = c3Etat();
+
+    c3Lancer(['--appliquer' => true]);
+
+    expect(c3Etat())->toBe($avant);
+});
+
+test('14. SOUS LE RÔLE APPLICATIF (pgsql_app, RLS) : la demande d une personne déjà liée est soldée', function () {
+    $owner = DB::connection('pgsql_owner');
+    $espace = (string) Str::uuid();
+    $slug = 'zz-c3-' . substr($espace, 0, 8);
+    $owner->table('workspaces')->insert([
+        'id' => $espace, 'slug' => $slug, 'name' => 'ZZ C3 RLS',
+        'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    config(['crm.ingest.business_workspace' => $slug, 'crm.ingest.demandes_personne_enabled' => true]);
+    $email = 'zz.c3.' . Str::lower(Str::random(8)) . '@example.invalid';
+    $cle = hash('sha256', 'zz-c3|' . $email);
+    $fiche = $owner->table('companies')->insertGetId([
+        'workspace_id' => $espace, 'siren' => '9' . random_int(10000000, 99999999), 'denomination' => 'ZZ FICHE RLS', 'discovery_source' => 'site',
+        'quality_score' => 0, 'signals' => '{}', 'metadata' => '{}', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $contact = $owner->table('contacts')->insertGetId([
+        'workspace_id' => $espace, 'company_id' => $fiche, 'first_name' => 'Jeanne', 'last_name' => 'ZZ C3', 'email' => $email,
+        'person_key' => $cle, 'discovery_source' => 'site', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $owner->table('personnes')->insert([
+        'workspace_id' => $espace, 'person_key' => $cle, 'email' => $email, 'email_hash' => hash('sha256', $email),
+        'first_name' => 'Jeanne', 'last_name' => 'ZZ C3', 'legal_basis' => 'precontractual', 'premiere_source' => 'formulaire',
+        'premiere_source_at' => now(), 'contact_id' => $contact, 'company_id' => $fiche, 'rattachee_at' => now(),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $demande = $owner->table('activities')->insertGetId([
+        'workspace_id' => $espace, 'contact_id' => null, 'type' => 'form_submission', 'kind' => 'form_submission',
+        'occurred_at' => now(), 'person_key' => $cle, 'external_ref' => 'site:event:' . Str::uuid(),
+        'subject_type' => null, 'subject_id' => null, 'title' => 'ZZ demande',
+        'payload' => json_encode(['pending_match' => ['email' => $email]]), 'created_at' => now(),
+    ]);
+
+    $precedente = DB::getDefaultConnection();
+    try {
+        DB::setDefaultConnection('pgsql_app');
+        $code = Artisan::call('crm:personnes-rattacher-depuis-dossiers', ['--appliquer' => true]);
+    } finally {
+        DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        DB::setDefaultConnection($precedente);
+    }
+
+    try {
+        $ligne = $owner->table('activities')->where('id', $demande)->first();
+        expect($code)->toBe(0)
+            ->and($ligne->subject_id)->toBe($fiche)
+            ->and($ligne->contact_id)->toBe($contact)
+            ->and(json_decode($ligne->payload, true)['arbitrage']['attached_by'])->toBe('rattrapage:dossiers');
+    } finally {
+        $owner->transaction(function () use ($owner, $espace): void {
+            $owner->statement("SET LOCAL app.autoriser_suppression_protegee = 'on'");
+            foreach (['activities', 'personnes', 'contacts', 'companies'] as $table) {
+                $owner->table($table)->where('workspace_id', $espace)->delete();
+            }
+            $owner->table('workspaces')->where('id', $espace)->delete();
+        });
+        DB::connection('pgsql_app')->disconnect();
+        $owner->disconnect();
+    }
 });

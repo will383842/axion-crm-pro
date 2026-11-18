@@ -31,6 +31,11 @@ use stdClass;
  *    n'est pas touché ;
  *  - contacts et entreprises à la corbeille ne comptent pas.
  *
+ * SECOND PASSAGE (drapeau des demandes ouvert) : les personnes DÉJÀ liées à un
+ * contact actif d'une fiche active voient leurs demandes en attente soldées vers
+ * ce contact, mêmes gardes, sans toucher au lien. Les personnes liées à un contact
+ * ou une fiche à la corbeille ne sont pas touchées (écart au plan, voir C3.md).
+ *
  * Aucune suppression. Les demandes sont soldées seulement avec le drapeau des
  * demandes (même règle que C1) ; `pending_match` est gardé (historique).
  */
@@ -67,12 +72,30 @@ class CrmPersonnesRattacherDepuisDossiers extends Command
             $bilan = [
                 'examinees' => 0, 'a_lier' => 0, 'demandes' => 0, 'opposees' => 0, 'plusieurs' => 0,
                 'divergentes' => 0, 'sans_contact' => 0, 'liees' => 0, 'soldees' => 0,
+                'deja_liees_demandes' => 0, 'deja_liees_soldees' => 0,
             ];
 
             $ids = DB::table('personnes')->where('workspace_id', $workspaceId)->whereNull('contact_id')->orderBy('id')->pluck('id');
             foreach ($ids as $id) {
                 $bilan['examinees']++;
                 $this->traiter((int) $id, $workspaceId, $appliquer, $demandesOuvertes, $contacts, $solde, $bilan);
+            }
+
+            // Second passage : les personnes DÉJÀ liées (contact et fiche actifs) dont des
+            // demandes attendent encore. Le lien n'est jamais touché.
+            if ($demandesOuvertes) {
+                $liees = DB::table('personnes')
+                    ->join('contacts', 'contacts.id', '=', 'personnes.contact_id')
+                    ->join('companies', 'companies.id', '=', 'contacts.company_id')
+                    ->where('personnes.workspace_id', $workspaceId)
+                    ->whereNotNull('personnes.contact_id')
+                    ->whereNull('contacts.deleted_at')
+                    ->whereNull('companies.deleted_at')
+                    ->orderBy('personnes.id')
+                    ->pluck('personnes.id');
+                foreach ($liees as $id) {
+                    $this->traiterLiee((int) $id, $workspaceId, $appliquer, $solde, $bilan);
+                }
             }
 
             return $bilan;
@@ -85,8 +108,10 @@ class CrmPersonnesRattacherDepuisDossiers extends Command
         $this->line('  clé dans plusieurs entreprises (laissées) : ' . $bilan['plusieurs']);
         $this->line('  clé divergente (laissées) : ' . $bilan['divergentes']);
         $this->line('  sans contact actif : ' . $bilan['sans_contact']);
+        $this->line('  demandes de personnes déjà liées : ' . $bilan['deja_liees_demandes'] . ($demandesOuvertes ? '' : ' (drapeau des demandes fermé : non examinées)'));
         if ($appliquer) {
             $this->line('Personnes liées : ' . $bilan['liees'] . ' · demandes soldées : ' . $bilan['soldees']);
+            $this->line('  demandes de personnes déjà liées soldées : ' . $bilan['deja_liees_soldees']);
         }
 
         return self::SUCCESS;
@@ -125,7 +150,7 @@ class CrmPersonnesRattacherDepuisDossiers extends Command
             if ($frais === null || $frais->contact_id !== null || $this->estOpposee($frais)) {
                 return;
             }
-            $ignores = array_fill_keys(['examinees', 'a_lier', 'demandes', 'opposees', 'plusieurs', 'divergentes', 'sans_contact', 'liees', 'soldees'], 0);
+            $ignores = array_fill_keys(['examinees', 'a_lier', 'demandes', 'opposees', 'plusieurs', 'divergentes', 'sans_contact', 'liees', 'soldees', 'deja_liees_demandes', 'deja_liees_soldees'], 0);
             $cible = $this->entrepriseUnique($workspaceId, $cle, $ignores, $frais);
             if ($cible === null) {
                 return;
@@ -140,6 +165,76 @@ class CrmPersonnesRattacherDepuisDossiers extends Command
                 ]));
             }
         });
+    }
+
+    /**
+     * Personne DÉJÀ liée à un contact actif d'une fiche active : on solde seulement ses
+     * demandes en attente, vers CE contact. Le lien n'est jamais déplacé.
+     *
+     * @param  array<string, int>  $bilan
+     */
+    private function traiterLiee(int $id, string $workspaceId, bool $appliquer, SoldeDemandesEnAttente $solde, array &$bilan): void
+    {
+        $personne = DB::table('personnes')->where('id', $id)->first(['person_key', 'email_hash', 'opposition_at', 'contact_id']);
+        if ($personne === null || ! is_string($personne->person_key) || $personne->contact_id === null) {
+            return;
+        }
+        $attente = $this->demandesEnAttente($workspaceId, $personne->person_key)->count();
+        if ($attente === 0) {
+            return;
+        }
+        if ($this->estOpposee($personne)) {
+            $bilan['opposees']++;
+
+            return;
+        }
+        if ($this->plusieursEntreprises($workspaceId, $personne->person_key)) {
+            $bilan['plusieurs']++;
+
+            return;
+        }
+
+        $bilan['deja_liees_demandes'] += $attente;
+        if (! $appliquer) {
+            return;
+        }
+
+        DB::transaction(function () use ($workspaceId, $personne, $solde, &$bilan): void {
+            $cle = $personne->person_key;
+            SoldeDemandesEnAttente::verrouillerPersonnes($workspaceId, $cle);
+            $frais = DB::table('personnes')->where('workspace_id', $workspaceId)->where('person_key', $cle)
+                ->lockForUpdate()->first(['contact_id', 'email_hash', 'opposition_at']);
+            if ($frais === null || $frais->contact_id === null || $this->estOpposee($frais) || $this->plusieursEntreprises($workspaceId, $cle)) {
+                return;
+            }
+            $contact = DB::table('contacts')
+                ->join('companies', 'companies.id', '=', 'contacts.company_id')
+                ->where('contacts.workspace_id', $workspaceId)
+                ->where('contacts.id', $frais->contact_id)
+                ->whereNull('contacts.deleted_at')
+                ->whereNull('companies.deleted_at')
+                ->first(['contacts.id', 'contacts.company_id']);
+            if ($contact === null) {
+                return;
+            }
+
+            $bilan['deja_liees_soldees'] += count($solde->solder($workspaceId, $cle, (int) $contact->company_id, (int) $contact->id, [
+                'attached_by' => 'rattrapage:dossiers',
+                'commande' => self::SIGNATURE,
+            ]));
+        });
+    }
+
+    private function plusieursEntreprises(string $workspaceId, string $cle): bool
+    {
+        return DB::table('contacts')
+            ->join('companies', 'companies.id', '=', 'contacts.company_id')
+            ->where('contacts.workspace_id', $workspaceId)
+            ->where('contacts.person_key', $cle)
+            ->whereNull('contacts.deleted_at')
+            ->whereNull('companies.deleted_at')
+            ->distinct()
+            ->count('contacts.company_id') > 1;
     }
 
     /**

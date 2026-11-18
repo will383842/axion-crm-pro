@@ -109,7 +109,7 @@ export function GestesCampagne({ campagne, maintenant, variante, avant, preparat
       <div ref={conteneur} tabIndex={-1} className={cn('flex flex-wrap items-center gap-2 outline-none', entete ? 'justify-end' : 'justify-start')}>
         {avant}
         {permis.lancer ? (
-          <Button className={TACTILE} iconLeft={<Rocket className="h-4 w-4" aria-hidden />} aria-label={nom('Lancer')} data-geste="lancer" disabled={blocage !== null || lancer.isPending}aria-describedby={blocage?.idRaison} loading={lancer.isPending} onClick={lancerCampagne}>
+          <Button className={TACTILE} iconLeft={<Rocket className="h-4 w-4" aria-hidden />} aria-label={nom('Lancer')} data-geste="lancer" disabled={blocage !== null || lancer.isPending} aria-describedby={blocage?.idRaison} loading={lancer.isPending} onClick={lancerCampagne}>
             Lancer
           </Button>
         ) : null}

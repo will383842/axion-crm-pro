@@ -70,11 +70,20 @@ jobs:
           set -euo pipefail
           OPT=""
           if [ "$MODE" = "appliquer" ]; then OPT="--appliquer"; fi
-          # Seule la sortie de la commande (des nombres) s'affiche.
+          # Journal PUBLIC : la sortie brute reste sur le serveur (un plantage
+          # peut contenir du SQL avec des valeurs). On n'affiche que les lignes
+          # de bilan attendues (liste blanche, que des nombres) ; en cas
+          # d'échec : « échec, code N » seulement, et on sort avec ce code.
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
-            set -euo pipefail
-            cd "$PROJECT_PATH"
+            set -uo pipefail
+            cd "$PROJECT_PATH" || exit 1
+            rc=0
             # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le
             # reste du heredoc comme stdin et avale les commandes suivantes.
-            docker compose exec -u root -T api php artisan crm:personnes-rattacher-depuis-dossiers $OPT < /dev/null
+            out=\$(docker compose exec -u root -T api php artisan crm:personnes-rattacher-depuis-dossiers $OPT 2>&1 < /dev/null) || rc=\$?
+            printf '%s\n' "\$out" | grep -E '^((APPLIQUÉ|À BLANC — rien n.a été écrit) · personnes sans lien examinées : [0-9]+|  (personnes à lier|personnes opposées \(laissées\)|clé dans plusieurs entreprises \(laissées\)|clé divergente \(laissées\)|sans contact actif|demandes de personnes déjà liées soldées) : [0-9]+|  demandes à solder : [0-9]+( \(drapeau des demandes fermé : laissées en attente\))?|  demandes de personnes déjà liées : [0-9]+( \(drapeau des demandes fermé : non examinées\))?|Personnes liées : [0-9]+ · demandes soldées : [0-9]+)\$' || true
+            if [ "\$rc" -ne 0 ]; then
+              echo "échec, code \$rc"
+              exit "\$rc"
+            fi
           EOF

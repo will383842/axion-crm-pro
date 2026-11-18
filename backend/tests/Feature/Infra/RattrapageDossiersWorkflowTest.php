@@ -55,3 +55,16 @@ it('n\'ajoute --appliquer que pour le mode appliquer, et un seul à la fois', fu
         ->and(substr_count($code, '--appliquer'))->toBe(1)
         ->and($code)->toContain('concurrency:');
 });
+
+it('ne montre jamais la sortie brute : capture, liste blanche, code réel', function () {
+    $code = codeWorkflowRattrapage();
+    // La commande est capturée (2>&1) sur le serveur, jamais lancée « à nu ».
+    expect($code)->toMatch('/out=\\\\\$\(docker compose exec[^\n]*rattacher-depuis-dossiers[^\n]*2>&1[^\n]*\)\s*\|\|\s*rc=\\\\\$\?/')
+        ->and(substr_count($code, 'rattacher-depuis-dossiers'))->toBe(1);
+    // Chaque affichage de la sortie passe par grep -E (liste blanche).
+    expect(substr_count($code, '\$out'))->toBe(1)
+        ->and($code)->toMatch('/printf \'%s\\\\n\' "\\\\\$out" \| grep -E \'\^/');
+    // Échec : seulement « échec, code N », et sortie avec ce code réel.
+    expect($code)->toContain('echo "échec, code \$rc"')
+        ->and($code)->toContain('exit "\$rc"');
+});

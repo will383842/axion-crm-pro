@@ -64,6 +64,22 @@ final class CodesConnexionCourriel
     /** @throws CanalFermeException drapeau éteint */
     public function emettre(User $u, string $objet, ?string $ip): void
     {
+        $code = $this->inserer($u, $objet, $ip);
+        if ($code === null) {
+            return;
+        }
+
+        // APRÈS l'insertion : si le canal lève, la ligne reste (l'appelant répond 503 canal_indisponible).
+        $this->canal()->envoyer($u, $code, $objet);
+    }
+
+    /**
+     * Écrit le code (et remplace l'ancien) ; rend le code en clair, ou null si l'adresse est opposée (rien n'est écrit).
+     *
+     * @throws CanalFermeException drapeau éteint
+     */
+    private function inserer(User $u, string $objet, ?string $ip): ?string
+    {
         if (config('double_auth.actif') !== true) {
             throw new CanalFermeException('Double authentification par courriel éteinte.');
         }
@@ -72,7 +88,7 @@ final class CodesConnexionCourriel
         if ($this->adresseOpposee($u)) {
             Log::warning('auth.code_courriel.adresse_opposee', ['user_id' => (string) $u->id, 'objet' => $objet]);
 
-            return;
+            return null;
         }
 
         $maintenant = CarbonImmutable::now();
@@ -94,24 +110,36 @@ final class CodesConnexionCourriel
             ]);
         });
 
-        // APRÈS l'insertion : si le canal lève, la ligne reste (l'appelant répond 503 canal_indisponible).
-        $this->canal()->envoyer($u, $code, $objet);
+        return $code;
     }
 
-    /** @throws TropDeRenvois @throws CanalFermeException */
+    /**
+     * Le verrou du compte est tenu du comptage jusqu'à l'insertion : deux renvois simultanés ne comptent plus
+     * le même total. Le courriel part APRÈS la validation (le verrou n'attend pas le canal).
+     *
+     * @throws TropDeRenvois @throws CanalFermeException
+     */
     public function renvoyer(User $u, ?string $ip): void
     {
-        $depuis = CarbonImmutable::now()->subMinutes(self::FENETRE_RENVOIS_MINUTES);
-        $emises = DB::table('codes_connexion_courriel')
-            ->where('user_id', $u->id)->where('objet', 'connexion')
-            ->where('cree_le', '>', $depuis->toIso8601String())
-            ->count();
+        $code = DB::transaction(function () use ($u, $ip): ?string {
+            DB::select("SELECT pg_advisory_xact_lock(hashtextextended('code_courriel|' || ?, 0))", [(string) $u->id]);
 
-        if ($emises >= (int) config('double_auth.renvois_max', 3)) {
-            throw new TropDeRenvois('Trop de codes demandés.');
+            $depuis = CarbonImmutable::now()->subMinutes(self::FENETRE_RENVOIS_MINUTES);
+            $emises = DB::table('codes_connexion_courriel')
+                ->where('user_id', $u->id)->where('objet', 'connexion')
+                ->where('cree_le', '>', $depuis->toIso8601String())
+                ->count();
+
+            if ($emises >= (int) config('double_auth.renvois_max', 3)) {
+                throw new TropDeRenvois('Trop de codes demandés.');
+            }
+
+            return $this->inserer($u, 'connexion', $ip);
+        });
+
+        if ($code !== null) {
+            $this->canal()->envoyer($u, $code, 'connexion');
         }
-
-        $this->emettre($u, 'connexion', $ip);
     }
 
     public function verifier(User $u, string $objet, string $code): bool

@@ -37,6 +37,8 @@ export interface GestesCampagneProps {
   avant?: React.ReactNode;
   /** Préparation de la fiche : sert au texte du refus « préparation pas terminée ». Absente dans la liste. */
   preparation?: PreparationCampagne;
+  /** UI-CAMP : campagne bloquée côté serveur. « Lancer » est désactivé et décrit par l'élément d'id `idRaison`. */
+  blocage?: { idRaison: string } | null | undefined;
 }
 
 /** Quels gestes chaque statut permet. */
@@ -58,7 +60,7 @@ const messageErreur = (e: unknown): string => messageErreurServeur(e, REPLI_GEST
 
 const TACTILE = 'max-md:h-11 max-md:text-sm';
 
-export function GestesCampagne({ campagne, maintenant, variante, avant, preparation = null }: GestesCampagneProps) {
+export function GestesCampagne({ campagne, maintenant, variante, avant, preparation = null, blocage = null }: GestesCampagneProps) {
   const [dialogue, setDialogue] = useState<Dialogue>(null);
   const [refus, setRefus] = useState<string | null>(null);
   const { lancer } = useGestesCampagne();
@@ -107,7 +109,7 @@ export function GestesCampagne({ campagne, maintenant, variante, avant, preparat
       <div ref={conteneur} tabIndex={-1} className={cn('flex flex-wrap items-center gap-2 outline-none', entete ? 'justify-end' : 'justify-start')}>
         {avant}
         {permis.lancer ? (
-          <Button className={TACTILE} iconLeft={<Rocket className="h-4 w-4" aria-hidden />} aria-label={nom('Lancer')} data-geste="lancer" loading={lancer.isPending} onClick={lancerCampagne}>
+          <Button className={TACTILE} iconLeft={<Rocket className="h-4 w-4" aria-hidden />} aria-label={nom('Lancer')} data-geste="lancer" disabled={blocage !== null || lancer.isPending} aria-describedby={blocage?.idRaison} loading={lancer.isPending} onClick={lancerCampagne}>
             Lancer
           </Button>
         ) : null}

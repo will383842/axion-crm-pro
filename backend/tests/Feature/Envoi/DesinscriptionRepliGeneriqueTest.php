@@ -4,7 +4,8 @@
  * Lot L6 (PLAN ADRESSES GÉNÉRALES, #680) — une opposition reçue sur une adresse de REPLI (adresse générale, un seul message)
  * inscrit AUSSI l'opposition du SIREN de l'entreprise : aucun contact nommé ajouté plus tard ne sera prospecté.
  * Échec fermé : une erreur d'écriture du SIREN n'annule jamais l'opposition de l'adresse, et l'opération est rejouable.
- * Fixtures FICTIVES (dépôt public), propriétaire de la base, un espace par test (cloisonnement `workspace_id`).
+ * Fixtures FICTIVES (dépôt public), un espace par test (cloisonnement `workspace_id`). Propriétaire de la base, sauf le test « rôle applicatif »
+ * (SET LOCAL ROLE `pgsql_app` : la RLS s'applique).
  */
 
 use App\Crm\Opposition\StatutOpposition;
@@ -239,8 +240,9 @@ test('L6 cloisonnement : l\'opposition d\'un espace n\'inscrit rien dans un autr
     $a = F::espace('zz-drg-a');
     $b = F::espace('zz-drg-b');
     $siren = drgSiren(8);
+    $sirenB = drgSiren(9);
     $entA = F::fiche($a, 'ZZ Entreprise A', ['siren' => $siren]);
-    $entB = F::fiche($b, 'ZZ Entreprise B', ['siren' => $siren]);
+    $entB = F::fiche($b, 'ZZ Entreprise B', ['siren' => $sirenB]);
     drgAllumer($a);
     drgAllumer($b);
     drgInscription($a, $entA, DRG_GENERIQUE, true);
@@ -249,6 +251,31 @@ test('L6 cloisonnement : l\'opposition d\'un espace n\'inscrit rien dans un autr
     drgOpposer($a);
 
     expect(drgSirenOppose($a, $siren))->toBeTrue();
+    expect(drgSirenOppose($a, $sirenB))->toBeFalse();   // rien de B n'entre dans A
+    expect(drgSirenOppose($b, $sirenB))->toBeFalse();
     expect(drgSirenOppose($b, $siren))->toBeFalse();
     expect(drgStatut($b, $chezB))->toBe(['active', null]);
+});
+
+test('L6 sous le rôle applicatif (RLS) : STOP sur l\'adresse de repli ⇒ adresse et SIREN opposés, inscriptions arrêtées', function () {
+    $ws = F::espace('zz-drg-app');
+    $siren = drgSiren(10);
+    $ent = F::fiche($ws, 'ZZ Entreprise', ['siren' => $siren]);
+    drgAllumer($ws);
+    $repli = drgInscription($ws, $ent, DRG_GENERIQUE, true);
+    $collegue = drgInscription($ws, $ent, 'collegue@zz-repli.example.invalid', false);
+
+    try {
+        WorkspaceContext::set($ws);
+        DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
+
+        drgOpposer($ws);
+
+        expect(drgAdresseOpposee($ws))->toBeTrue();
+        expect(drgSirenOppose($ws, $siren))->toBeTrue();
+        expect(drgStatut($ws, $repli))->toBe(['arretee', Evenement::OPPOSITION]);
+        expect(drgStatut($ws, $collegue))->toBe(['arretee', Evenement::OPPOSITION]);
+    } finally {
+        DB::statement('RESET ROLE');
+    }
 });

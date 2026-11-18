@@ -10,7 +10,7 @@ import { http, HttpResponse } from 'msw';
 import { NouvelleCampagnePage } from '@/features/envoi/campagnes/NouvelleCampagnePage';
 import { handlers } from '@/demo/handlers/envoi/creation.handlers';
 import { demoDb } from '@/demo/base';
-import { SAISIE_INITIALE, contenuEtape, saisieDepuis, type Saisie } from '@/features/envoi/creation/saisie';
+import { SAISIE_INITIALE, capacitesDe, contenuEtape, saisieDepuis, type Saisie } from '@/features/envoi/creation/saisie';
 import type { Brouillon } from '@/features/envoi/creation/api';
 import { renderScreen } from '../../helpers/renderScreen';
 
@@ -79,6 +79,13 @@ describe('B8-F — contenu des étapes sans les réglages refusés (pur)', () =>
     expect(JSON.stringify(contenuEtape(2, s))).toContain('"objet_b":"B"');
   });
 
+  it('capacités absentes ou mal formées : tout est refusé (échec fermé)', () => {
+    expect(capacitesDe(undefined)).toEqual(REFUSEES);
+    expect(capacitesDe({ maintenant: '2026-11-18T09:00:00Z' })).toEqual(REFUSEES);
+    expect(capacitesDe({ capacites: { ab: 'true', boites: 1, plafond: null } })).toEqual(REFUSEES);
+    expect(capacitesDe({ capacites: ACCEPTEES })).toEqual(ACCEPTEES);
+  });
+
   it('un ancien brouillon est rechargé, puis réécrit sans ces champs', () => {
     const s = saisieDepuis(brouillonAncien(3));
     expect(s.boites).toEqual(['boi-camille']);
@@ -120,10 +127,13 @@ describe('B8-F — assistant : contrôles grisés tant que refusés', () => {
     const neuf = { ...brouillonAncien(3), contenu: { nom: 'N', cible: { type: 'etiquette', reference: 'x', libelle: 'x' }, depart_immediat: true } } as unknown as Brouillon;
     const { puts, surcharges } = serveur(REFUSEES, neuf);
     await ouvrir(surcharges, `${CHEMIN}?brouillon=bro-ancien`);
-    await screen.findByLabelText('Plafond de cette campagne');
+    const plafond = await screen.findByLabelText('Plafond de cette campagne');
     await new Promise((r) => setTimeout(r, 400));
     for (const c of screen.queryAllByRole('checkbox')) expect(c).not.toBeChecked();
     for (const p of puts) expect(p.corps).not.toHaveProperty('boites');
+    // Rien n'a été pré-sélectionné dans la saisie (pas seulement masqué) : aucun « réglage retiré », plafond par défaut.
+    expect(screen.queryByText(/réglages retirés : non pris en charge/i)).toBeNull();
+    expect(plafond).toHaveValue(80);
   });
 
   it('étape 2 : case A/B désactivée avec raison, objet_b jamais envoyé', async () => {

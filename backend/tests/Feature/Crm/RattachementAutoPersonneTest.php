@@ -297,3 +297,128 @@ test('8. contact existant d une autre clé : rien n est lié', function () {
         ->and(rapPersonne()->contact_id)->toBeNull()
         ->and(rapDemandeLigne($demande->activityId)->subject_id)->toBeNull();
 });
+
+// ── C2 (#784) : demande sans SIREN, personne déjà contact actif d'UNE entreprise ──
+
+/** @return array<string, mixed> demande sans SIREN qui déclare AUTRE CHOSE que la fiche. */
+function rapDemandeDeclarative(): array
+{
+    $e = rapDemande();
+    $e['company'] = ['name' => 'ZZ AUTRE NOM', 'postcode' => '99999', 'city' => 'ZZVille', 'website' => 'https://zz.example.invalid'];
+    $e['person'] = ['person_key' => rapCle(), 'email' => RAP_EMAIL, 'first_name' => 'Zoe', 'last_name' => 'ZZ AUTRE', 'phone' => '0102030405'];
+
+    return $e;
+}
+
+/** Ce que la demande n'a pas le droit de changer : les valeurs de la fiche et du contact. */
+function rapValeursFiche(int $companyId): array
+{
+    return [
+        (array) DB::table('companies')->where('id', $companyId)->first(['denomination', 'postcode', 'city', 'website', 'relation_type', 'lifecycle_stage', 'legal_basis']),
+        DB::table('contacts')->where('company_id', $companyId)->orderBy('id')->get(['id', 'first_name', 'last_name', 'phone', 'email', 'person_key'])->map(fn ($c) => (array) $c)->all(),
+    ];
+}
+
+test('10. dossier puis demande sans SIREN : rattachée, aucune valeur déclarée écrite sur la fiche', function () {
+    rapIngerer(rapDossier());
+    $fiche = DB::table('companies')->where('siren', '900000801')->first();
+    $contact = DB::table('contacts')->where('company_id', $fiche->id)->first();
+    $avant = rapValeursFiche((int) $fiche->id);
+    $contactsAvant = DB::table('contacts')->count();
+
+    $issue = rapIngerer(rapDemandeDeclarative());
+
+    $ligne = rapDemandeLigne($issue->activityId);
+    $payload = json_decode($ligne->payload, true);
+    $personne = rapPersonne();
+    expect($issue->status)->toBe(IngestOutcome::UPDATED)
+        ->and($issue->subjectType)->toBe('company')
+        ->and($issue->subjectId)->toBe($fiche->id)
+        ->and($ligne->subject_type)->toBe('company')
+        ->and($ligne->subject_id)->toBe($fiche->id)
+        ->and($ligne->contact_id)->toBe($contact->id)
+        ->and($payload['arbitrage']['attached_by'])->toBe('automatique:personne_connue')
+        ->and($payload['arbitrage']['company_id'])->toBe($fiche->id)
+        ->and($payload['arbitrage']['contact_id'])->toBe($contact->id)
+        ->and($payload['pending_match']['denomination'])->toBe('ZZ AUTRE NOM')
+        ->and($personne)->not->toBeNull()
+        ->and($personne->contact_id)->toBe($contact->id)
+        ->and($personne->company_id)->toBe($fiche->id)
+        ->and(DB::table('contacts')->count())->toBe($contactsAvant)
+        ->and(rapValeursFiche((int) $fiche->id))->toBe($avant);
+});
+
+test('10b. le rattachement ne passe jamais par upsertCompany ni upsertContact', function () {
+    rapIngerer(rapDossier());
+
+    DB::enableQueryLog();
+    rapIngerer(rapDemandeDeclarative());
+    $requetes = array_column(DB::getQueryLog(), 'query');
+    DB::disableQueryLog();
+
+    $ecrituresSurFiche = array_filter($requetes, static fn (string $q): bool => preg_match('/^\s*(update|insert into)\s+"(companies|contacts)"/i', $q) === 1);
+    expect($ecrituresSurFiche)->toBe([]);
+});
+
+test('11. plusieurs entreprises possibles : la demande reste en attente, aucune étiquette ajoutée', function () {
+    rapIngerer(rapDossier('900000801', client: '5d1e7c2a-3b4f-4a6d-9c8e-1f2a3b4c5d01'));
+    rapIngerer(rapDossier('900000802', client: '5d1e7c2a-3b4f-4a6d-9c8e-1f2a3b4c5d02'));
+    expect(DB::table('contacts')->where('person_key', rapCle())->count())->toBe(2);
+    $etiquettes = DB::table('company_tag')->count();
+
+    $issue = rapIngerer(rapDemandeDeclarative());
+
+    $ligne = rapDemandeLigne($issue->activityId);
+    expect($issue->status)->toBe(IngestOutcome::PENDING_MATCH)
+        ->and($issue->subjectId)->toBeNull()
+        ->and($ligne->subject_id)->toBeNull()
+        ->and($ligne->contact_id)->toBeNull()
+        ->and(json_decode($ligne->payload, true))->not->toHaveKey('arbitrage')
+        ->and(DB::table('company_tag')->count())->toBe($etiquettes);
+});
+
+test('12. contact ou fiche à la corbeille ne compte pas', function () {
+    rapIngerer(rapDossier('900000801', client: '5d1e7c2a-3b4f-4a6d-9c8e-1f2a3b4c5d01'));
+    rapIngerer(rapDossier('900000802', client: '5d1e7c2a-3b4f-4a6d-9c8e-1f2a3b4c5d02'));
+    $ficheA = DB::table('companies')->where('siren', '900000801')->first();
+    $ficheB = DB::table('companies')->where('siren', '900000802')->first();
+    DB::table('contacts')->where('company_id', $ficheB->id)->update(['deleted_at' => now()]);
+
+    $issue = rapIngerer(rapDemandeDeclarative());
+    expect($issue->status)->toBe(IngestOutcome::UPDATED)
+        ->and(rapDemandeLigne($issue->activityId)->subject_id)->toBe($ficheA->id);
+
+    DB::table('personnes')->where('person_key', rapCle())->update(['contact_id' => null, 'company_id' => null]);
+    DB::table('companies')->where('id', $ficheA->id)->update(['deleted_at' => now()]);
+    $suivante = rapIngerer(rapDemandeDeclarative());
+
+    expect($suivante->status)->toBe(IngestOutcome::PENDING_MATCH)
+        ->and(rapDemandeLigne($suivante->activityId)->subject_id)->toBeNull();
+});
+
+test('14. drapeau des demandes fermé : comportement d avant, aucun verrou ni requête sur personnes', function () {
+    config(['crm.ingest.personnes_enabled' => false, 'crm.ingest.demandes_personne_enabled' => false]);
+    rapIngerer(rapDossier());
+
+    DB::enableQueryLog();
+    $issue = rapIngerer(rapDemandeDeclarative());
+    $requetes = array_column(DB::getQueryLog(), 'query');
+    DB::disableQueryLog();
+
+    expect($issue->status)->toBe(IngestOutcome::PENDING_MATCH)
+        ->and(rapDemandeLigne($issue->activityId)->subject_id)->toBeNull()
+        ->and(rapPosition($requetes, 'pg_advisory_xact_lock'))->toBeNull()
+        ->and(rapPosition($requetes, '"personnes"'))->toBeNull();
+});
+
+test('13. personne mise à l écart : la demande reste en attente', function () {
+    rapIngerer(rapDossier());
+    rapIngerer(rapDemande());
+    DB::table('personnes')->where('person_key', rapCle())->update(['opposition_at' => now(), 'contact_id' => null, 'company_id' => null]);
+
+    $issue = rapIngerer(rapDemandeDeclarative());
+
+    expect($issue->status)->toBe(IngestOutcome::PENDING_MATCH)
+        ->and(rapDemandeLigne($issue->activityId)->subject_id)->toBeNull()
+        ->and(rapPersonne()->contact_id)->toBeNull();
+});

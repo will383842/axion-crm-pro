@@ -166,9 +166,11 @@ final class SiteSyncIngestService
             return new IngestOutcome(status: IngestOutcome::OPTED_OUT);
         }
 
-        [$subjectType, $subjectId, $status, $contactId] = $universe === 'vivier'
+        $resultat = $universe === 'vivier'
             ? $this->upsertCandidate($event, $workspaceId)
             : $this->upsertBusiness($event, $workspaceId);
+        [$subjectType, $subjectId, $status, $contactId] = $resultat;
+        $rattachementAuto = $resultat[4] ?? null;
 
         $tags = [];
         $tagsIgnores = [];
@@ -192,7 +194,7 @@ final class SiteSyncIngestService
             }
         }
 
-        $activityId = $this->recordActivity($event, $workspaceId, $subjectType, $subjectId, $contactId, $activityRef);
+        $activityId = $this->recordActivity($event, $workspaceId, $subjectType, $subjectId, $contactId, $activityRef, $rattachementAuto);
 
         return new IngestOutcome(
             status: $status,
@@ -207,7 +209,7 @@ final class SiteSyncIngestService
     // ── Univers BUSINESS ────────────────────────────────────────────────────
 
     /**
-     * @return array{0: ?string, 1: ?int, 2: string, 3: ?int}
+     * @return array{0: ?string, 1: ?int, 2: string, 3: ?int, 4?: array{motif: string, company_id: int, contact_id: int}}
      */
     private function upsertBusiness(SiteSyncEvent $event, string $workspaceId): array
     {
@@ -224,7 +226,24 @@ final class SiteSyncIngestService
             // sortirait la demande de la file d'arbitrage. Drapeau fermé :
             // `concerneUneDemande` rend `false` sans aucune requête.
             if ($this->personnes->concerneUneDemande($event, 'business')) {
-                $this->personnes->assurerDepuisDemande($event, $workspaceId);
+                // C2 (#784) : verrou de personne AVANT tout verrou de ligne (même
+                // ordre que C1 dans `DossierClientIngest`), puis la personne.
+                SoldeDemandesEnAttente::verrouillerPersonnes($workspaceId, $event->personKey());
+                $etat = $this->personnes->assurerDepuisDemande($event, $workspaceId);
+                $connue = $etat === PersonnesIngestService::DEMANDE_ECARTEE
+                    ? null
+                    : $this->entrepriseUniqueDeLaPersonne($workspaceId, $event->personKey());
+                if ($connue !== null) {
+                    // Ni `upsertCompany` ni `upsertContact` : aucune valeur
+                    // déclarée sans SIREN n'est écrite sur la fiche ni le contact.
+                    $this->contacts->lierPersonne($workspaceId, $event->personKey(), $connue[1], $connue[0]);
+
+                    return ['company', $connue[0], IngestOutcome::UPDATED, $connue[1], [
+                        'motif' => 'automatique:personne_connue',
+                        'company_id' => $connue[0],
+                        'contact_id' => $connue[1],
+                    ]];
+                }
             }
 
             return [null, null, IngestOutcome::PENDING_MATCH, null];
@@ -239,6 +258,39 @@ final class SiteSyncIngestService
             $contact === null ? $companyStatus : $contact[1],
             $contact === null ? null : $contact[0],
         ];
+    }
+
+    /**
+     * C2 (#784) : l'entreprise de la personne, seulement si elle est contact
+     * ACTIF d UNE seule entreprise active (contacts et entreprises à la
+     * corbeille ne comptent pas), lue sur `contacts` et non sur `personnes`.
+     * Une personne déjà liée à un contact d une AUTRE fiche : rien (arbitrage).
+     *
+     * @return array{0: int, 1: int}|null [company_id, contact_id]
+     */
+    private function entrepriseUniqueDeLaPersonne(string $workspaceId, string $personKey): ?array
+    {
+        $lignes = DB::table('contacts')
+            ->join('companies', 'companies.id', '=', 'contacts.company_id')
+            ->where('contacts.workspace_id', $workspaceId)
+            ->where('contacts.person_key', $personKey)
+            ->whereNull('contacts.deleted_at')
+            ->whereNull('companies.deleted_at')
+            ->groupBy('contacts.company_id')
+            ->limit(2)
+            ->get(['contacts.company_id', DB::raw('MIN(contacts.id) AS contact_id')]);
+        $ligne = $lignes->first();
+        if ($lignes->count() !== 1 || $ligne === null) {
+            return null;
+        }
+        $companyId = (int) $ligne->company_id;
+
+        $liee = DB::table('personnes')->where('workspace_id', $workspaceId)->where('person_key', $personKey)->value('contact_id');
+        if ($liee !== null && (int) DB::table('contacts')->where('id', $liee)->value('company_id') !== $companyId) {
+            return null;
+        }
+
+        return [$companyId, (int) $ligne->contact_id];
     }
 
     /**
@@ -700,6 +752,9 @@ final class SiteSyncIngestService
         ]);
     }
 
+    /**
+     * @param  array{motif: string, company_id: int, contact_id: int}|null  $rattachementAuto  C2 (#784)
+     */
     private function recordActivity(
         SiteSyncEvent $event,
         string $workspaceId,
@@ -707,6 +762,7 @@ final class SiteSyncIngestService
         ?int $subjectId,
         ?int $contactId,
         string $activityRef,
+        ?array $rattachementAuto = null,
     ): int {
         // `origines`, `origine_contenu` et `commentaire_ref` ne vont jamais en
         // clair dans la timeline : ils vivent dans `personnes` (le jeton de
@@ -715,7 +771,7 @@ final class SiteSyncIngestService
         $payload['source_slug'] = $event->sourceSlug;
         $payload['subject_ref'] = $event->subjectRef;
 
-        if ($subjectId === null) {
+        if ($subjectId === null || $rattachementAuto !== null) {
             // Matière première de l'écran d'arbitrage : ce qu'on sait de
             // l'entreprise ET de la personne, sans avoir jamais deviné à quelle
             // fiche l'attacher.
@@ -747,6 +803,17 @@ final class SiteSyncIngestService
             }
 
             $payload['pending_match'] = $pendingMatch;
+        }
+        if ($rattachementAuto !== null) {
+            // C2 (#784) : `pending_match` est gardé (ce qui a été déclaré peut
+            // être relu si le rattachement est contesté) ; la ligne sort de la
+            // file parce que `subject_id` n'est pas nul.
+            $payload['arbitrage'] = [
+                'attached_at' => now()->toIso8601String(),
+                'attached_by' => $rattachementAuto['motif'],
+                'company_id' => $rattachementAuto['company_id'],
+                'contact_id' => $rattachementAuto['contact_id'],
+            ];
         }
 
         return (int) DB::table('activities')->insertGetId([

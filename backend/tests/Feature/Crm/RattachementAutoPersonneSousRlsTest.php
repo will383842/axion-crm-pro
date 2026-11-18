@@ -110,3 +110,68 @@ test('sous axion_app : le dossier lie la personne et solde la demande en attente
         rarNettoyer($espace);
     }
 });
+
+test('C2 sous axion_app : la demande sans SIREN est rattachée à l entreprise unique du contact, fiche intacte', function () {
+    config([
+        'crm.ingest.enabled' => true,
+        'crm.ingest.personnes_enabled' => false,
+        'crm.ingest.demandes_personne_enabled' => true,
+    ]);
+    $owner = rarProprio();
+    $espace = (string) Str::uuid();
+    $slug = 'zz-rar2-' . substr($espace, 0, 8);
+    $owner->table('workspaces')->insert([
+        'id' => $espace, 'slug' => $slug, 'name' => 'ZZ RAR2 RLS',
+        'settings' => '{}', 'cost_cap_eur' => 100, 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    config(['crm.ingest.business_workspace' => $slug]);
+
+    $email = 'zz.rar2.' . Str::lower(Str::random(8)) . '@example.invalid';
+    $cle = hash('sha256', 'zz-c2|' . $email);
+    $fiche = $owner->table('companies')->insertGetId([
+        'workspace_id' => $espace, 'siren' => '9' . random_int(10000000, 99999999), 'denomination' => 'ZZ FICHE RAR2',
+        'postcode' => '75011', 'discovery_source' => 'site', 'quality_score' => 0, 'signals' => '{}', 'metadata' => '{}',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $contact = $owner->table('contacts')->insertGetId([
+        'workspace_id' => $espace, 'company_id' => $fiche, 'first_name' => 'Jeanne', 'last_name' => 'ZZ RAR2',
+        'person_key' => $cle, 'discovery_source' => 'site', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $evenement = [
+        'schema_version' => 1, 'event_id' => (string) Str::uuid(), 'event_type' => 'form_submission', 'form_type' => 'audit',
+        'occurred_at' => now()->subMinute()->toAtomString(), 'subject_ref' => 'site:submission:' . Str::uuid(),
+        'person' => ['person_key' => $cle, 'email' => $email, 'first_name' => 'Zoe', 'last_name' => 'ZZ AUTRE', 'phone' => '0102030405'],
+        'company' => ['name' => 'ZZ AUTRE NOM', 'postcode' => '99999'],
+        'consent' => ['version' => 'v1-2026-05-24', 'at' => now()->subMinutes(2)->toAtomString(), 'text_ref' => 'unified-contact-form'],
+        'tags' => [], 'payload' => ['page' => '/fr/contact'],
+    ];
+
+    $precedente = DB::getDefaultConnection();
+    try {
+        DB::setDefaultConnection('pgsql_app');
+        $issue = app(SiteSyncIngestService::class)->ingest(SiteSyncEvent::fromArray($evenement));
+    } finally {
+        DB::connection('pgsql_app')->select('SELECT set_config(?, ?, false)', ['app.current_workspace_id', '']);
+        DB::setDefaultConnection($precedente);
+    }
+
+    try {
+        $ligne = $owner->table('activities')->where('id', $issue->activityId)->first();
+        $personne = $owner->table('personnes')->where('workspace_id', $espace)->where('person_key', $cle)->first();
+        $payload = json_decode($ligne->payload, true);
+        expect($issue->status)->toBe(IngestOutcome::UPDATED)
+            ->and($ligne->subject_type)->toBe('company')
+            ->and($ligne->subject_id)->toBe($fiche)
+            ->and($ligne->contact_id)->toBe($contact)
+            ->and($payload['arbitrage']['attached_by'])->toBe('automatique:personne_connue')
+            ->and($payload)->toHaveKey('pending_match')
+            ->and($personne->contact_id)->toBe($contact)
+            ->and($personne->company_id)->toBe($fiche)
+            ->and($owner->table('companies')->where('id', $fiche)->value('denomination'))->toBe('ZZ FICHE RAR2')
+            ->and($owner->table('companies')->where('id', $fiche)->value('postcode'))->toBe('75011')
+            ->and($owner->table('contacts')->where('id', $contact)->value('first_name'))->toBe('Jeanne')
+            ->and($owner->table('contacts')->where('id', $contact)->value('phone'))->toBeNull();
+    } finally {
+        rarNettoyer($espace);
+    }
+});

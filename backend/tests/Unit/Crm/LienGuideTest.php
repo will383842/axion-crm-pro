@@ -56,18 +56,29 @@ test('un libellé absent ou vide : pas de lien (jamais un lien sans nom)', funct
     expect(LienGuide::pour('guide-ia'))->toBeNull();
 });
 
-test('la table de production livrée est éteinte et ne contient que des adresses exemple.invalid à remplacer', function () {
+test('la table de production livrée est éteinte et porte la vraie adresse du guide (donnée par le fondateur)', function () {
     $table = require base_path('config/guides.php');
     expect($table['lien_enabled'])->toBeFalse()
         ->and(array_keys($table['publics']))->toBe(['guide-ia'])
-        ->and($table['publics']['guide-ia']['url'])->toStartWith('https://exemple.invalid/');
-    expect(file_get_contents(base_path('config/guides.php')))->toContain('À REMPLACER PAR LE FONDATEUR');
+        ->and($table['publics']['guide-ia']['url'])->toBe('https://axion-ia.com/fr/guide-ia');
+    $source = file_get_contents(base_path('config/guides.php'));
+    expect($source)->not->toContain('exemple.invalid/guides')
+        ->and($source)->toContain('Adresse donnée par le fondateur le 18/11');
+});
+
+test('la vraie adresse livrée passe la garde, même en production, une fois le lien allumé', function () {
+    config(['guides.lien_enabled' => true]);
+    foreach (['production', 'testing'] as $env) {
+        app()->detectEnvironment(fn () => $env);
+        expect(LienGuide::pour('guide-ia'))->toBe(['url' => 'https://axion-ia.com/fr/guide-ia', 'libelle' => 'Guide IA pour TPE-PME (PDF)']);
+    }
+    app()->detectEnvironment(fn () => 'testing');
 });
 
 test('la table livrée nomme le guide de son vrai titre', function () {
     expect(LienGuide::nom('guide-ia'))->toBe('Guide IA pour TPE-PME')
         ->and(config('guides.publics.guide-ia.libelle'))->toBe('Guide IA pour TPE-PME (PDF)')
-        ->and(parse_url((string) config('guides.publics.guide-ia.url'), PHP_URL_HOST))->toBeIn(['exemple.invalid', 'axion-ia.com']);
+        ->and(parse_url((string) config('guides.publics.guide-ia.url'), PHP_URL_HOST))->toBe('axion-ia.com');
 });
 
 test('statut : éteint avant tout, puis refusé sans droit, sinon disponible', function () {

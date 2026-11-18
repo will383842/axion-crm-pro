@@ -27,25 +27,22 @@
 | surchargeable par `CRM_GUIDE_HOTE`). L'hôte de test `exemple.invalid` n'est
 | accepté QUE dans les environnements testing, local et demo, jamais en production.
 |
-| ⚠️ AVANT D'ALLUMER `CRM_GUIDE_LIEN_ENABLED` : poser la VRAIE adresse publique du
-| guide (sur `hote_autorise`) dans `publics`. Tant que l'entrée de test
-| `exemple.invalid` reste en place, la production n'affiche aucun lien.
+| L'interrupteur `CRM_GUIDE_LIEN_ENABLED` peut être posé par le déploiement
+| (variable GitHub du même nom, `true` ou `false` ; absente = rien ne change).
 |
-| ⚠️ À REMPLACER PAR LE FONDATEUR : seule l'ADRESSE de l'entrée `guide-ia`
-| ci-dessous est un guide de TEST en `exemple.invalid` (domaine réservé, qui ne
-| résout jamais). Le NOM est désormais le vrai titre du guide (celui du Studio).
-| Ne jamais inventer une vraie adresse : le fondateur y met l'adresse publique
-| réelle du guide validé, avant d'allumer l'interrupteur.
+| ADRESSE RÉELLE : l'adresse de l'entrée `guide-ia` ci-dessous (sur
+| `hote_autorise`) a été donnée par le fondateur le 18/11. Ne jamais inventer
+| une autre adresse. L'hôte de test `exemple.invalid` reste refusé en production.
 */
 return [
     'lien_enabled' => (bool) env('CRM_GUIDE_LIEN_ENABLED', false),
     'hote_autorise' => (string) env('CRM_GUIDE_HOTE', 'axion-ia.com'),
     'publics' => [
-        // À REMPLACER PAR LE FONDATEUR : adresse de test, pas une vraie adresse.
+        // Adresse donnée par le fondateur le 18/11.
         'guide-ia' => [
             'nom' => 'Guide IA pour TPE-PME',
             'libelle' => 'Guide IA pour TPE-PME (PDF)',
-            'url' => 'https://exemple.invalid/guides/guide-ia.pdf',
+            'url' => 'https://axion-ia.com/fr/guide-ia',
         ],
     ],
 ];

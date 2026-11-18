@@ -167,6 +167,7 @@ test('DEPLOIEMENT-ARGS — les drapeaux sont normalises (true|false sinon ignore
     foreach ([
         'CRM_INGEST_DOSSIER_ENABLED', 'CRM_SYNC_DOSSIER_CLIENT_STAGE', 'CRM_INGEST_DEMANDES_PERSONNE_ENABLED',
         'ORIGINES_V3_ENABLED', 'ORIGINES_LECTURE_ENABLED', 'ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED',
+        'CRM_GUIDE_LIEN_ENABLED',
     ] as $nom) {
         expect($ligne)->toContain($nom);
     }

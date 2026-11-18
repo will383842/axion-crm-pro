@@ -36,6 +36,7 @@ import { RotationsPage } from '@/features/llm/RotationsPage';
 import { RgpdRequestsPage } from '@/features/rgpd/RgpdRequestsPage';
 import { EffacementsDemandesPage } from '@/features/rgpd/EffacementsDemandesPage';
 import { OriginesPage } from '@/features/origines/OriginesPage';
+import { FileLinkedinPage } from '@/features/prospection-linkedin/FileLinkedinPage';
 import { AiActRegisterPage } from '@/features/rgpd/AiActRegisterPage';
 import { AuditLogsPage } from '@/features/rgpd/AuditLogsPage';
 import { UsersPage } from '@/features/users/UsersPage';
@@ -197,6 +198,7 @@ const proxyProvidersRoute = createRoute({ getParentRoute: () => layoutRoute, pat
 const rotationsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/llm/rotations', component: RotationsPage });
 const rgpdRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/requests', component: RgpdRequestsPage });
 const effacementsRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/effacements', component: EffacementsDemandesPage });
+const fileLinkedinRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/prospection-linkedin', component: FileLinkedinPage });
 const originesRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/origines', component: OriginesPage });
 const aiActRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/rgpd/ai-act', component: AiActRegisterPage });
 const auditRoute = createRoute({ getParentRoute: () => layoutRoute, path: '/audit-logs', component: AuditLogsPage });
@@ -478,6 +480,7 @@ export const routeTree = rootRoute.addChildren([
     rgpdRoute,
     effacementsRoute,
     originesRoute,
+    fileLinkedinRoute,
     aiActRoute,
     auditRoute,
     usersRoute,

@@ -6,6 +6,7 @@ use App\Crm\Campagnes\EligibiliteAdresse;
 use App\Crm\Campagnes\Segments;
 use App\Crm\Opposition\StatutOpposition;
 use App\Crm\Personnes\NatureEmail;
+use App\Envoi\Campagnes\RepliGenerique;
 use App\Envoi\Conformite\RegistreOppositionManuel;
 use App\Envoi\ListesNoires\GardeListes;
 use App\Socle\Espace\FonctionsEspace;
@@ -280,7 +281,14 @@ final class EnvoiAutorise
             ->first();
 
         // Le DERNIER verdict fait foi : un « invalide » récent annule un « valide » plus ancien.
-        if ($ligne === null || $ligne->verdict !== 'valide') {
+        if ($ligne === null) {
+            return false;
+        }
+        // R6 (repli sur l'adresse générale) : `risque/generique` n'est admis QUE pour une demande de repli ET si l'interrupteur de l'espace
+        // est relu à « true » (échec fermé : absent, illisible ou en erreur = refus). Tout autre verdict non « valide » reste refusé.
+        $repliAdmis = $ligne->verdict === 'risque' && ($ligne->motif ?? null) === 'generique'
+            && $d->repliGenerique && RepliGenerique::ouvert($d->workspaceId);
+        if ($ligne->verdict !== 'valide' && ! $repliAdmis) {
             return false;
         }
 

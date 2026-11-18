@@ -354,6 +354,19 @@ export const handlers: HttpHandler[] = [
     return HttpResponse.json(apresGeste(maj, resume(maj, classement, tache)));
   }),
 
+  // Mêmes refus que le serveur : un STOP ne s'annule pas (409 `stop_definitif`), une réponse sans classement non plus (409 `pas_traitee`).
+  http.post(api('/envoi/reponses/:id/annuler'), async ({ params }) => {
+    await delai();
+    zone();
+    const r = demoDb.reponses.trouver(String(params['id']));
+    if (!r) return erreur(404, 'introuvable', 'Cette réponse n’existe pas.');
+    if (!r.traitee) return erreur(409, 'pas_traitee', 'Cette réponse n’a pas de classement à annuler.');
+    if (r.classement === 'stop') return erreur(409, 'stop_definitif', 'Un STOP est définitif : il ne peut être ni annulé ni corrigé.');
+    // Ajout seul : rien n'est effacé (arrêts, tâches, registre gardés) ; la réponse revient « à traiter ».
+    const maj = demoDb.reponses.modifier(r.id, { traitee: false }) ?? r;
+    return HttpResponse.json({ ...maj, message: 'Classement annulé. Les arrêts et les tâches déjà créés sont conservés.' });
+  }),
+
   http.post(api('/envoi/reponses/:id/rattacher'), async ({ params, request }) => {
     await delai();
     const z = zone();

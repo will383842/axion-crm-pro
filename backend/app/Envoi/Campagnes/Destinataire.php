@@ -14,5 +14,6 @@ final class Destinataire
         public readonly int $entrepriseId,
         public readonly ?int $personneId,     // toujours null dans ce lot
         public readonly string $empreinte,    // 64 caractères hexadécimaux
+        public readonly bool $repliGenerique = false, // L3 : adresse générale choisie en dernier recours (un seul message, aucune relance)
     ) {}
 }

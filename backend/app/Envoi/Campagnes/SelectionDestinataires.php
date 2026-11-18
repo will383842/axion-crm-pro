@@ -21,7 +21,10 @@ use Illuminate\Support\Facades\DB;
  *    `lectureTropLongue`. Modèle : `AssistantCreation::mesurer`.
  *  - FERMÉ EN CAS D'ERREUR : toute exception d'une lecture d'exclusion annule le lot (`lectureOppositionImpossible`) ; une adresse
  *    absente de la réponse du lecteur d'opposition compte comme opposée.
- *  - Entreprise (règle E7) : on retient le plus petit `contact_id` NOMINATIF sans motif d'exclusion. Un générique n'est JAMAIS choisi.
+ *  - Entreprise (règle E7) : on retient le plus petit `contact_id` NOMINATIF sans motif d'exclusion. Un générique n'est choisi qu'en
+ *    DERNIER RECOURS (PLAN ADRESSES GÉNÉRALES #680, lot L3) : interrupteur `RepliGenerique::ouvert` allumé, AUCUN contact nommé (nominatif)
+ *    dans la fiche, lecture non tronquée, adresse de la liste blanche, mêmes exclusions qu'un nommé, jamais de repli passé ni d'adresse
+ *    partagée par plusieurs fiches. Interrupteur éteint ou illisible = comportement d'avant, à l'identique.
  *  - Ordre strict des motifs : PRIORITE. Le dédoublonnage par empreinte ne vaut que DANS le lot.
  *  - Aucune adresse n'est rendue : seulement des identifiants et l'empreinte.
  */
@@ -97,8 +100,13 @@ final class SelectionDestinataires
         $membres = $this->membres($ws, is_array($cible) ? $cible : [], $apres, $taille);
         $curseur = count($membres) === $taille ? (int) $membres[$taille - 1]->cle : null;
 
+        // UNE lecture de l'interrupteur par lot, dans la transaction en lecture seule. Éteint ou illisible : aucun repli.
+        $repliOuvert = RepliGenerique::ouvert($ws);
         $compteurs = array_fill_keys(self::MOTIFS, 0) + ['membres' => count($membres), 'retenus' => 0, 'sans_contact_generique_disponible' => 0];
-        $destinataires = $this->choisir($ws, $membres, $compteurs, $filtre, $contenu);
+        if ($repliOuvert) {
+            $compteurs['retenus_repli_generique'] = 0; // sous-compte, hors de la somme `membres = retenus + Σ MOTIFS`
+        }
+        $destinataires = $this->choisir($ws, $membres, $compteurs, $filtre, $contenu, $repliOuvert);
         $compteurs['retenus'] = count($destinataires);
 
         return new LotDestinataires($destinataires, $compteurs, $curseur);
@@ -185,7 +193,7 @@ final class SelectionDestinataires
      * @param  array<string, int>  $compteurs  modifié en place
      * @return list<Destinataire>
      */
-    private function choisir(string $ws, array $membres, array &$compteurs, ?FiltreOrigine $filtre = null, ?FiltreOrigineContenu $contenu = null): array
+    private function choisir(string $ws, array $membres, array &$compteurs, ?FiltreOrigine $filtre = null, ?FiltreOrigineContenu $contenu = null, bool $repliOuvert = false): array
     {
         $idsCibles = [];
         $idsEntreprises = [];
@@ -208,7 +216,7 @@ final class SelectionDestinataires
                 $compteurs['entreprise_deja_couverte']++;
                 $unites[] = null;
             } else {
-                $unites[] = $this->uniteEntreprise($entreprises[(int) $m->company_id] ?? null, $compteurs);
+                $unites[] = $this->uniteEntreprise($entreprises[(int) $m->company_id] ?? null, $compteurs, $repliOuvert);
             }
         }
 
@@ -221,15 +229,20 @@ final class SelectionDestinataires
         // Exclusions : UNE lecture chacune pour tout le lot ; une exception annule le lot (fermé en cas d'erreur).
         $candidats = [];
         $sirens = [];
+        $replis = []; // entreprise_id => candidat de repli (le même passe par les mêmes exclusions qu'un nommé)
         foreach ($unites as $u) {
             foreach ($u['candidats'] ?? [] as $c) {
                 $candidats[$c['contact_id']] = $c;
+            }
+            if (isset($u['repli'])) {
+                $candidats[$u['repli']['contact_id']] = $u['repli'];
+                $replis[$u['entreprise_id']] = $u['repli']['email'];
             }
             if (isset($u['entreprise_id'], $u['siren'])) {
                 $sirens[$u['entreprise_id']] = $u['siren'];
             }
         }
-        $ex = $this->lireExclusions($ws, $candidats, $sirens, $idsEntreprises);
+        $ex = $this->lireExclusions($ws, $candidats, $sirens, $idsEntreprises, $replis);
 
         $retenus = [];
         $vus = [];
@@ -257,6 +270,21 @@ final class SelectionDestinataires
 
                 continue;
             }
+            $repli = false;
+            if ($choisi === null && $u['candidats'] === [] && isset($u['repli'])) {
+                $motifRepli = $this->motifRepli($u['repli'], $u, $ex);
+                if ($motifRepli === null) {
+                    $choisi = $u['repli'];
+                    $repli = true;
+                } else {
+                    $this->compter($compteurs, $motifRepli);
+                    if ($motifRepli === 'sans_contact') {
+                        $compteurs['sans_contact_generique_disponible']++;
+                    }
+
+                    continue;
+                }
+            }
             if ($choisi === null) {
                 if ($u['candidats'] === []) {
                     $this->compter($compteurs, 'sans_contact');
@@ -276,7 +304,10 @@ final class SelectionDestinataires
                 continue;
             }
             $vus[$empreinte] = true;
-            $retenus[] = new Destinataire('entreprises', $choisi['contact_id'], $choisi['entreprise_id'], null, $empreinte);
+            if ($repli) {
+                $compteurs['retenus_repli_generique']++;
+            }
+            $retenus[] = new Destinataire('entreprises', $choisi['contact_id'], $choisi['entreprise_id'], null, $empreinte, $repli);
         }
 
         return $retenus;
@@ -363,13 +394,14 @@ final class SelectionDestinataires
     }
 
     /**
-     * Entreprise (E7) : candidats = contacts NOMINATIFS de la fiche (jamais un générique).
+     * Entreprise (E7) : candidats = contacts NOMINATIFS de la fiche. Un générique n'est que `repli` (dernier recours, R2) : interrupteur
+     * allumé, aucun nominatif dans la fiche, lecture non tronquée (< CONTACTS_PAR_ENTREPRISE lignes), adresse de la liste blanche R1.
      *
      * @param  array<string, mixed>|null  $e
      * @param  array<string, int>  $compteurs
      * @return array<string, mixed>
      */
-    private function uniteEntreprise(?array $e, array &$compteurs): array
+    private function uniteEntreprise(?array $e, array &$compteurs, bool $repliOuvert = false): array
     {
         if ($e === null || $e['supprimee']) {
             $compteurs['fiche_supprimee']++;
@@ -377,17 +409,24 @@ final class SelectionDestinataires
             return ['motif_direct' => 'fiche_supprimee'];
         }
         $candidats = [];
+        $generiques = [];
         $generique = $e['a_generique_fiche'];
         foreach ($e['contacts'] as $k) {
+            $candidat = ['contact_id' => $k['contact_id'], 'entreprise_id' => $e['id'], 'email' => $k['email'], 'siren' => $e['siren'], 'presse' => $k['contact_presse'] || $e['fiche_presse']];
             if (QualificationEmail::type($k['email']) !== 'nominatif') {
                 $generique = true;
+                if ($repliOuvert && RepliGenerique::admise($k['email'])) { // `admise` exige déjà « générique » : jamais une adresse nominative
+                    $generiques[] = $candidat;
+                }
 
                 continue;
             }
-            $candidats[] = ['contact_id' => $k['contact_id'], 'entreprise_id' => $e['id'], 'email' => $k['email'], 'siren' => $e['siren'], 'presse' => $k['contact_presse'] || $e['fiche_presse']];
+            $candidats[] = $candidat;
         }
+        // Repli seulement sans aucun nommé (même exclu : un générique ne contourne jamais une exclusion) et sans troncature (on ne sait pas).
+        $repli = $repliOuvert && $candidats === [] && count($e['contacts']) < self::CONTACTS_PAR_ENTREPRISE ? RepliGenerique::choisir($generiques) : null;
 
-        return ['entreprise_id' => $e['id'], 'siren' => $e['siren'], 'ciblee' => false, 'fiche_presse' => $e['fiche_presse'], 'candidats' => $candidats, 'generique_disponible' => $generique];
+        return ['entreprise_id' => $e['id'], 'siren' => $e['siren'], 'ciblee' => false, 'fiche_presse' => $e['fiche_presse'], 'candidats' => $candidats, 'generique_disponible' => $generique, 'repli' => $repli];
     }
 
     /**
@@ -416,6 +455,21 @@ final class SelectionDestinataires
         }
 
         return null;
+    }
+
+    /**
+     * Motif d'exclusion d'un candidat de REPLI : mêmes exclusions qu'un nommé (PRIORITE), puis repli déjà fait un jour (tous statuts) =
+     * `deja_en_sequence`, puis adresse portée par plusieurs fiches (D10) = `sans_contact`. null = retenu.
+     *
+     * @param  array<string, mixed>  $c
+     * @param  array<string, mixed>  $u
+     * @param  array<string, mixed>  $ex
+     */
+    private function motifRepli(array $c, array $u, array $ex): ?string
+    {
+        return $this->motifPrioritaire($c, $u, $ex)
+            ?? (($ex['repli_passe'][$c['entreprise_id']] ?? false) ? 'deja_en_sequence' : null)
+            ?? (($ex['partagees'][QualificationEmail::normaliser($c['email'])] ?? false) ? 'sans_contact' : null);
     }
 
     /** @param list<string> $motifs non vide */
@@ -509,9 +563,10 @@ final class SelectionDestinataires
      * @param  array<int, array<string, mixed>>  $candidats  contact_id => candidat
      * @param  array<int, string>  $sirens  entreprise_id => SIREN
      * @param  list<int>  $idsEntreprises
+     * @param  array<int, string>  $replis  entreprise_id => adresse de repli (lectures supplémentaires seulement s'il y en a)
      * @return array<string, mixed>
      */
-    private function lireExclusions(string $ws, array $candidats, array $sirens, array $idsEntreprises): array
+    private function lireExclusions(string $ws, array $candidats, array $sirens, array $idsEntreprises, array $replis = []): array
     {
         try {
             $lignes = [];
@@ -555,6 +610,18 @@ final class SelectionDestinataires
             $seqContacts = $this->inscrits('contact_id', $ws, $contacts, 'bigint');
             $seqEmpreintes = $this->inscrits('empreinte_adresse', $ws, $empreintes, 'text');
             $seqEntreprises = $this->inscrits('entreprise_id', $ws, array_values(array_unique($idsEntreprises)), 'bigint');
+            $replisPasses = [];
+            $partagees = [];
+            if ($replis !== []) {
+                // Un seul repli par entreprise, À VIE : tous statuts (la colonne et son index unique viennent de L0a / L0b).
+                foreach (DB::select('SELECT DISTINCT entreprise_id AS v FROM envoi_inscriptions WHERE workspace_id = ? AND repli_generique AND entreprise_id = ANY(?::bigint[])', [$ws, self::tableau(array_keys($replis))]) as $r) {
+                    $replisPasses[(int) $r->v] = true;
+                }
+                // D10 : une adresse générale portée par contacts de plusieurs fiches (cabinet, domiciliation) est exclue.
+                foreach (DB::select('SELECT min(email::text) AS adresse FROM contacts WHERE workspace_id = ? AND deleted_at IS NULL AND email = ANY(?::citext[]) GROUP BY email HAVING COUNT(DISTINCT company_id) > 1', [$ws, self::tableau(array_values($replis))]) as $r) {
+                    $partagees[mb_strtolower((string) $r->adresse)] = true; // email est CITEXT : regroupé sans tenir compte de la casse
+                }
+            }
         } catch (QueryException $e) {
             throw $e->getCode() === '57014' ? SelectionRefusee::lectureTropLongue() : SelectionRefusee::lectureOppositionImpossible($e);
         } catch (\Throwable $e) {
@@ -562,7 +629,8 @@ final class SelectionDestinataires
         }
 
         return ['opposee' => $opposee, 'entreprise_opposee' => $entrepriseOpposee, 'rgpd' => $rgpd, 'console' => $console,
-            'seq_contacts' => $seqContacts, 'seq_empreintes' => $seqEmpreintes, 'seq_entreprises' => $seqEntreprises];
+            'seq_contacts' => $seqContacts, 'seq_empreintes' => $seqEmpreintes, 'seq_entreprises' => $seqEntreprises,
+            'repli_passe' => $replisPasses, 'partagees' => $partagees];
     }
 
     /**

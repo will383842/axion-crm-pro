@@ -13,7 +13,9 @@
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { sectionsDeNavigation, fileLinkedinDisponible } from '@/components/layout/Sidebar';
+import { api } from '@/lib/api';
 
 const RACINE = resolve(__dirname, '../..');
 const PHOTO = resolve(RACINE, '../backend/tests/Feature/NonRegression/instantanes/nr20-routes.json');
@@ -214,5 +216,33 @@ describe('NR-20 : les appels du frontend visent des routes du serveur', () => {
       .map((a) => a.cle)
       .sort();
     expect(sansRoute).toEqual([...ECARTS_CONNUS].sort());
+  });
+});
+
+describe('LI-D2 : route et entrée de menu de la file LinkedIn', () => {
+  const FEATURES = { console_v2: true, universes: { business: true, vivier: true } };
+  const chemins = (linkedin: boolean) => sectionsDeNavigation(FEATURES, true, linkedin).flatMap((s) => s.items.map((i) => i.to));
+
+  it('la garde des routes connaît /prospection-linkedin', () => {
+    const arbre = readFileSync(resolve(RACINE, 'src/app/routeTree.tsx'), 'utf8');
+    expect(arbre).toMatch(/path: '\/prospection-linkedin'/);
+    expect(arbre).toMatch(/FileLinkedinPage/);
+  });
+
+  it('menu absent par défaut et quand la file répond 404', async () => {
+    expect(chemins(false)).not.toContain('/prospection-linkedin');
+    vi.spyOn(api, 'get').mockRejectedValueOnce({ isAxiosError: true, response: { status: 404 } });
+    expect(await fileLinkedinDisponible()).toBe(false);
+  });
+
+  it('menu absent sur toute autre erreur (échec fermé)', async () => {
+    vi.spyOn(api, 'get').mockRejectedValueOnce({ isAxiosError: true, response: { status: 500 } });
+    expect(await fileLinkedinDisponible()).toBe(false);
+  });
+
+  it('menu présent quand la file répond', async () => {
+    vi.spyOn(api, 'get').mockResolvedValueOnce({ data: {} });
+    expect(await fileLinkedinDisponible()).toBe(true);
+    expect(chemins(true)).toContain('/prospection-linkedin');
   });
 });

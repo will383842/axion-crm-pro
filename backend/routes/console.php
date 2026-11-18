@@ -610,6 +610,15 @@ Schedule::command(EnvoiTemoinsReleve::SIGNATURE_PLANIFIEE)
     ->onOneServer()
     ->when(fn (): bool => config('envoi.reel_actif') === true && config('envoi.temoins_releve_actif') === true);
 
+// PONT-LINKEDIN LI-E — veille quotidienne de la voie S (rappels, arrêt si acceptation basse, relevé du lundi).
+// DERRIÈRE `PROSPECTION_LINKEDIN_ACTIVE` (faux par défaut) : `skip` ici, et la commande se garde aussi elle-même.
+// Alertes au fondateur seul ; n'écrit que des ajouts ; aucun envoi, aucun appel vers LinkedIn.
+Schedule::command('prospection-linkedin:releve')
+    ->dailyAt('07:00')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->skip(static fn (): bool => config('prospection_linkedin.active') !== true);
+
 // Envoi S0 : planifications d'envoi rangées par fichier (vides tant que L8-ORCH et R06-ARCH ne les remplissent pas).
 require __DIR__ . '/console/envoi-orchestration.php';
 require __DIR__ . '/console/envoi-retention.php';

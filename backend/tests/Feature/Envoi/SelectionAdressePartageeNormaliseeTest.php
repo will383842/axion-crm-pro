@@ -73,3 +73,21 @@ test('REPLI-MOT : une adresse portée par une seule fiche reste admise en repli'
     [$retenus] = sapnLot($mode, $ws, [$a]);
     expect($retenus)->toBe([$a]);
 })->with(['app', 'proprio']);
+
+test('REPLI-MOT : « Info@X » avec espace et « info@x » sans espace sur deux fiches sont la même adresse, donc exclue (cas du plan)', function (string $mode) {
+    $ws = sapnEspace();
+    $a = sapnFiche($ws, ' Info@X.example.test');
+    $b = sapnFiche($ws, 'info@x.example.test');
+    $seule = sapnFiche($ws, 'info@seule.example.test');
+    [$retenus, $sansContact] = sapnLot($mode, $ws, [$a, $b, $seule]);
+    expect($retenus)->toBe([$seule])->and($sansContact)->toBe(2);
+})->with(['app', 'proprio']);
+
+test('REPLI-MOT : la détection des adresses partagées reste cloisonnée par espace', function (string $mode) {
+    $ws = sapnEspace();
+    $autre = sapnEspace();
+    $a = sapnFiche($ws, 'info@x.example.test');
+    WorkspaceContext::run($autre, fn () => sapnFiche($autre, ' Info@X.example.test'));
+    [$retenus] = sapnLot($mode, $ws, [$a]);
+    expect($retenus)->toBe([$a]);
+})->with(['app', 'proprio']);

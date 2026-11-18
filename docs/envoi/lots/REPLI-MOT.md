@@ -11,3 +11,4 @@ Plan : commentaire « PLAN DU RESTE À FAIRE (18/11) » de #680 (relectures de #
 
 ## Mutations (rouges, restaurées)
 Retour à `array_intersect` ⇒ 7 rouges ; retour à `mb_strtolower` ⇒ 2 rouges.
+- Relecture Opus n°2 : la détection D10 compare par empreinte (`empreinte_adresse_sql`, index `idx_contacts_empreinte_email`) : « ␣Info@X » et « info@x » (sans espace) sur deux fiches sont la même adresse. Tests ajoutés : cas du plan et cloisonnement par espace.

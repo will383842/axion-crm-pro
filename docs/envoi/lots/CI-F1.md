@@ -17,3 +17,6 @@ Contrôles exigés (Backend Laravel, Frontend React/Vite, Workers Node + Playwri
 
 ## Fichiers
 `.github/workflows/a11y.yml`, `.github/workflows/e2e.yml`, `backend/tests/Feature/Infra/PorteA11yMesureCeQuElleAnnonceTest.php`, `backend/tests/Feature/Infra/CiBrouillonsGardesIndispensablesTest.php`, ce document.
+
+## Nom de contrôle
+Appelé par `a11y`, le job d'e2e s'affiche « e2e / Suites e2e sur le build (BLOQUANT) ». Ce n'est pas un contrôle exigé. `.github/PROTECTION-DE-BRANCHE.md` (l. 54 et 140) cite l'ancien nom : correction dans un autre lot.

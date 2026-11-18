@@ -42,7 +42,9 @@ it('est à blanc par défaut', function () {
 
 it('exige la confirmation APPLIQUER avant toute connexion', function () {
     $code = codeWorkflowRattrapage();
-    expect($code)->toContain('[ "$CONFIRMATION" != "APPLIQUER" ]');
+    // La ligne entière ET la sortie en erreur : retirer `exit 1` ou ajouter une
+    // condition qui affaiblit le test doit rougir.
+    expect($code)->toMatch('/if \[ "\$CONFIRMATION" != "APPLIQUER" \]; then\s*\n[^\n]*::error::[^\n]*\n\s*exit 1\s*\n\s*fi/');
     expect(strpos($code, '"$CONFIRMATION" != "APPLIQUER"'))
         ->toBeLessThan(strpos($code, 'webfactory/ssh-agent'));
 });

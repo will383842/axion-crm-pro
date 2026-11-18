@@ -328,12 +328,15 @@ class ListeFeuVert
     {
         $code = 'auto.batterie_fraiche';
         try {
+            [$domaines, $listes] = $this->ressourcesConfigurees($ws);
+            // Rien de configuré (ni domaine ni IP) : aucun filtre, comme avant (la batterie vide reste rouge).
+            $filtrer = $domaines !== [] || $listes !== [];
             $r = WorkspaceContext::run($ws, fn () => DB::selectOne(
                 'SELECT (d.dns > x.limite AND l.listes > x.limite) AS frais FROM
                     (SELECT now() - make_interval(secs => ?) AS limite) x,
-                    (SELECT min(d.controle_le) AS dns FROM (SELECT DISTINCT ON (domaine) domaine, controle_le FROM envoi_controles_dns WHERE workspace_id = ? ORDER BY domaine, controle_le DESC, id DESC) d) d,
-                    (SELECT min(l.controle_le) AS listes FROM (SELECT DISTINCT ON (type, ressource) type, ressource, controle_le FROM envoi_controles_listes WHERE workspace_id = ? ORDER BY type, ressource, id DESC) l) l',
-                [self::BATTERIE_FRAICHEUR_SECONDES, $ws, $ws],
+                    (SELECT min(d.controle_le) AS dns FROM (SELECT DISTINCT ON (domaine) domaine, controle_le FROM envoi_controles_dns WHERE workspace_id = ? AND (? = false OR domaine IN (SELECT jsonb_array_elements_text(?::jsonb))) ORDER BY domaine, controle_le DESC, id DESC) d) d,
+                    (SELECT min(l.controle_le) AS listes FROM (SELECT DISTINCT ON (type, ressource) type, ressource, controle_le FROM envoi_controles_listes WHERE workspace_id = ? AND (? = false OR (type || \':\' || ressource) IN (SELECT jsonb_array_elements_text(?::jsonb))) ORDER BY type, ressource, controle_le DESC, id DESC) l) l',
+                [self::BATTERIE_FRAICHEUR_SECONDES, $ws, $filtrer ? 'true' : 'false', json_encode($domaines, JSON_THROW_ON_ERROR), $ws, $filtrer ? 'true' : 'false', json_encode($listes, JSON_THROW_ON_ERROR)],
             ));
         } catch (\Throwable) {
             return self::pointAuto($code, false, 'Lecture des contrôles impossible : relancer les contrôles DNS et listes (moins de 15 min) avant d’accorder.');
@@ -341,6 +344,28 @@ class ListeFeuVert
         $fait = $r !== null && $r->frais === true; // NULL (aucune ligne) ⇒ faux
 
         return self::pointAuto($code, $fait, $fait ? 'Contrôles DNS et listes de moins de 15 minutes.' : 'Relancer les contrôles DNS et listes (moins de 15 min) avant d’accorder.');
+    }
+
+    /**
+     * Domaines et ressources de listes ENCORE configurés pour l'espace : domaines de `envoi.dns.domaines` et de la table
+     * `envoi_domaines`, IP de `envoi.listes_noires.ips` (« ip@espace », cet espace seulement).
+     *
+     * @return array{0: list<string>, 1: list<string>} [domaines pour le DNS, « type:ressource » pour les listes]
+     */
+    private function ressourcesConfigurees(string $ws): array
+    {
+        $domaines = array_map('strval', array_keys((array) config('envoi.dns.domaines', [])));
+        $table = WorkspaceContext::run($ws, fn () => DB::table('envoi_domaines')->where('workspace_id', $ws)->pluck('nom')->map(fn ($n): string => (string) $n)->all());
+        $domaines = array_values(array_unique([...$domaines, ...$table]));
+        $listes = array_map(static fn (string $d): string => 'domaine:' . $d, $domaines);
+        foreach ((array) config('envoi.listes_noires.ips', []) as $entree) {
+            [$ip, $espace] = array_pad(explode('@', (string) $entree, 2), 2, '');
+            if (trim($espace) === $ws && trim($ip) !== '') {
+                $listes[] = 'ip:' . trim($ip);
+            }
+        }
+
+        return [$domaines, array_values(array_unique($listes))];
     }
 
     /** Chaque domaine dont l'adaptateur n'est pas `faux` (D11) a un dernier contrôle DNS prêt, hors pause, daté d'aujourd'hui. */

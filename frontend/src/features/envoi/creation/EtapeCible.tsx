@@ -1,7 +1,7 @@
 /** Étape 1 — Qui reçoit ? Liste, audience ou étiquette, exclusions et revérification. */
 import { useMemo, useState } from 'react';
 import { Button, Skeleton } from '@/components/ui';
-import { Bloc, CHAMP, Jauge, Puces } from './composants';
+import { Bloc, CHAMP, Puces } from './composants';
 import { useEstimation, type CibleProposee } from './api';
 import { cibleDeContrat, type Saisie } from './saisie';
 import { FiltreReseau, MENTION_ESTIMATION } from './FiltreReseau';
@@ -34,6 +34,7 @@ export function EtapeCible({
   const e = estimation.data;
   const dOffice = e ? (e.exclusions['opposition'] ?? 0) + (e.exclusions['clients'] ?? 0) + (e.exclusions['adresses_partagees'] ?? 0) : 0;
   const saisies = e?.exclusions['saisies'] ?? 0;
+  const evaluees = e?.exclusions_evaluees !== false;
 
   return (
     <Bloc titre="Qui reçoit ?" mot="Étape 1 sur 5" etiquette="Étape 1">
@@ -82,8 +83,7 @@ export function EtapeCible({
                 />
                 <strong className="min-w-0 break-words text-sm text-slate-900">{c.libelle}</strong>
               </span>
-              <span className="mt-1 block text-2xl font-semibold tracking-tight text-slate-900">{c.joignables === null ? 'Non estimé' : c.joignables.toLocaleString('fr-FR')}</span>
-              {c.joignables === null ? null : <Jauge valeur={c.joignables} max={c.total} libelle={`Joignables : ${c.joignables} sur ${c.total}`} />}
+              <span className="mt-1 block text-2xl font-semibold tracking-tight text-slate-900">{c.total.toLocaleString('fr-FR')} <span className="text-sm font-normal text-slate-600">{c.total > 1 ? 'membres' : 'membre'}</span></span>
             </label>
           );
         })}
@@ -107,10 +107,21 @@ export function EtapeCible({
           <Skeleton className="h-10 w-full" />
         ) : (
           <>
-            <p className="text-sm text-slate-900"><strong>{dOffice.toLocaleString('fr-FR')} adresses retirées d’office</strong></p>
-            <p className="mt-0.5 text-xs text-slate-600">
-              Oppositions ({e.exclusions['opposition'] ?? 0}), clients et affaires en cours ({e.exclusions['clients'] ?? 0}), adresses partagées ({e.exclusions['adresses_partagees'] ?? 0}).
+            <p className="text-sm text-slate-900" data-testid="joignables-estimes">
+              {!evaluees ? (
+                <>Joignables non évalués : les exclusions ne sont pas encore calculées.</>
+              ) : e.complet === false ? (
+                <>Joignables : <strong>au moins {e.restant.toLocaleString('fr-FR')} sur {e.total.toLocaleString('fr-FR')} examinés</strong></>
+              ) : (
+                <>Joignables : <strong>{e.restant.toLocaleString('fr-FR')}</strong></>
+              )}
             </p>
+            {!evaluees ? null : <p className="mt-1 text-sm text-slate-900"><strong>{dOffice.toLocaleString('fr-FR')} adresses retirées d’office</strong></p>}
+            {!evaluees ? null : (
+              <p className="mt-0.5 text-xs text-slate-600">
+                Oppositions ({e.exclusions['opposition'] ?? 0}), clients et affaires en cours ({e.exclusions['clients'] ?? 0}), adresses partagées ({e.exclusions['adresses_partagees'] ?? 0}).
+              </p>
+            )}
             {saisie.reseaux.length > 0 ? <p className="mt-1 text-xs text-slate-600">{MENTION_ESTIMATION}</p> : null}
             {saisies > 0 ? <p className="mt-1 text-xs text-slate-600">{saisies.toLocaleString('fr-FR')} de plus selon vos exclusions.</p> : null}
           </>

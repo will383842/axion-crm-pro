@@ -342,6 +342,7 @@ test('R07 : chaque case A4 à A12 est présente une seule fois, source « 30 Ax 
 });
 
 test('R07 : les points automatiques sans source sont FAUX, même avec tout au vert', function () {
+    expect(FV_AUTO_SANS_SOURCE)->toBe([]);
     $ws = espaceFeuVert();
     toutVert($ws);
     foreach (FV_AUTO_SANS_SOURCE as $code) {

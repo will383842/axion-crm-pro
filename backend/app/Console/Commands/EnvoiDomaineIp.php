@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Envoi\Chauffe\DepotIps;
+use App\Exceptions\MissingWorkspaceContextException;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
 use InvalidArgumentException;
@@ -24,6 +25,8 @@ class EnvoiDomaineIp extends Command
             return self::SUCCESS;
         } catch (InvalidArgumentException $e) {
             $this->error('Refusé : ' . $e->getMessage() . '.');
+        } catch (MissingWorkspaceContextException) {
+            $this->error('Refusé : espace inconnu ou invalide.');
         } catch (QueryException $e) {
             // Le message de la base (préfixé « envoi_domaines : ») est sans valeur secrète : on n'affiche que cette raison.
             $this->error('Refusé : ' . (preg_match('/envoi_domaines : ([^\n]+?)(?: \(Connection|\n|$)/u', $e->getMessage(), $m) ? $m[1] : 'accès refusé par la base') . '.');

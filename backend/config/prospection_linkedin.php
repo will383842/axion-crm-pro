@@ -11,7 +11,7 @@
 */
 
 return [
-    'active' => (bool) env('PROSPECTION_LINKEDIN_ACTIVE', false),
+    'active' => filter_var(env('PROSPECTION_LINKEDIN_ACTIVE', false), FILTER_VALIDATE_BOOLEAN),
 
     // Plafonds par défaut prudents (ESCALADE E5), modifiables par le propriétaire.
     'plafonds' => [

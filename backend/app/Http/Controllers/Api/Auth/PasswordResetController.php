@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ApiController;
 use App\Models\User;
 use App\Rules\NotPwnedPassword;
 use App\Services\Auth\AuthService;
+use App\Services\Auth\CodeCourriel\AppareilsConfiance;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -191,20 +192,27 @@ class PasswordResetController extends ApiController
             return response()->json(['error' => 'invalid_token'], 401);
         }
 
-        $user->password_hash = Hash::make((string) $request->input('password'));
-        $user->failed_login_count = 0;
-        $user->last_failed_login_at = null;
-        $user->locked_until = null;
-        $user->save();
+        // SEC-APP : une seule transaction (mot de passe, jetons, appareils de confiance). Erreur => rien ne change.
+        $retires = DB::transaction(function () use ($user, $request): int {
+            $user->password_hash = Hash::make((string) $request->input('password'));
+            $user->failed_login_count = 0;
+            $user->last_failed_login_at = null;
+            $user->locked_until = null;
+            $user->save();
 
-        // -- Couper tous les acces ouverts avec l'ANCIEN mot de passe ---------
-        // La reinitialisation ne revoquait rien. C'est pourtant le geste que fait
-        // un utilisateur PARCE QU'IL SE CROIT COMPROMIS : il doit fermer la porte.
-        // Les sessions web etaient deja couvertes par `AuthenticateSession`
-        // (Sanctum compare le hachage du mot de passe stocke en session) ; les
-        // jetons d'API, eux, survivaient indefiniment - d'autant que
-        // `sanctum.expiration` valait `null`. Mesure (audit 360, F35-006).
-        $user->tokens()->delete();
+            // -- Couper tous les acces ouverts avec l'ANCIEN mot de passe ---------
+            // La reinitialisation ne revoquait rien. C'est pourtant le geste que fait
+            // un utilisateur PARCE QU'IL SE CROIT COMPROMIS : il doit fermer la porte.
+            // Les sessions web etaient deja couvertes par `AuthenticateSession`
+            // (Sanctum compare le hachage du mot de passe stocke en session) ; les
+            // jetons d'API, eux, survivaient indefiniment - d'autant que
+            // `sanctum.expiration` valait `null`. Mesure (audit 360, F35-006).
+            $user->tokens()->delete();
+
+            // Celui qui réinitialise se croit compromis : TOUS les appareils de confiance sont retirés, cookie compris.
+            return app(AppareilsConfiance::class)->retirerTous($user);
+        });
+        \Log::info('appareils_confiance.retires', ['user_id' => $user->id, 'nombre' => $retires, 'cause' => 'reinitialisation']);
 
         if (config('session.driver') === 'database') {
             DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();

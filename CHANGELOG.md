@@ -2,6 +2,35 @@
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) — SemVer.
 
+## [Non publié] — 2026-11-18
+
+Journée de fusions sur le chantier « envoi » et la connexion. Aucun drapeau n'a été allumé : `ENVOI_REEL_ACTIF`, la double authentification par courriel et la garde du rôle applicatif restent éteints.
+
+### Added
+- Connexion : codes de secours (consulter, régénérer, les saisir à la connexion par code courriel) — G3-D (#776) ; écrans du code courriel et du code de secours — G3-E (#787).
+- Connexion : verrou sur le renvoi des codes courriel, tests du lien magique et de la session régénérée — AUTH-RL (#786).
+- Connexion : un changement ou une réinitialisation du mot de passe ferme aussi les appareils de confiance — SEC-APP (#771).
+- Démarrage : l'application peut refuser de démarrer sans le rôle applicatif (garde éteinte par défaut) — G4-A (#779).
+- Adresses générales : repli sur l'adresse générale d'une entreprise (sélection, matérialisation, porte, séquenceur), avec opposition sur l'adresse de repli et sur le SIREN — L3 (#751), L4 (#754), L5a (#755), L5b (#758), L6 (#757), L6b (#759), REPLI-MOT (#781).
+- LinkedIn : file LinkedIn dans le menu (#747), alertes, rappels de relance et relevé hebdomadaire (#756), dépôt des prospects avec journal (#774), réglage et texte (#768), lien de profil sûr (#778).
+- Envoi, écrans : écran « Traitées » avec corriger et annuler — RR-6D (#753) ; « Lancer » piloté par le blocage — UI-CAMP (#769) ; nouveau code dans l'ajout de boîte — UI-BOITE (#772) ; assistant avec vrais joignables — B8-E (#773) ; assistant, A/B, boîtes et plafond grisés tant qu'ils sont refusés — B8-F (#783).
+- Outils : constat en lecture seule des lignes d'ancienne forme — L8-B (#767).
+
+### Changed
+- Envoi : `envoi:sante` interroge le serveur dans le contexte de chaque espace — SANTE-ESP (#770).
+- Envoi : le plafond d'une IP compte aussi les réservations en cours — IP-ENCOURS (#782) ; inventaire des IP avec auteur contrôlé et retrait atomique — IP-INV (#775).
+- Envoi : feu vert, batterie et attestation corrigés — FV-BAT (#780) ; libellés des motifs d'opposition — X7-LIB (#765) ; capacités de l'assistant — MSG-CAP (#766).
+- CI : un seul build du frontend pour les tests e2e et axe (#777) ; `!cancelled()` dans les audits (#764) ; cliquet Node resserré (#750).
+- Dossier client : la personne née d'une demande est liée au dossier et ses demandes sont soldées — C1-C2 (#785).
+
+### Fixed
+- Cloisonnement : `courant()` filtre par espace (#760) ; `geste()` LinkedIn limité à l'expéditeur du prospect (#761).
+- Test instable de lot injectable : délai SQL élargi — FLAKY-CJO3 (#788).
+- Un prénom retiré d'un commentaire de migration — NOM-MIG (#763).
+
+### Proposé, en relecture
+- Commande locale `crm:compte:double-auth` : passe un compte en double authentification par courriel (refusée tant que le canal est faux ou le drapeau éteint ; le retour à l'application est refusé sans application inscrite) ou le ramène à l'application — G3-F (#792).
+
 ## [0.1.0-mocks-complete] — 2026-05-17
 
 ### Added

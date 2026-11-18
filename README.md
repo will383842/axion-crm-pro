@@ -68,6 +68,25 @@ INSEE Sirene · annuaire-entreprises.data.gouv.fr · Infogreffe · Societe.com �
 | S11 Phase 2 scaffold + RGPD + Monitoring | tables Phase 2 + Erasure/Portability + 7-services obs stack | ✅ |
 | S12 Tests E2E + Doc + Polish + Tag | Playwright × 17 + runbooks × 5 + DR drill + pentest + OpenAPI | ✅ |
 
+## Où en est l'envoi (18/11)
+
+- Le code de l'envoi est écrit et testé, mais **rien ne part** : `ENVOI_REEL_ACTIF=false`. Aucun agent ne le touche.
+- Fusionné le 18/11 : repli sur l'adresse générale (avec opposition sur l'adresse et le SIREN), LinkedIn (file, alertes, relevé), assistant et campagnes (écrans grisés tant qu'un refus s'applique), plafond d'IP et inventaire des IP, feu vert, santé par espace. Détail dans `CHANGELOG.md`.
+- Connexion : codes de secours et écrans du code courriel fusionnés ; un changement de mot de passe ferme les appareils de confiance. La double authentification par courriel reste éteinte ; la commande locale `crm:compte:double-auth` (PR #792, en relecture) refuse de l'activer tant que le canal est faux ou le drapeau éteint.
+- Bilan de couverture du contrat d'envoi : `docs/envoi/lots/R19.md` (aucun trou réel).
+
+## Ce qui reste au fondateur
+
+Ces gestes ne peuvent pas être faits par un agent. La procédure complète, dans l'ordre, est dans **`docs/envoi/JOUR-J.md`** :
+
+- **Achats** : serveur d'envoi, domaines d'envoi et adresses IP (étape « J-30 »).
+- **DNS** : publier SPF, DKIM, DMARC, PTR et HELO, puis contrôler (étape « J-21 »).
+- **Port 25** : le faire ouvrir en sortie chez l'hébergeur (étape « J-30 »).
+- **Feu vert** : relancer la batterie des preuves, accorder le feu vert à l'écran, puis poser soi-même `ENVOI_REEL_ACTIF=true` (étape « J0 »).
+- Allumer les autres interrupteurs de production (double authentification par courriel, garde du rôle applicatif) : décision du fondateur, après le jour J ou à part.
+
+Aucun prix ni secret n'est écrit dans le dépôt : les références d'achat et les vraies valeurs restent hors dépôt.
+
 ## Runbooks
 
 - `infra/runbooks/01-restart-workers.md` — workers Playwright
@@ -117,7 +136,7 @@ docker exec axion-crm-api php artisan audit:verify-chain
 - ✅ **OWASP Top 10** via `php artisan app:pentest-self-check`
 - ✅ **DPO** : `contact@axion-ia.com`
 - ✅ **Hébergement UE** : Hetzner Frankfurt
-- ⚠️ **DPA papier providers** : action humaine Will (cf. spec/17)
+- ⚠️ **DPA papier providers** : action humaine du fondateur (cf. spec/17)
 
 ## Licence
 

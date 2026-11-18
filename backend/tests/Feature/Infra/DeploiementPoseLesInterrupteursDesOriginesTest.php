@@ -39,17 +39,23 @@ function blocCleHmac(): string
     return substr($s, $debut, $fin - $debut);
 }
 
-test('ORIGINES-DEPLOI — les 3 variables sont recopiees, true|false seulement', function (): void {
+test('ORIGINES-DEPLOI — les 4 variables sont recopiees, true|false seulement', function (): void {
     $s = deploiementOriginesScript();
-    foreach (['ORIGINES_V3_ENABLED', 'ORIGINES_LECTURE_ENABLED', 'ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED'] as $v) {
+    foreach (['ORIGINES_V3_ENABLED', 'ORIGINES_LECTURE_ENABLED', 'ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED', 'CRM_GUIDE_LIEN_ENABLED'] as $v) {
         expect(deploiementOriginesEtape()['env'][$v] ?? null)->toBe("\${{ vars.{$v} }}");
         expect($s)->toContain("\"{$v}=\$" . $v . '"');
     }
     expect($s)->toContain('case "$val" in true|false) ;; *) continue ;; esac');
 });
 
-test('ORIGINES-DEPLOI — le lien du guide n est jamais synchronise', function (): void {
-    expect(deploiementOriginesScript())->not->toContain('CRM_GUIDE_LIEN_ENABLED');
+test('ORIGINES-DEPLOI — le lien du guide est normalise et transmis comme les autres (absent = rien ne change)', function (): void {
+    $s = deploiementOriginesScript();
+    expect($s)->toContain('ORIGINES_LECTURE_ENABLED ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED CRM_GUIDE_LIEN_ENABLED; do');
+    expect($s)->toContain('"$ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED" "$CRM_GUIDE_LIEN_ENABLED" <<\'REMOTE\'');
+    expect($s)->toContain('CRM_GUIDE_LIEN_ENABLED="${13:-}"');
+    expect(deploiementOriginesEtape()['env']['CRM_GUIDE_LIEN_ENABLED'])->toBe('${{ vars.CRM_GUIDE_LIEN_ENABLED }}');
+    // Jamais de valeur par defaut allumee : seul `true|false` venu de la variable est ecrit.
+    expect($s)->not->toMatch('/CRM_GUIDE_LIEN_ENABLED=true/');
 });
 
 test('ORIGINES-DEPLOI — la cle HMAC est creee sur le serveur, sans fuite ni ecrasement', function (): void {

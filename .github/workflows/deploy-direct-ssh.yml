@@ -166,10 +166,11 @@ jobs:
           # Toute demande du site devient une personne du CRM (06/11/2026). Même règle : `true` ou `false`, sinon le .env n'est pas touché.
           CRM_INGEST_DEMANDES_PERSONNE_ENABLED: ${{ vars.CRM_INGEST_DEMANDES_PERSONNE_ENABLED }}
           # Origines des contacts (v3). Variables GitHub, même règle : `true` ou `false`, sinon le .env n'est pas touché.
-          # Absentes = RIEN ne s'allume. (CRM_GUIDE_LIEN_ENABLED n'est volontairement PAS synchronisé.)
+          # Absentes = RIEN ne s'allume. Le lien du guide (CRM_GUIDE_LIEN_ENABLED) suit la même règle : absent = rien ne change.
           ORIGINES_V3_ENABLED: ${{ vars.ORIGINES_V3_ENABLED }}
           ORIGINES_LECTURE_ENABLED: ${{ vars.ORIGINES_LECTURE_ENABLED }}
           ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED: ${{ vars.ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED }}
+          CRM_GUIDE_LIEN_ENABLED: ${{ vars.CRM_GUIDE_LIEN_ENABLED }}
           # Jeton EPHEMERE du run, pour que le serveur puisse lire un depot
           # PRIVE. Il expire a la fin du job ; rien n'est ecrit sur le disque
           # du serveur (voir le bloc `git fetch` plus bas).
@@ -222,7 +223,7 @@ jobs:
           # vide DISPARAÎT et décale les positions, une valeur à métacaractères serait
           # interprétée. On normalise donc ici : tout ce qui n'est pas true|false devient
           # `ignore` (le serveur l'ignore déjà : seul true|false est écrit).
-          for v in CRM_INGEST_DOSSIER_ENABLED CRM_SYNC_DOSSIER_CLIENT_STAGE CRM_INGEST_DEMANDES_PERSONNE_ENABLED ORIGINES_V3_ENABLED ORIGINES_LECTURE_ENABLED ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED; do
+          for v in CRM_INGEST_DOSSIER_ENABLED CRM_SYNC_DOSSIER_CLIENT_STAGE CRM_INGEST_DEMANDES_PERSONNE_ENABLED ORIGINES_V3_ENABLED ORIGINES_LECTURE_ENABLED ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED CRM_GUIDE_LIEN_ENABLED; do
             case "${!v}" in true|false) ;; *) printf -v "$v" '%s' 'ignore' ;; esac
           done
           # Arguments NON drapeaux (même risque : OpenSSH recolle, le shell distant redécoupe).
@@ -255,7 +256,7 @@ jobs:
               "$USER@$HOST" 'bash -s' -- \
             "$PROJECT_PATH" "$SKIP_MIGRATE" "$EXPECTED_SHA" "$INSEE_API_KEY" \
             "$GH_TOKEN_LECTURE" "$GH_DEPOT"             "$CRM_INGEST_DOSSIER_ENABLED" "$CRM_SYNC_DOSSIER_CLIENT_STAGE" "$CRM_INGEST_DEMANDES_PERSONNE_ENABLED" \
-            "$ORIGINES_V3_ENABLED" "$ORIGINES_LECTURE_ENABLED" "$ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED" <<'REMOTE' | tee /tmp/deploy-remote.log
+            "$ORIGINES_V3_ENABLED" "$ORIGINES_LECTURE_ENABLED" "$ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED" "$CRM_GUIDE_LIEN_ENABLED" <<'REMOTE' | tee /tmp/deploy-remote.log
           set -euo pipefail
           PROJECT_PATH="$1"
           SKIP_MIGRATE="$2"
@@ -269,6 +270,7 @@ jobs:
           ORIGINES_V3_ENABLED="${10:-}"
           ORIGINES_LECTURE_ENABLED="${11:-}"
           ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED="${12:-}"
+          CRM_GUIDE_LIEN_ENABLED="${13:-}"
 
           cd "$PROJECT_PATH"
 
@@ -380,7 +382,7 @@ jobs:
 
           echo "::group::sync drapeaux du dossier client into .env"
           # Une valeur vide (variable GitHub absente) ne touche PAS au .env : seul `true`/`false` est écrit.
-          for kv in "CRM_INGEST_DOSSIER_ENABLED=$CRM_INGEST_DOSSIER_ENABLED" "CRM_SYNC_DOSSIER_CLIENT_STAGE=$CRM_SYNC_DOSSIER_CLIENT_STAGE" "CRM_INGEST_DEMANDES_PERSONNE_ENABLED=$CRM_INGEST_DEMANDES_PERSONNE_ENABLED" "ORIGINES_V3_ENABLED=$ORIGINES_V3_ENABLED" "ORIGINES_LECTURE_ENABLED=$ORIGINES_LECTURE_ENABLED" "ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED=$ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED"; do
+          for kv in "CRM_INGEST_DOSSIER_ENABLED=$CRM_INGEST_DOSSIER_ENABLED" "CRM_SYNC_DOSSIER_CLIENT_STAGE=$CRM_SYNC_DOSSIER_CLIENT_STAGE" "CRM_INGEST_DEMANDES_PERSONNE_ENABLED=$CRM_INGEST_DEMANDES_PERSONNE_ENABLED" "ORIGINES_V3_ENABLED=$ORIGINES_V3_ENABLED" "ORIGINES_LECTURE_ENABLED=$ORIGINES_LECTURE_ENABLED" "ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED=$ORIGINES_MASQUAGE_COMMENTAIRE_REF_ENABLED" "CRM_GUIDE_LIEN_ENABLED=$CRM_GUIDE_LIEN_ENABLED"; do
             cle="${kv%%=*}"; val="${kv#*=}"
             case "$val" in true|false) ;; *) continue ;; esac
             if [ -f .env ]; then

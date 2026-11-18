@@ -91,7 +91,7 @@ grâce à la table fermée `backend/config/guides.php` : aucune adresse ne vient
 et le lien personnel de l'e-mail (`?t=`) n'est jamais affiché ni stocké. Interrupteur `CRM_GUIDE_LIEN_ENABLED`, éteint par
 défaut (allumer = déployer). Identifiant inconnu ou profil en lecture seule (sans `contacts.view_pii`) : pas de lien. Seul l'hôte `guides.hote_autorise`
 (`CRM_GUIDE_HOTE`, par défaut `axion-ia.com`) est accepté ; l'hôte de test `exemple.invalid` ne l'est qu'en testing, local et
-demo. Avant d'allumer l'interrupteur en production, poser la vraie adresse publique dans `config/guides.php`.
+demo. L'adresse réelle (`https://axion-ia.com/fr/guide-ia`, donnée par le fondateur le 18/11) est dans `config/guides.php` ; l'interrupteur se pose par la variable GitHub `CRM_GUIDE_LIEN_ENABLED` (`true`/`false`) au déploiement.
 Le message « Aucun lien disponible pour ce guide » est propre à la ligne concernée.
 
 ## Version 3 — historique des origines (ADR-CONTRAT-V3-ORIGINE)

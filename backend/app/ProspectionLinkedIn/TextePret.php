@@ -52,11 +52,11 @@ final class TextePret
         }
 
         if ($type === 'invitation') {
-            if (mb_strlen($texte) > self::MAX_INVITATION) {
+            if (mb_strlen(self::avecPrefixe($texte, $essai)) > self::MAX_INVITATION) {
                 throw new InvalidArgumentException('Invitation trop longue.');
             }
         } else {
-            if (mb_strlen($texte) > self::MAX_MESSAGE) {
+            if (mb_strlen(self::avecPrefixe($texte, $essai)) > self::MAX_MESSAGE) {
                 throw new InvalidArgumentException('Message trop long.');
             }
             if (! str_contains($plat, 'repondez stop')) {
@@ -68,6 +68,12 @@ final class TextePret
             }
         }
 
+        return self::avecPrefixe($texte, $essai);
+    }
+
+    /** Le texte tel qu'il sera rendu : la longueur se contrôle sur CE texte, préfixe compris. */
+    private static function avecPrefixe(string $texte, bool $essai): string
+    {
         return $essai ? '[ESSAI] ' . $texte : $texte;
     }
 

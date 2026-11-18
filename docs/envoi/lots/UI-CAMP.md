@@ -6,8 +6,10 @@
 - Le test « Retirer le filtre » est complété avec des mots et des guides (ajout seul dans `FiltreReseau.test.tsx`).
 - Test `phraseBlocage('toString')` : phrase par défaut, jamais `[object …]`.
 
+- Relecture : « Lancer » est aussi désactivé pendant l'envoi (`blocage !== null || lancer.isPending`).
+
 ## Tests
-- `frontend/tests/screens/envoi/CampagneSuiviBlocage.test.tsx` : « Lancer » désactivé dès le premier rendu avec sa raison accessible (vu rouge avant le code) ; actif sans blocage ; `phraseBlocage` sur `toString`, `constructor`, `__proto__`, `hasOwnProperty`.
+- `frontend/tests/screens/envoi/CampagneSuiviBlocage.test.tsx` : « Lancer » désactivé dès le premier rendu avec sa raison accessible (vu rouge avant le code) ; actif sans blocage ; « Lancer » désactivé pendant l'envoi, un second clic n'envoie rien (rouge avant le correctif) ; `phraseBlocage` sur `toString`, `constructor`, `__proto__`, `hasOwnProperty`.
 - Les tests existants de la page de suivi et de la liste restent verts et inchangés.
 
 ## Mutation

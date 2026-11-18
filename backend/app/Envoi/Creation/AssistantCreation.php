@@ -40,11 +40,13 @@ final class AssistantCreation
 
     /**
      * @param  (\Closure(): (int|float))|null  $horloge  nanosecondes (hrtime) ; injectable pour les tests
+     * @param  SelectionDestinataires|null  $selection  lecteur des lots « joignables » ; null = `new SelectionDestinataires` (production) ; injectable pour les tests
      */
     public function __construct(
         private readonly DepotCampagnes $depot,
         private readonly ?\Closure $horloge = null,
         private readonly int $lignesMax = self::LIGNES_MAX,
+        private readonly ?SelectionDestinataires $selection = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -304,7 +306,7 @@ final class AssistantCreation
         }
 
         $echeance = $this->maintenant() + self::ECHEANCE_SECONDES * 1_000_000_000;
-        $selection = new SelectionDestinataires;
+        $selection = $this->selection ?? new SelectionDestinataires;
         $somme = array_fill_keys([...SelectionDestinataires::MOTIFS, 'sans_contact_generique_disponible', 'adresse_invalide', 'adresse_risquee'], 0);
         $total = 0;
         $retenus = 0;

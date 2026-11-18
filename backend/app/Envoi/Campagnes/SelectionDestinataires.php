@@ -43,8 +43,11 @@ final class SelectionDestinataires
 
     public const PRIORITE = ['opposition', 'rgpd_en_cours', 'presse', 'client_console', 'deja_en_sequence', 'doublon']; // ordre strict
 
-    /** @param (\Closure(string, array<int|string, array{email: ?string, siren: ?string}>): array<int|string, array{opposee: bool, motifs: list<string>}>)|null $lecteurOpposition injectable pour les tests */
-    public function __construct(private readonly ?\Closure $lecteurOpposition = null) {}
+    /**
+     * @param  (\Closure(string, array<int|string, array{email: ?string, siren: ?string}>): array<int|string, array{opposee: bool, motifs: list<string>}>)|null  $lecteurOpposition  injectable pour les tests
+     * @param  int  $delaiSqlMs  `statement_timeout` du lot ; DELAI_SQL_MS partout en production, élargi seulement par un test qui ne mesure pas ce délai
+     */
+    public function __construct(private readonly ?\Closure $lecteurOpposition = null, private readonly int $delaiSqlMs = self::DELAI_SQL_MS) {}
 
     public function lot(string $ws, string $campagneId, string $population, int $apres = 0, int $taille = 200): LotDestinataires
     {
@@ -60,7 +63,7 @@ final class SelectionDestinataires
                 if ($racine) {
                     DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
                 }
-                DB::statement("SET LOCAL statement_timeout = '" . self::DELAI_SQL_MS . "'");
+                DB::statement("SET LOCAL statement_timeout = '" . $this->delaiSqlMs . "'");
 
                 return $this->calculer($ws, $campagneId, $apres, $taille);
             }));

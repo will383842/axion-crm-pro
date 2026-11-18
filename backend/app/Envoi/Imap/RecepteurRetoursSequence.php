@@ -12,6 +12,7 @@ use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * RR-3A : voir `recevoir` (STOP, plainte et rebond dur arrêtent aussi la séquence).
@@ -80,8 +81,17 @@ final class RecepteurRetoursSequence implements RecepteurRetours
                 if ($retour->adresseExpediteur !== null && $retour->adresseExpediteur !== '') {
                     $empreintes[] = ListeSuppression::empreinte($retour->adresseExpediteur);
                 }
+                // TOUTES les adresses sont opposées d'abord ; la première erreur (ex. écriture du SIREN) remonte ensuite : échec fermé, rien d'avalé.
+                $erreur = null;
                 foreach (array_unique($empreintes) as $empreinte) {
-                    $opposer->executer($workspaceId, $empreinte, EnregistrerOpposition::CANAL_RELEVE);
+                    try {
+                        $opposer->executer($workspaceId, $empreinte, EnregistrerOpposition::CANAL_RELEVE);
+                    } catch (Throwable $e) {
+                        $erreur ??= $e;
+                    }
+                }
+                if ($erreur !== null) {
+                    throw $erreur;
                 }
             }
         });

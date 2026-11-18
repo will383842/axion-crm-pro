@@ -188,6 +188,8 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_07_000110_envoi_domaines_ip.php',
     // Filet modifié : pourquoi — envoi L0a : colonne repli_generique, CHECK une étape et gardes, AJOUTS SEULS ; il n'y a aucune donnée à défaire et les retirer rouvrirait le repli sans garde ; down() inerte, up() rejouable.
     '2026_12_12_000100_envoi_repli_generique.php',
+    // Filet modifié : pourquoi — envoi L0b : index unique partiel « un repli par entreprise », AJOUT D'INDEX SEUL ; le retirer rouvrirait plusieurs messages de repli par entreprise ; down() inerte, up() rejouable.
+    '2026_12_12_000110_envoi_inscriptions_repli_entreprise_unique.php',
 ];
 
 /** @return list<string> noms de fichiers (sans dossier), triés */

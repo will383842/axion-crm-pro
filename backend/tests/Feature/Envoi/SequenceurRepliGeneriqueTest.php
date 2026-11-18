@@ -29,8 +29,8 @@ use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
-const SRG_DOMAINE = 'zz-envoi.example.invalid';
-const SRG_GENERIQUE = 'contact@zz-repli.example.invalid';
+const SQR_DOMAINE = 'zz-envoi.example.invalid';
+const SQR_GENERIQUE = 'contact@zz-repli.example.invalid';
 
 beforeEach(function () {
     $this->ws = F::espace('zz-envoi-l5b');
@@ -39,7 +39,7 @@ beforeEach(function () {
     (new DepotSocleDb)->eteindreTemoins($this->ws, 'test-sequenceur-repli');
     WorkspaceContext::set($this->ws);
     DB::table('envoi_domaines')->insert([
-        'workspace_id' => $this->ws, 'nom' => SRG_DOMAINE, 'achete_le' => '2026-01-01',
+        'workspace_id' => $this->ws, 'nom' => SQR_DOMAINE, 'achete_le' => '2026-01-01',
         'dmarc_verifie_le' => $this->lundi->format('c'), 'spf_verifie_le' => $this->lundi->format('c'), 'dkim_verifie_le' => $this->lundi->format('c'),
     ]);
     $this->faux = new FauxServeurEnvoi;
@@ -60,7 +60,7 @@ beforeEach(function () {
             new PasserelleLocale($this->faux, new DepotSocleDb, true, 300, fn () => $this->maintenant, $this->ws, 300, fn () => WorkspaceContext::current()),
             new LecteurFicheDb,
             $this->composeur,
-            new ParametresExpedition(SRG_DOMAINE, 'from@' . SRG_DOMAINE, 'ZZ Expediteur SAS'),
+            new ParametresExpedition(SQR_DOMAINE, 'from@' . SQR_DOMAINE, 'ZZ Expediteur SAS'),
         );
     };
 });
@@ -72,7 +72,7 @@ afterEach(function () {
     }
 });
 
-function srgInterrupteur(string $ws, string $valeur): void
+function sqrInterrupteur(string $ws, string $valeur): void
 {
     WorkspaceContext::run($ws, function () use ($ws, $valeur): void {
         if (DB::table('envoi_reglages')->where('workspace_id', $ws)->where('cle', 'envoi.repli_generique')->exists()) {
@@ -83,7 +83,7 @@ function srgInterrupteur(string $ws, string $valeur): void
     });
 }
 
-function srgSequence(object $t, int $etapes): string
+function sqrSequence(object $t, int $etapes): string
 {
     $id = (string) Str::uuid();
     DB::table('envoi_sequences')->insert(['id' => $id, 'workspace_id' => $t->ws, 'nom' => 'Séquence repli', 'fenetre_debut' => 9, 'fenetre_fin' => 17]);
@@ -95,7 +95,7 @@ function srgSequence(object $t, int $etapes): string
 }
 
 /** Contact (et verdict d'adresse récent) dans l'entreprise $entreprise (créée si null) ; retourne [entreprise, contact]. */
-function srgContact(object $t, string $email, ?int $entreprise = null, string $verdict = 'valide', ?string $motif = null): array
+function sqrContact(object $t, string $email, ?int $entreprise = null, string $verdict = 'valide', ?string $motif = null): array
 {
     if ($entreprise === null) {
         $entreprise = F::fiche($t->ws, 'ZZ Entreprise', ['country_code' => 'FR', 'first_info_at' => $t->lundi->modify('-3 days')->format('c')]);
@@ -112,14 +112,14 @@ function srgContact(object $t, string $email, ?int $entreprise = null, string $v
 }
 
 /** Une inscription de REPLI (une seule étape, `repli_generique = true`, interrupteur allumé) sur `contact@` ; retourne [entreprise, inscription]. */
-function srgRepli(object $t, array $plus = []): array
+function sqrRepli(object $t, array $plus = []): array
 {
-    srgInterrupteur($t->ws, 'true');
-    [$entreprise, $contact] = srgContact($t, SRG_GENERIQUE, null, 'risque', 'generique');
+    sqrInterrupteur($t->ws, 'true');
+    [$entreprise, $contact] = sqrContact($t, SQR_GENERIQUE, null, 'risque', 'generique');
     $id = (string) Str::uuid();
     DB::table('envoi_inscriptions')->insert($plus + [
-        'id' => $id, 'workspace_id' => $t->ws, 'sequence_id' => srgSequence($t, 1), 'contact_id' => $contact, 'entreprise_id' => $entreprise,
-        'empreinte_adresse' => ListeSuppression::empreinte(SRG_GENERIQUE), 'repli_generique' => true,
+        'id' => $id, 'workspace_id' => $t->ws, 'sequence_id' => sqrSequence($t, 1), 'contact_id' => $contact, 'entreprise_id' => $entreprise,
+        'empreinte_adresse' => ListeSuppression::empreinte(SQR_GENERIQUE), 'repli_generique' => true,
         'prochaine_echeance' => $t->maintenant->format('c'),
         'version_figee' => json_encode(['fenetre' => ['debut' => 9, 'fin' => 17], 'etapes' => [['rang' => 1, 'delai_jours_ouvres' => 0, 'sujet' => 'Sujet 1', 'corps' => 'Corps 1']]]),
     ]);
@@ -128,7 +128,7 @@ function srgRepli(object $t, array $plus = []): array
 }
 
 /** Un passage du séquenceur SOUS LE RÔLE APPLICATIF (non propriétaire, RLS active) ; le rôle est toujours rendu. */
-function srgApp(object $t, string $ins): string
+function sqrApp(object $t, string $ins): string
 {
     WorkspaceContext::set($t->ws);
     DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
@@ -139,7 +139,7 @@ function srgApp(object $t, string $ins): string
     }
 }
 
-function srgEtat(string $id): array
+function sqrEtat(string $id): array
 {
     $l = DB::table('envoi_inscriptions')->where('id', $id)->first();
 
@@ -147,10 +147,10 @@ function srgEtat(string $id): array
 }
 
 test('L5b : un seul message au repli, puis « terminee », et aucune relance même longtemps après', function () {
-    [, $ins] = srgRepli($this);
+    [, $ins] = sqrRepli($this);
 
     expect(($this->seq)()->executer($this->ws, $this->maintenant))->toBe([Sequenceur::ENVOYE => 1]);
-    expect(srgEtat($ins))->toBe(['terminee', null]);
+    expect(sqrEtat($ins))->toBe(['terminee', null]);
 
     $this->maintenant = $this->lundi->modify('+30 days');
     expect(($this->seq)()->executer($this->ws, $this->maintenant))->toBe([]);
@@ -158,50 +158,50 @@ test('L5b : un seul message au repli, puis « terminee », et aucune relance mê
 });
 
 test('L5b R7 : interrupteur éteint après l\'inscription ⇒ arrêt « repli_generique_caduc », rien ne part, jamais reporté', function () {
-    [, $ins] = srgRepli($this);
-    srgInterrupteur($this->ws, 'false');
+    [, $ins] = sqrRepli($this);
+    sqrInterrupteur($this->ws, 'false');
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ARRETEE);
 
-    expect(srgEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
+    expect(sqrEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
     expect($this->faux->appels)->toBe(0)->and(DB::table('envoi_messages')->where('inscription_id', $ins)->count())->toBe(0);
 });
 
 test('L5b R7 : interrupteur supprimé de l\'espace ou allumé seulement ailleurs ⇒ arrêt (échec fermé, cloisonnement workspace_id)', function () {
     $autre = F::espace('zz-envoi-l5b-autre');
-    srgInterrupteur($autre, 'true');
-    [, $ins] = srgRepli($this);
-    srgInterrupteur($this->ws, 'false');
+    sqrInterrupteur($autre, 'true');
+    [, $ins] = sqrRepli($this);
+    sqrInterrupteur($this->ws, 'false');
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ARRETEE);
-    expect(srgEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
+    expect(sqrEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
 });
 
 test('L5b R7 : un contact nommé (adresse nominative) apparu depuis l\'inscription ⇒ arrêt « repli_generique_caduc »', function () {
-    [$entreprise, $ins] = srgRepli($this);
-    srgContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
+    [$entreprise, $ins] = sqrRepli($this);
+    sqrContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ARRETEE);
 
-    expect(srgEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
+    expect(sqrEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
     expect($this->faux->appels)->toBe(0);
 });
 
 test('L5b R7 : un autre générique, un contact supprimé ou d\'une autre entreprise ne rendent PAS le repli caduc', function () {
-    [$entreprise, $ins] = srgRepli($this);
-    srgContact($this, 'info@zz-repli.example.invalid', $entreprise);
-    [$autreEntreprise] = srgContact($this, 'prenom.autre@zz-autre.example.invalid');
-    [, $supprime] = srgContact($this, 'prenom.supprime@zz-repli.example.invalid', $entreprise);
+    [$entreprise, $ins] = sqrRepli($this);
+    sqrContact($this, 'info@zz-repli.example.invalid', $entreprise);
+    [$autreEntreprise] = sqrContact($this, 'prenom.autre@zz-autre.example.invalid');
+    [, $supprime] = sqrContact($this, 'prenom.supprime@zz-repli.example.invalid', $entreprise);
     DB::table('contacts')->where('id', $supprime)->update(['deleted_at' => $this->lundi->format('c')]);
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ENVOYE);
-    expect(srgEtat($ins))->toBe(['terminee', null])->and($autreEntreprise)->not->toBe($entreprise);
+    expect(sqrEtat($ins))->toBe(['terminee', null])->and($autreEntreprise)->not->toBe($entreprise);
 });
 
 test('L5b : opposition d\'une autre personne de l\'entreprise ⇒ arrêt, rien ne part', function () {
-    [$entreprise, $ins] = srgRepli($this);
-    [, $contact] = srgContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
-    $autre = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, srgSequence($this, 1), $contact, $this->maintenant);
+    [$entreprise, $ins] = sqrRepli($this);
+    [, $contact] = sqrContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
+    $autre = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, sqrSequence($this, 1), $contact, $this->maintenant);
     (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $autre, Evenement::OPPOSITION, $this->maintenant);
 
     expect(DB::table('envoi_inscriptions')->where('id', $ins)->value('statut'))->toBe('arretee'); // déjà arrêtée par l'événement
@@ -210,35 +210,35 @@ test('L5b : opposition d\'une autre personne de l\'entreprise ⇒ arrêt, rien n
 });
 
 test('L5b : défense — une inscription de repli au rang 2 est arrêtée (« etape_inconnue »), jamais envoyée', function () {
-    [, $ins] = srgRepli($this, ['etape_courante' => 2]);
+    [, $ins] = sqrRepli($this, ['etape_courante' => 2]);
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ARRETEE);
 
-    expect(srgEtat($ins))->toBe(['arretee', 'etape_inconnue']);
+    expect(sqrEtat($ins))->toBe(['arretee', 'etape_inconnue']);
     expect($this->faux->appels)->toBe(0);
 });
 
 test('L5b non-régression : une inscription ordinaire (3 étapes) n\'est pas touchée, interrupteur absent ou éteint', function () {
     foreach ([null, 'false'] as $etat) {
         if ($etat !== null) {
-            srgInterrupteur($this->ws, $etat);
+            sqrInterrupteur($this->ws, $etat);
         }
         $this->faux = new FauxServeurEnvoi;
         $email = 'ordinaire-' . ($etat ?? 'absent') . '@zz-client.example.invalid';
-        [, $contact] = srgContact($this, $email);
-        $ins = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, srgSequence($this, 3), $contact, $this->maintenant);
+        [, $contact] = sqrContact($this, $email);
+        $ins = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, sqrSequence($this, 3), $contact, $this->maintenant);
         $this->maintenant = $this->lundi;
         DB::table('envoi_inscriptions')->where('id', $ins)->update(['prochaine_echeance' => $this->maintenant->format('c')]);
 
         expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ENVOYE);
-        expect(srgEtat($ins))->toBe(['active', null])->and((int) DB::table('envoi_inscriptions')->where('id', $ins)->value('etape_courante'))->toBe(2);
+        expect(sqrEtat($ins))->toBe(['active', null])->and((int) DB::table('envoi_inscriptions')->where('id', $ins)->value('etape_courante'))->toBe(2);
     }
 });
 
 test('L5b non-régression : un `risque/generique` sur une inscription ORDINAIRE reste refusé par la porte, même interrupteur allumé', function () {
-    srgInterrupteur($this->ws, 'true');
-    [, $contact] = srgContact($this, SRG_GENERIQUE, null, 'risque', 'generique');
-    $ins = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, srgSequence($this, 1), $contact, $this->maintenant);
+    sqrInterrupteur($this->ws, 'true');
+    [, $contact] = sqrContact($this, SQR_GENERIQUE, null, 'risque', 'generique');
+    $ins = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, sqrSequence($this, 1), $contact, $this->maintenant);
     DB::table('envoi_inscriptions')->where('id', $ins)->update(['prochaine_echeance' => $this->maintenant->format('c')]);
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REFUSE);
@@ -246,30 +246,30 @@ test('L5b non-régression : un `risque/generique` sur une inscription ORDINAIRE 
 });
 
 test('L5b sous le rôle applicatif : un seul message au repli, puis « terminee »', function () {
-    [, $ins] = srgRepli($this);
+    [, $ins] = sqrRepli($this);
 
-    expect(srgApp($this, $ins))->toBe(Sequenceur::ENVOYE);
+    expect(sqrApp($this, $ins))->toBe(Sequenceur::ENVOYE);
 
-    expect(srgEtat($ins))->toBe(['terminee', null]);
+    expect(sqrEtat($ins))->toBe(['terminee', null]);
     expect($this->faux->appels)->toBe(1)->and(DB::table('envoi_messages')->where('inscription_id', $ins)->count())->toBe(1);
 });
 
 test('L5b sous le rôle applicatif : interrupteur éteint ⇒ arrêt « repli_generique_caduc », rien ne part', function () {
-    [, $ins] = srgRepli($this);
-    srgInterrupteur($this->ws, 'false');
+    [, $ins] = sqrRepli($this);
+    sqrInterrupteur($this->ws, 'false');
 
-    expect(srgApp($this, $ins))->toBe(Sequenceur::ARRETEE);
+    expect(sqrApp($this, $ins))->toBe(Sequenceur::ARRETEE);
 
-    expect(srgEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
+    expect(sqrEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
     expect($this->faux->appels)->toBe(0);
 });
 
 test('L5b sous le rôle applicatif : un contact nommé apparu ⇒ arrêt « repli_generique_caduc », rien ne part', function () {
-    [$entreprise, $ins] = srgRepli($this);
-    srgContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
+    [$entreprise, $ins] = sqrRepli($this);
+    sqrContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
 
-    expect(srgApp($this, $ins))->toBe(Sequenceur::ARRETEE);
+    expect(sqrApp($this, $ins))->toBe(Sequenceur::ARRETEE);
 
-    expect(srgEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
+    expect(sqrEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
     expect($this->faux->appels)->toBe(0);
 });

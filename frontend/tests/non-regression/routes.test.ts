@@ -109,6 +109,8 @@ const ECARTS_CONNUS: string[] = [
   'GET /api/v1/envoi/reponses',
   'GET /api/v1/envoi/reponses/raccourcis',
   'GET /api/v1/envoi/reponses/{p}',
+  // Filet modifié : pourquoi — RR-6D : appel littéral de « Annuler le classement » (écran Traitées), route serveur RR-6B ; même cas que « classer » ci-dessous (module Envoi absent de la photo NR-20), servi par la démo.
+  'POST /api/v1/envoi/reponses/{p}/annuler',
   'POST /api/v1/envoi/reponses/{p}/classer',
   'POST /api/v1/envoi/reponses/{p}/creer-fiche',
   'POST /api/v1/envoi/reponses/{p}/rattacher',

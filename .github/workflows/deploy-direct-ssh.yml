@@ -88,7 +88,8 @@ jobs:
     needs: [ci]
     if: ${{ needs.ci.result == 'success' }}
     runs-on: ubuntu-24.04
-    # Lecture des artefacts pour la mesure E1 (lecture seule).
+    # Permissions du job (lecture seule) : `contents: read` pour le dépôt, `actions: read`
+    # pour la mesure E1 (lecture des artefacts). Aucune écriture.
     permissions:
       contents: read
       actions: read
@@ -322,8 +323,8 @@ jobs:
           #     ressort telle quelle dans les erreurs reseau) ;
           #   - le jeton expire a la fin du run. Rien a revoquer.
           #
-          # `permissions: contents: read` en tete de ce fichier borne ce que ce
-          # jeton peut faire : lire. Il ne peut ni pousser, ni ouvrir une PR.
+          # Les `permissions` de ce job (`contents: read` et `actions: read`)
+          # bornent ce que ce jeton peut faire : lire. Il ne peut ni pousser, ni ouvrir une PR.
           #
           # ⚠️ SI CE BLOC DISPARAIT, LE DEPLOIEMENT S'ARRETE — il ne degrade pas
           # en silence : `git fetch` echoue franchement et le job rougit.

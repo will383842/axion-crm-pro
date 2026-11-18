@@ -226,6 +226,9 @@ test('F36-001 — RECENSEMENT : toute ecriture authentifiee porte une permission
         // `viewer` doit pouvoir retirer un appareil qui n'est plus le sien.
         'api/v1/compte/appareils/{id}/retirer',
         'api/v1/compte/code',
+        // Geste sur SON propre compte (comme `compte/code` et `compte/appareils/{id}/retirer`) :
+        // protégé par un code de geste par courriel, sans permission d'espace.
+        'api/v1/compte/codes-secours/regenerer',
         // Ses propres notifications.
         'api/v1/notifications/read-all',
         'api/v1/notifications/{n}/read',

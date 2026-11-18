@@ -147,6 +147,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/compte/appareils', [SecuriteCompteController::class, 'appareils'])->middleware('throttle:password-change');
         Route::post('/compte/appareils/{id}/retirer', [SecuriteCompteController::class, 'retirerAppareil'])->middleware('throttle:password-change');
         Route::post('/compte/code', [SecuriteCompteController::class, 'envoyerCode'])->middleware('throttle:password-change');
+        // G3-D : codes de secours (un seul jeu par compte, quelle que soit la méthode).
+        Route::get('/compte/codes-secours', [SecuriteCompteController::class, 'codesSecours'])->middleware('throttle:password-change');
+        Route::post('/compte/codes-secours/regenerer', [SecuriteCompteController::class, 'regenererCodesSecours'])->middleware('throttle:password-change');
         // `/search` est declaree PLUS BAS, sur `GlobalSearchController`. Elle
         // l'etait deja : la closure supprimee ici la MASQUAIT, la premiere route
         // qui correspond l'emportant. Deux implementations vides du meme point

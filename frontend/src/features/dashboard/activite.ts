@@ -51,6 +51,7 @@ export const EVENEMENTS: Record<string, string> = {
   'auth.code_courriel.verifie': 'Connexion : code reçu par courriel accepté',
   'auth.code_courriel.refuse': 'Connexion : code reçu par courriel refusé',
   'compte.appareil.retire': 'Compte : appareil de confiance retiré',
+  'compte.codes_secours.regeneres': 'Compte : codes de secours régénérés',
   'company.tags_synced': 'Étiquettes synchronisées',
   'company.archived': 'Fiche archivée',
   'envoi.recherche': 'Recherche d’un envoi par adresse',

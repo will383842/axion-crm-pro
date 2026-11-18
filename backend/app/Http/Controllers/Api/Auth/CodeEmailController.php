@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Api\ApiController;
+use App\Models\User;
 use App\Services\Auth\CodeCourriel\AppareilsConfiance;
 use App\Services\Auth\CodeCourriel\CodesConnexionCourriel;
 use App\Services\Auth\CodeCourriel\TropDeRenvois;
 use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
@@ -31,11 +34,18 @@ class CodeEmailController extends ApiController
         }
 
         $request->validate([
-            'code' => ['required', 'string', 'regex:/^\d{6}$/'],
+            'code' => ['required', 'string', 'between:6,10'],
             'appareil_confiance' => ['sometimes', 'boolean'],
         ]);
 
-        if (! $this->codes->verifier($user, 'connexion', (string) $request->input('code'))) {
+        // 6 chiffres : code reçu par courriel. 10 caractères : code de secours (G3-D). Toute autre forme : refusée.
+        $code = (string) $request->input('code');
+        $accepte = match (true) {
+            preg_match('/^\d{6}$/', $code) === 1 => $this->codes->verifier($user, 'connexion', $code),
+            strlen($code) === 10 => $this->consommerCodeSecours($user, $code),
+            default => false,
+        };
+        if (! $accepte) {
             AuditLogger::log('auth.code_courriel.refuse', ['user_id' => (string) $user->id]);
             throw ValidationException::withMessages(['code' => ['Code incorrect. Vérifiez-le et réessayez.']]);
         }
@@ -54,6 +64,31 @@ class CodeEmailController extends ApiController
         }
 
         return $reponse;
+    }
+
+    /**
+     * G3-D — code de secours à usage unique, même logique que `TwoFactorService::verify` (recopiée : ce service n'est pas touché).
+     * La ligne du compte est verrouillée : deux requêtes simultanées avec le même code ne passent pas toutes les deux.
+     * Seul le compte connecté est lu.
+     */
+    private function consommerCodeSecours(User $user, string $code): bool
+    {
+        return DB::transaction(function () use ($user, $code): bool {
+            $verrouille = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $jeu = (array) ($verrouille->totp_recovery_codes ?? []);
+            foreach ($jeu as $i => $hache) {
+                if (Hash::check($code, (string) $hache)) {
+                    unset($jeu[$i]);
+                    $verrouille->totp_recovery_codes = array_values($jeu);
+                    $verrouille->save();
+                    $user->totp_recovery_codes = $verrouille->totp_recovery_codes;
+
+                    return true;
+                }
+            }
+
+            return false;
+        });
     }
 
     public function renvoyer(Request $request): JsonResponse

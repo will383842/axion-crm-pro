@@ -9,6 +9,8 @@
  */
 import { useRef, useState, type ReactNode } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import {
   LayoutDashboard,
   Building2,
@@ -43,6 +45,7 @@ import {
   CopyCheck,
   ListChecks,
   Inbox,
+  Linkedin,
 } from 'lucide-react';
 import { cn, Tooltip } from '@/components/ui';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -244,8 +247,28 @@ const SECTIONS_FIXES: NavSection[] = [
 export const SECTION_TECHNIQUE = 'technique';
 
 /** L'arborescence complète du menu, pour l'écran et pour les gardes. */
-export function sectionsDeNavigation(features: ConsoleFeatures, owner = false): NavSection[] {
-  return [SECTION_ACCUEIL, sectionATraiter(features, owner), sectionMaBase(features), ...SECTIONS_FIXES];
+export function sectionsDeNavigation(features: ConsoleFeatures, owner = false, linkedin = false): NavSection[] {
+  const fixes = linkedin
+    ? SECTIONS_FIXES.map((s) =>
+        s.id === 'ciblage'
+          ? { ...s, items: [...s.items, { to: '/prospection-linkedin', label: 'File LinkedIn', icon: icone(Linkedin) }] }
+          : s,
+      )
+    : SECTIONS_FIXES;
+  return [SECTION_ACCUEIL, sectionATraiter(features, owner), sectionMaBase(features), ...fixes];
+}
+
+/**
+ * LI-D2 — l'entrée « File LinkedIn » n'existe que si le serveur sert la file : 404 (module absent), refus ou
+ * erreur quelconque => pas d'entrée (échec fermé). Lecture seule, aucun effet.
+ */
+export async function fileLinkedinDisponible(): Promise<boolean> {
+  try {
+    await api.get('/prospection-linkedin/file');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -287,7 +310,14 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
   const espace = espaceDeLaBarre(produitCourant, visibles, dernierEspace());
   const identite = visibles.envoi;
   const deuxProduits = visibles.crm && visibles.envoi;
-  const sections = espace === 'envoi' ? sectionsEnvoi(features) : sectionsDeNavigation(features, owner);
+  const { data: linkedin } = useQuery({
+    queryKey: ['menu', 'prospection-linkedin-disponible'],
+    queryFn: fileLinkedinDisponible,
+    enabled: espace !== 'envoi',
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+  const sections = espace === 'envoi' ? sectionsEnvoi(features) : sectionsDeNavigation(features, owner, linkedin === true);
   const dansEnvoi = espace === 'envoi' && visibles.envoi;
   const { data: compteursEnvoi } = useCompteursEnvoi(dansEnvoi);
   const { data: etatEnvois } = useEtatEnvois(dansEnvoi);

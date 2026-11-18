@@ -72,5 +72,20 @@ Le serveur signe seul (`kumomta/dkim.lua`, chargé par `init.lua`) ; le CRM ne d
 - **I3 (banc)** : la sur-signature KumoMTA (liste `h=` répétée) est à valider au banc avec un vérificateur DKIM indépendant, version de KumoMTA figée.
 - **M3 (lots K4)** : tout lot K4 qui touche `smtp_server_message_received` / `http_message_generated` doit se greffer sur `kumomta/dkim.lua` (pas de second handler concurrent qui court-circuiterait la signature).
 
+## Brancher la passerelle sur KumoMTA (`PASSERELLE_KUMO_URL`)
+
+À poser dans l'environnement de la **passerelle** (sur le serveur d'envoi, jamais dans le dépôt), après l'installation et le DKIM :
+
+```
+PASSERELLE_KUMO_URL=<URL_KUMO_LOCALE>
+ENVOI_REEL_ACTIF=<true_ou_false_decide_par_le_fondateur>
+```
+
+- `<URL_KUMO_LOCALE>` : l'API d'administration de KumoMTA, **locale seulement** (`http://127.0.0.1:8000`, voir « Surface exposée »). Un hôte non local est refusé au démarrage.
+- La passerelle n'utilise KumoMTA (`KumoHttp`) que si `PASSERELLE_KUMO_URL` est non vide **et** `ENVOI_REEL_ACTIF` vaut exactement `true` ; sinon elle reste inactive (`KumoInactif`). Tant que le fondateur n'a pas posé `true`, rien ne part.
+- Contrôle : `curl -s http://127.0.0.1:8000/api/check-liveness/` répond, puis `curl -s https://<ip-gestion>/v1/sante` répond depuis `<ip-crm-prod>`.
+- Retour arrière : vider `PASSERELLE_KUMO_URL` (ou remettre `ENVOI_REEL_ACTIF` à autre chose que `true`), puis `systemctl restart kumomta-envoi`.
+- Suite : `docs/envoi/JOUR-J.md` (procédure complète du jour J).
+
 ## Hors périmètre K3 (restant)
 Passerelle HTTPS HMAC elle-même (écoute 443) et son **AC privée** (autorité de certification interne qui signe le certificat de la passerelle et que le CRM épingle : non livrée ici), injection CRM→KumoMTA, DKIM/SPF/DMARC, réputation et chauffe de l'IP, supervision.

@@ -5,7 +5,7 @@
  * Les réponses sont l'indicateur principal. Aucun clic n'est suivi : les
  * ouvertures ne sont pas mesurées et la carte dit « non suivi », jamais 0.
  */
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useParams } from '@tanstack/react-router';
 import { Card, EmptyState, KpiCard, PageHeader, QueryErrorState, Skeleton, StatusPill, Tabs } from '@/components/ui';
 import { useCampagne, type FicheCampagne } from './api';
@@ -324,22 +324,6 @@ export function CampagneSuiviPage() {
   const { campagneId } = useParams({ strict: false });
   const [onglet, setOnglet] = useState<Onglet>('progression');
   const requete = useCampagne(campagneId ?? '');
-  const racine = useRef<HTMLDivElement>(null);
-  const blocage = requete.data?.campagne.blocage ?? null;
-  // B8-B : « Lancer » reste désactivé tant que le serveur dit « bloquée » ; sa raison est reliée par aria-describedby.
-  // (Les gestes sont dans GestesCampagne, hors lot : on pose l'état sur le bouton rendu, à chaque rendu.)
-  useLayoutEffect(() => {
-    const bouton = racine.current?.querySelector<HTMLButtonElement>('[data-geste="lancer"]');
-    if (!bouton) return;
-    if (blocage !== null) {
-      bouton.disabled = true;
-      bouton.setAttribute('aria-describedby', ID_RAISON_BLOCAGE);
-    } else if (bouton.getAttribute('aria-describedby') === ID_RAISON_BLOCAGE) {
-      bouton.removeAttribute('aria-describedby');
-      bouton.disabled = false;
-    }
-  });
-
   if (requete.isPending) {
     return (
       <div role="status" aria-busy="true" aria-label="Chargement de la campagne" className="space-y-3">
@@ -360,6 +344,7 @@ export function CampagneSuiviPage() {
 
   const fiche = requete.data;
   const c = fiche.campagne;
+  const blocage = c.blocage ?? null;
   const onglets: Array<{ id: Onglet; label: string; count?: number }> = [
     { id: 'progression', label: 'Progression' },
     { id: 'destinataires', label: 'Destinataires', count: c.total },
@@ -369,7 +354,7 @@ export function CampagneSuiviPage() {
   ];
 
   return (
-    <div ref={racine}>
+    <div>
       <PageHeader
         title={c.nom}
         surTitre="Envoi"
@@ -381,6 +366,8 @@ export function CampagneSuiviPage() {
             maintenant={fiche.maintenant}
             variante="entete"
             preparation={fiche.preparation}
+            // B8-B / UI-CAMP : « Lancer » reste désactivé tant que le serveur dit « bloquée » ; sa raison est le bandeau.
+            blocage={blocage !== null ? { idRaison: ID_RAISON_BLOCAGE } : null}
             avant={
               c.statut === 'brouillon' ? (
                 <Link

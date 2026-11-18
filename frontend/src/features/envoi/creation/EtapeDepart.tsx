@@ -4,7 +4,7 @@ import { Button, Skeleton } from '@/components/ui';
 import { Bloc, CHAMP, Puces } from './composants';
 import { useBoites, useContexte, type BoiteChoix } from './api';
 import { ajouterJours, dateCourte, dateDeFin, FENETRES, jourDeParis, joursNecessaires, pluriel } from './outils';
-import type { Saisie } from './saisie';
+import { capacitesDe, type Saisie } from './saisie';
 
 const MOT_STATUT: Record<BoiteChoix['statut'], string> = {
   prete: 'Prête',
@@ -30,17 +30,24 @@ export function EtapeDepart({
   const boites = useBoites();
   const contexte = useContexte();
   const liste = boites.data ?? [];
+  const capacites = capacitesDe(contexte.data);
+  const raison = 'Bientôt : ce réglage n’est pas encore pris en charge par l’envoi.';
+  const retires = (!capacites.boites && saisie.boites.length > 0) || (!capacites.plafond && saisie.plafond !== 80);
 
-  // Par défaut : les boîtes prêtes (tant que la personne n'a rien coché ni décoché).
   useEffect(() => {
-    if (!saisie.boitesChoisies && boites.data) {
+    if (capacites.ab !== saisie.capacites.ab || capacites.boites !== saisie.capacites.boites || capacites.plafond !== saisie.capacites.plafond) modifier({ capacites });
+  }, [capacites.ab, capacites.boites, capacites.plafond]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Par défaut : les boîtes prêtes (tant que la personne n'a rien coché ni décoché), seulement si l'envoi sait les appliquer.
+  useEffect(() => {
+    if (capacites.boites && !saisie.boitesChoisies && boites.data) {
       const pretes = boites.data.filter((b) => b.statut === 'prete').map((b) => b.id);
       const capacite = boites.data.filter((b) => pretes.includes(b.id)).reduce((n, b) => n + b.quota_jour, 0);
       modifier({ boites: pretes, plafond: Math.max(1, Math.min(80, capacite)) });
     }
     // `modifier` est stable pour un rendu donné ; on ne réagit qu'à l'arrivée des boîtes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boites.data]);
+  }, [boites.data, capacites.boites]);
 
   const demain = (): string | null => (contexte.data ? ajouterJours(jourDeParis(new Date(contexte.data.maintenant)), 1) : null);
   const aujourdhui = contexte.data ? jourDeParis(new Date(contexte.data.maintenant)) : undefined;
@@ -123,14 +130,18 @@ export function EtapeDepart({
             min={1}
             className={CHAMP}
             value={saisie.plafond}
-            aria-describedby="plafond-aide"
+            disabled={!capacites.plafond}
+            aria-describedby={capacites.plafond ? 'plafond-aide' : 'plafond-aide plafond-refus'}
             onChange={(ev) => { modifier({ plafond: Math.max(1, Number(ev.target.value) || 1) }); }}
           />
           <span id="plafond-aide" className="mt-1 block text-xs text-slate-600">par jour, toutes boîtes</span>
+          {capacites.plafond ? null : <span id="plafond-refus" className="mt-1 block text-xs text-slate-600">{raison}</span>}
         </div>
       </div>
 
       <h3 className="mb-2 mt-5 text-sm font-semibold text-slate-900">Boîtes d’envoi</h3>
+      {capacites.boites ? null : <p id="boites-refus" className="mb-2 text-xs text-slate-600">{raison}</p>}
+      {retires ? <p role="status" className="mb-2 text-xs text-slate-600">Réglages retirés : non pris en charge (boîtes ou plafond d’un ancien brouillon).</p> : null}
       {boites.isPending ? (
         <Skeleton className="h-24 w-full" />
       ) : (
@@ -142,7 +153,9 @@ export function EtapeDepart({
                   id={`boite-${b.id}`}
                   type="checkbox"
                   className="h-4 w-4 accent-[var(--color-produit)]"
-                  checked={saisie.boites.includes(b.id)}
+                  checked={capacites.boites && saisie.boites.includes(b.id)}
+                  disabled={!capacites.boites}
+                  {...(capacites.boites ? {} : { 'aria-describedby': 'boites-refus' })}
                   onChange={(ev) => { bascule(b.id, ev.target.checked); }}
                 />
                 <span className="min-w-0 flex-1">

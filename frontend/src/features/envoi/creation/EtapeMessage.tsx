@@ -1,11 +1,11 @@
 /** Étape 2 — Quel message ? Séquence de 1 à 3 messages, objets A/B, champs et valeurs de repli. */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Send, X } from 'lucide-react';
 import { Button, Modal } from '@/components/ui';
 import { Bloc, CHAMP, Interrupteur } from './composants';
-import { useChamps, useMessagesTypes, envoyerTestCampagne, type MessageTypeEtat } from './api';
+import { useChamps, useContexte, useMessagesTypes, envoyerTestCampagne, type MessageTypeEtat } from './api';
 import { messageErreur } from '../infrastructure/composants/format';
-import { cibleDeContrat, sequenceDeContrat, type Saisie } from './saisie';
+import { capacitesDe, cibleDeContrat, sequenceDeContrat, type Saisie } from './saisie';
 
 function versionUtilisee(m: MessageTypeEtat | undefined) {
   if (!m) return undefined;
@@ -31,6 +31,11 @@ export function EtapeMessage({
   assurerBrouillon: () => Promise<string>;
 }) {
   const messages = useMessagesTypes(false);
+  const capacites = capacitesDe(useContexte().data);
+  // Les capacités rejoignent la saisie : le contenu enregistré en dépend (jamais d'`objet_b` refusé).
+  useEffect(() => {
+    if (capacites.ab !== saisie.capacites.ab || capacites.boites !== saisie.capacites.boites || capacites.plafond !== saisie.capacites.plafond) modifier({ capacites });
+  }, [capacites.ab, capacites.boites, capacites.plafond]); // eslint-disable-line react-hooks/exhaustive-deps
   const liste = messages.data?.data ?? [];
   const champs = useChamps(cibleDeContrat(saisie), sequenceDeContrat(saisie), saisie.repli, brouillonId);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -63,7 +68,7 @@ export function EtapeMessage({
       setErreur('Chaque message de la séquence doit être un message validé.');
       return;
     }
-    if (saisie.ab && saisie.objetB.trim() === '') {
+    if (capacites.ab && saisie.ab && saisie.objetB.trim() === '') {
       setErreur('Écrivez la version B de l’objet, ou désactivez le test A/B.');
       return;
     }
@@ -154,14 +159,25 @@ export function EtapeMessage({
       ) : null}
 
       <div className="mt-5 space-y-3">
-        <Interrupteur
-          id="ab"
-          libelle="Tester deux objets (A/B)"
-          aide="Sur 20 % de la cible ; la meilleure version part ensuite."
-          coche={saisie.ab}
-          onChange={basculerAB}
-        />
-        {saisie.ab ? (
+        {capacites.ab ? (
+          <Interrupteur
+            id="ab"
+            libelle="Tester deux objets (A/B)"
+            aide="Sur 20 % de la cible ; la meilleure version part ensuite."
+            coche={saisie.ab}
+            onChange={basculerAB}
+          />
+        ) : (
+          <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
+            <input id="ab" type="checkbox" className="mt-1 h-4 w-4" checked={false} disabled aria-describedby="ab-aide" readOnly />
+            <div className="min-w-0">
+              <label htmlFor="ab" className="block text-sm font-semibold text-slate-600">Tester deux objets (A/B)</label>
+              <span id="ab-aide" className="mt-0.5 block text-xs text-slate-600">Bientôt : le test A/B n’est pas encore pris en charge par l’envoi.</span>
+              {saisie.ab || saisie.objetB !== '' ? <span role="status" className="mt-0.5 block text-xs text-slate-600">Réglages retirés : non pris en charge (version B de l’objet).</span> : null}
+            </div>
+          </div>
+        )}
+        {capacites.ab && saisie.ab ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-sky-50 p-3 ring-1 ring-sky-200">
               <p className="text-xs font-semibold text-slate-700">Objet · version A</p>

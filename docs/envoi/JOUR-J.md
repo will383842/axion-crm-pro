@@ -61,7 +61,7 @@ Variables de l'envoi (toutes posées dans le `.env` du serveur du CRM, jamais da
 - Retour arrière : retirer les enregistrements chez le registraire ; vider `ENVOI_DNS_DOMAINES`.
 
 ## J-21 — IP inscrites et domaines reliés
-- Commandes : `php artisan envoi:ip-inventaire <ID_ESPACE> ajouter <IP_ENVOI_1>`, puis
+- Commandes : `php artisan envoi:ip-inventaire <ID_ESPACE> ajouter <IP_ENVOI_1> --flux=prospection` (`--flux=lettre` pour une IP de la lettre ; sans `--flux`, la commande refuse), puis
   `php artisan envoi:domaine-ip <ID_ESPACE> <DOMAINE_ENVOI_1> <IP_ENVOI_1>`.
 - Poser `ENVOI_LISTES_IPS` (`<IP_ENVOI_1>@<ID_ESPACE>`) et `ENVOI_LISTES_NON_FIABLE_BLOQUE_APRES_MINUTES`.
 - Contrôle : chaque IP d'envoi est inscrite, chaque domaine est relié à une IP, puis

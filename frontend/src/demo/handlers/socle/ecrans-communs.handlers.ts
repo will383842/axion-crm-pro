@@ -15,6 +15,8 @@ import { api, delai, erreur, repondreEtatForce } from '../../outils';
 import { ecrireSession, lireSession } from '../../session';
 
 const MAX_RENVOIS = 3;
+/** Code de secours de la démonstration : 10 caractères, comme le serveur. */
+const CODE_SECOURS_DEMO = 'SECOURS001';
 const MOT_DE_PASSE_MIN = 12;
 
 interface Acces { id: string; crm: boolean; envoi: boolean; actif: boolean; derniere_connexion: string }
@@ -126,7 +128,7 @@ export const handlers: HttpHandler[] = [
     await delai();
     if (lireSession() === 'deconnecte') return erreur(401, 'non_connecte', 'Reconnectez-vous.');
     const c = await corps<{ code: string }>(request);
-    if (!codeBon(c.code)) return mauvaisCode();
+    if (!codeBon(c.code) && c.code !== CODE_SECOURS_DEMO) return mauvaisCode();
     ecrireSession('connecte');
     return HttpResponse.json({ ok: true });
   }),
@@ -139,6 +141,18 @@ export const handlers: HttpHandler[] = [
     if (n > MAX_RENVOIS) return erreur(429, 'trop_de_renvois', 'Trop de renvois. Patientez quelques minutes.');
     demoDb.zone<{ id: string; n: number }>('ecrans-communs', 'etat').modifier('renvois', { n });
     return HttpResponse.json({ ok: true, renvois_restants: MAX_RENVOIS - n });
+  }),
+
+  // Code « geste » (avant retirer un appareil, régénérer les codes de secours) : même plafond que les renvois.
+  http.post(api('/compte/code'), async () => {
+    await delai();
+    donnees();
+    const etat = demoDb.zone<{ id: string; n: number }>('ecrans-communs', 'etat');
+    const n = (etat.trouver('gestes')?.n ?? 0) + 1;
+    if (n > MAX_RENVOIS) return erreur(429, 'trop_de_renvois', 'Trop de codes demandés. Réessayez dans quelques minutes.');
+    if (etat.trouver('gestes') === undefined) etat.ajouter({ id: 'gestes', n });
+    else etat.modifier('gestes', { n });
+    return HttpResponse.json({ ok: true });
   }),
 
   // ── Mot de passe ────────────────────────────────────────────────────────

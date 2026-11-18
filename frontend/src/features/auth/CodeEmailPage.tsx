@@ -15,6 +15,7 @@ import { AuthShell } from './LoginPage';
  */
 
 const LONGUEUR = 6;
+const LONGUEUR_SECOURS = 10;
 const MAX_RENVOIS = 3;
 
 function messageErreur(err: unknown): string {
@@ -33,6 +34,14 @@ export function CodeEmailPage() {
   const [renvois, setRenvois] = useState(0);
   const [info, setInfo] = useState<string | null>(null);
   const [limite, setLimite] = useState(false);
+  const [secours, setSecours] = useState(false);
+  const longueur = secours ? LONGUEUR_SECOURS : LONGUEUR;
+
+  function basculer() {
+    setSecours((v) => !v);
+    setCode('');
+    setErreur(null);
+  }
 
   async function valider(e: React.FormEvent) {
     e.preventDefault();
@@ -68,22 +77,37 @@ export function CodeEmailPage() {
       description="Saisissez le code à 6 chiffres que nous venons de vous envoyer."
     >
       <form onSubmit={(e) => void valider(e)} aria-labelledby="auth-title" className="space-y-4">
-        <input
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={LONGUEUR}
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, LONGUEUR))}
-          onPaste={(e) => {
-            e.preventDefault();
-            setCode(e.clipboardData.getData('text').replace(/\D/g, '').slice(0, LONGUEUR));
-          }}
-          aria-label="Code à 6 chiffres"
-          autoComplete="one-time-code"
-          required
-          className="h-11 w-full rounded-lg bg-white px-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 sm:h-9"
-          placeholder="••••••"
-        />
+        {secours ? (
+          <input
+            maxLength={LONGUEUR_SECOURS}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, LONGUEUR_SECOURS))}
+            aria-label="Code de secours à 10 caractères"
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            required
+            className="h-11 w-full rounded-lg bg-white px-3 text-center font-mono text-xl font-semibold tracking-widest text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 sm:h-9"
+            placeholder="••••••••••"
+          />
+        ) : (
+          <input
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={LONGUEUR}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, LONGUEUR))}
+            onPaste={(e) => {
+              e.preventDefault();
+              setCode(e.clipboardData.getData('text').replace(/\D/g, '').slice(0, LONGUEUR));
+            }}
+            aria-label="Code à 6 chiffres"
+            autoComplete="one-time-code"
+            required
+            className="h-11 w-full rounded-lg bg-white px-3 text-center text-2xl font-semibold tracking-[0.5em] text-slate-900 ring-1 ring-slate-200 transition focus:outline-none focus:ring-2 focus:ring-slate-300 sm:h-9"
+            placeholder="••••••"
+          />
+        )}
 
         <label className="flex min-h-11 items-center gap-2 text-sm text-slate-700 sm:min-h-0">
           <input
@@ -112,7 +136,7 @@ export function CodeEmailPage() {
           full
           loading={envoi}
           iconLeft={<MailCheck className="h-3.5 w-3.5" />}
-          disabled={code.length !== LONGUEUR}
+          disabled={code.length !== longueur}
         >
           Vérifier le code
         </Button>
@@ -120,6 +144,9 @@ export function CodeEmailPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
           <Button type="button" variant="ghost" onClick={() => void renvoyer()} disabled={limite}>
             Renvoyer le code
+          </Button>
+          <Button type="button" variant="ghost" onClick={basculer}>
+            {secours ? 'Utiliser le code reçu par e-mail' : 'Utiliser un code de secours'}
           </Button>
           <a href="/login" className="hover:text-slate-900 hover:underline">
             Retour à la connexion

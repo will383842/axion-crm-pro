@@ -119,7 +119,7 @@ class ProspectionLinkedInController extends ApiController
         if (! is_string($cle) || mb_strlen($cle) < 16 || mb_strlen($cle) > 128) {
             return response()->json(['message' => 'Idempotency-Key : 16 à 128 caractères.', 'errors' => ['Idempotency-Key' => ['obligatoire']]], 422);
         }
-        $p = Str::isUuid($id) ? WorkspaceContext::run($ws, static fn () => DB::table('pl_prospects')->where('workspace_id', $ws)->where('id', $id)->first()) : null;
+        $p = Str::isUuid($id) ? WorkspaceContext::run($ws, static fn () => DB::table('pl_prospects')->where('workspace_id', $ws)->where('expediteur_user_id', $uid)->where('id', $id)->first()) : null; // un prospect d'un autre expéditeur est introuvable, comme dans la file
         if ($p === null) {
             return response()->json(['message' => 'Prospect introuvable.'], 404);
         }

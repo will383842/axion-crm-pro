@@ -59,8 +59,19 @@ final class DepotIps
             ->where('d.workspace_id', $ws)->whereNull('i.id')->count());
     }
 
+    /** Auteur : 1 à 100 caractères, jamais une adresse (`@`) : le journal ne garde que des noms d'opérateur. */
+    public static function auteurValide(string $auteur): bool
+    {
+        $a = trim($auteur);
+
+        return $a !== '' && mb_strlen($auteur) <= 100 && ! str_contains($auteur, '@');
+    }
+
     public function ajouter(string $ws, string $ip, string $flux, string $auteur): void
     {
+        if (! self::auteurValide($auteur)) {
+            throw new InvalidArgumentException('auteur invalide (1 à 100 caractères, sans @)');
+        }
         if (! self::formeValide($ip)) {
             throw new InvalidArgumentException('forme d’IP invalide');
         }
@@ -75,8 +86,8 @@ final class DepotIps
     /** @return bool faux si l'IP est inconnue ou déjà retirée */
     public function retirer(string $ws, string $ip): bool
     {
-        return WorkspaceContext::run($ws, fn () => DB::table('envoi_ips')
-            ->where('workspace_id', $ws)->where('ref', $ip)->whereNull('retiree_le')->update(['retiree_le' => now()])) > 0;
+        return WorkspaceContext::run($ws, fn () => DB::transaction(fn () => DB::table('envoi_ips')
+            ->where('workspace_id', $ws)->where('ref', $ip)->whereNull('retiree_le')->update(['retiree_le' => now()]))) > 0;
     }
 
     /** @return bool faux si la liaison existait déjà (rien changé) ; la base refuse le reste (flux, IP retirée, espace). */

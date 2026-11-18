@@ -159,7 +159,7 @@ function retraitsSaisis(jetons: readonly string[] | undefined, joignables: numbe
   return Math.min(total, joignables);
 }
 
-function estimer(cible: Cible): { total: number; exclus: number; restant: number; exclusions: Record<string, number> } {
+function estimer(cible: Cible): { total: number; exclus: number; restant: number; exclusions: Record<string, number>; exclusions_evaluees: boolean; complet: boolean } {
   const trouvee = trouverCible(cible);
   const joignables = trouvee?.joignables ?? 0;
   const r = retraitsDOffice(joignables);
@@ -170,6 +170,8 @@ function estimer(cible: Cible): { total: number; exclus: number; restant: number
     exclus,
     restant: Math.max(0, joignables - saisies),
     exclusions: { opposition: r.opposition, clients: r.clients, adresses_partagees: r.adresses_partagees, saisies },
+    exclusions_evaluees: true,
+    complet: true,
   };
 }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ApiController;
 use App\Models\User;
 use App\Rules\NotPwnedPassword;
 use App\Services\Audit\AuditHashChain;
+use App\Services\Auth\CodeCourriel\AppareilsConfiance;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,17 +138,29 @@ class PasswordChangeController extends ApiController
             }
         }
 
-        // ── Mêmes effets que la réinitialisation ──────────────────────────────
-        $user->password_hash = Hash::make((string) $request->input('password'));
-        $user->failed_login_count = 0;
-        $user->last_failed_login_at = null;
-        $user->locked_until = null;
-        // Les cookies « se souvenir de moi » des AUTRES appareils portent l'ancien
-        // jeton : sans ce changement, ils rouvriraient une session neuve.
-        $user->setRememberToken(Str::random(60));
-        $user->save();
+        // SEC-APP : on garde l'appareil de la requête seulement si son cookie est reconnu pour CE compte
+        // (la personne est présente). Cookie absent, faux ou d'un autre compte : tout est retiré.
+        $appareils = app(AppareilsConfiance::class);
+        $jeton = $request->cookie(AppareilsConfiance::COOKIE);
+        $jeton = is_string($jeton) && $appareils->reconnaitre($user, $jeton) ? $jeton : null;
 
-        $user->tokens()->delete();
+        // ── Mêmes effets que la réinitialisation ──────────────────────────────
+        // Une seule transaction : une erreur sur le retrait des appareils laisse l'ancien mot de passe (échec fermé).
+        $retires = DB::transaction(function () use ($user, $request, $appareils, $jeton): int {
+            $user->password_hash = Hash::make((string) $request->input('password'));
+            $user->failed_login_count = 0;
+            $user->last_failed_login_at = null;
+            $user->locked_until = null;
+            // Les cookies « se souvenir de moi » des AUTRES appareils portent l'ancien
+            // jeton : sans ce changement, ils rouvriraient une session neuve.
+            $user->setRememberToken(Str::random(60));
+            $user->save();
+
+            $user->tokens()->delete();
+
+            return $appareils->retirerTous($user, $jeton);
+        });
+        Log::info('appareils_confiance.retires', ['user_id' => $user->id, 'nombre' => $retires, 'cause' => 'changement']);
 
         // La session courante reste ouverte, sur un identifiant neuf. `login()`
         // ré-émet aussi le cookie « se souvenir » avec le nouveau jeton quand la

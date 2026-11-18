@@ -28,10 +28,17 @@ export interface Estimation {
   exclus: number;
   restant: number;
   exclusions: Record<string, number>;
+  /** Faux tant que les exclusions ne sont pas évaluées : `restant` n'est alors PAS un nombre de joignables. */
+  exclusions_evaluees?: boolean;
+  /** Faux si l'examen a été interrompu : `total` = membres examinés, `restant` = un minimum (« au moins »). */
+  complet?: boolean;
 }
 
+/** Une audience passée dans l'adresse n'est transmise que si c'est un identifiant (chiffres, moins de 18). */
+export const AUDIENCE_VALIDE = /^\d{1,17}$/;
+
 export const CLES = {
-  cibles: (entreprise: string | null) => ['envoi', 'creation', 'cibles', entreprise] as const,
+  cibles: (entreprise: string | null, audience: string | null = null) => ['envoi', 'creation', 'cibles', entreprise, audience] as const,
   boites: ['envoi', 'creation', 'boites'] as const,
   contexte: ['envoi', 'creation', 'contexte'] as const,
   exemples: ['envoi', 'creation', 'exemples'] as const,
@@ -41,10 +48,16 @@ export const CLES = {
 
 // ── Lectures ──────────────────────────────────────────────────────────────
 
-export function useCibles(entreprise: string | null) {
+export function useCibles(entreprise: string | null, audience: string | null = null) {
+  const audienceSure = audience !== null && AUDIENCE_VALIDE.test(audience) ? audience : null;
   return useQuery({
-    queryKey: CLES.cibles(entreprise),
-    queryFn: async () => (await api.get<{ data: CibleProposee[] }>('/envoi/creation/cibles', { params: entreprise === null ? {} : { entreprise } })).data.data,
+    queryKey: CLES.cibles(entreprise, audienceSure),
+    queryFn: async () =>
+      (
+        await api.get<{ data: CibleProposee[] }>('/envoi/creation/cibles', {
+          params: { ...(entreprise === null ? {} : { entreprise }), ...(audienceSure === null ? {} : { audience: audienceSure }) },
+        })
+      ).data.data,
   });
 }
 

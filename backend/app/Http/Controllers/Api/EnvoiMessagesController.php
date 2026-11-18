@@ -130,6 +130,18 @@ class EnvoiMessagesController extends ApiController
         return response()->json(['maintenant' => now()->utc()->toIso8601String(), 'fuseau' => (string) config('app.timezone'), 'capacites' => $this->capacites()]);
     }
 
+    /** `ab` n'est vrai que si la sonde n'est refusée par AUCUN motif : tout refus (objet_b ou autre) laisse `ab` faux. */
+    public static function abApplique(Closure $sonde): bool
+    {
+        try {
+            $sonde();
+        } catch (ConstructionRefusee) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Ce que l'envoi sait appliquer, LU des refus du serveur (jamais une constante du front) : `ab` = faux tant que `PlanSequence` refuse
      * un `objet_b` ; `boites` et `plafond` = faux tant que `RaisonBlocage::REGLAGES_APPLIQUES` l'est (même constante que la matérialisation).
@@ -138,14 +150,11 @@ class EnvoiMessagesController extends ApiController
      */
     private function capacites(): array
     {
-        try {
+        $ab = self::abApplique(static function (): void {
             PlanSequence::depuisCampagne((object) ['nb_etapes' => 1, 'saisie' => ['contenu' => ['sequence' => [['etape' => 1, 'objet_b' => 'sonde']]]]]);
-            $ab = true;
-        } catch (ConstructionRefusee $e) {
-            $ab = $e->motif !== 'objet_b_non_applicable';
-        }
+        });
 
-        return ['ab' => $ab, 'boites' => RaisonBlocage::REGLAGES_APPLIQUES, 'plafond' => RaisonBlocage::REGLAGES_APPLIQUES];
+        return ['ab' => $ab, 'boites' => RaisonBlocage::reglagesAppliques(), 'plafond' => RaisonBlocage::reglagesAppliques()];
     }
 
     /**

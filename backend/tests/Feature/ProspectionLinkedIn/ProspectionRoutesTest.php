@@ -214,3 +214,20 @@ test('aucune route ne supprime ; aucune requête sortante', function () {
     }
     Http::assertNothingSent();
 });
+
+test('geste : prospect d\'un autre expéditeur du même espace ⇒ 404, rien écrit (invitation, opposition ; proprio ET app)', function () {
+    $autreProprio = $this->compte($this->espace, 'owner');
+    foreach (LIC_MODES as $mode) {
+        foreach (['invitation_faite', 'opposition'] as $geste) {
+            $p = licProspect($this->espace->id, $autreProprio->id);
+            licSous($mode);
+            $this->actingAs($this->proprio)->postJson(LIC_BASE . "/prospects/{$p}/gestes", ['geste' => $geste], ['Idempotency-Key' => licCle()])->assertNotFound();
+            expect(licVoir($this->espace->id, 'pl_journal', ['prospect_id' => $p]))->toBe(0, "{$mode}/{$geste}")
+                ->and(DB::table('pl_prospects')->where('id', $p)->value('etat'))->toBe('en_file', "{$mode}/{$geste}");
+            // témoin : l'expéditeur lui-même agit normalement
+            licSous($mode);
+            $this->actingAs($autreProprio)->postJson(LIC_BASE . "/prospects/{$p}/gestes", ['geste' => $geste], ['Idempotency-Key' => licCle()])->assertOk();
+            DB::statement('RESET ROLE');
+        }
+    }
+});

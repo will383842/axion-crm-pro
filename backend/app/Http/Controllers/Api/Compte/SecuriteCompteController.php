@@ -11,6 +11,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -85,6 +86,44 @@ class SecuriteCompteController extends ApiController
         }
 
         return $this->ok(['ok' => true]);
+    }
+
+    /** G3-D — nombre de codes de secours restants du compte connecté (jamais les codes). */
+    public function codesSecours(Request $request): JsonResponse
+    {
+        $user = $this->utilisateur($request);
+
+        return $this->ok(['restants' => count((array) ($user->totp_recovery_codes ?? []))]);
+    }
+
+    /**
+     * G3-D — 10 nouveaux codes de secours, montrés une seule fois ; ils REMPLACENT le jeu du compte
+     * (mise à jour de colonne, aucune suppression). Exige un code « geste » valide.
+     */
+    public function regenererCodesSecours(Request $request): JsonResponse
+    {
+        $user = $this->utilisateur($request);
+        if (CodesConnexionCourriel::methode($user) !== 'email') {
+            return $this->methodeNonCourriel();
+        }
+        $request->validate(['code' => ['required', 'string', 'regex:/^\d{6}$/']]);
+
+        if (! $this->codes->verifier($user, 'geste', (string) $request->input('code'))) {
+            AuditLogger::log('auth.code_courriel.refuse', ['user_id' => (string) $user->id, 'objet' => 'geste']);
+            throw ValidationException::withMessages(['code' => ['Code incorrect. Vérifiez-le et réessayez.']]);
+        }
+
+        // Même règle que `TwoFactorService::confirmEnrolment` : 10 codes de 10 caractères, haches.
+        $clairs = [];
+        $haches = [];
+        for ($i = 0; $i < 10; $i++) {
+            $clairs[] = $c = Str::random(10);
+            $haches[] = Hash::make($c);
+        }
+        $user->forceFill(['totp_recovery_codes' => $haches])->save();
+        AuditLogger::log('compte.codes_secours.regeneres', ['user_id' => (string) $user->id]);
+
+        return $this->ok(['recovery_codes' => $clairs]);
     }
 
     private function utilisateur(Request $request): User

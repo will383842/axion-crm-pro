@@ -62,6 +62,7 @@
  */
 import type { ReactElement } from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -271,7 +272,7 @@ async function monter(options: OptionsMontage): Promise<Montage> {
  * de `ErrorBoundary` en rajoute une. On les tait pour garder la sortie lisible,
  * MAIS on garde l'espion : « la frontiere a journalise » est une assertion.
  */
-let espionConsole: ReturnType<typeof vi.spyOn>;
+let espionConsole: MockInstance<typeof console.error>;
 
 beforeEach(() => {
   espionConsole = vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -36,6 +36,13 @@ return [
     'db_app_role' => env('CRM_DB_APP_ROLE_ENABLED', false),
 
     /*
+    | G4-A — garde de démarrage : en production, refuser de démarrer si le rôle
+    | applicatif n'est pas en place (voir `GardeRoleApplicatif`). Éteinte par
+    | défaut. L'allumer est un geste de production, jamais fait par le code.
+    */
+    'garde_role_applicatif' => env('CRM_GARDE_ROLE_APPLICATIF', false),
+
+    /*
     | `strict_workspace_scope` : ceinture applicative (la RLS est la bretelle).
     | Quand il est à true :
     |   - les modèles workspace-scopés portent un global scope Eloquent qui

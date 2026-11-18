@@ -55,7 +55,7 @@ it('les jobs lourds sautent en brouillon, jamais hors PR', function () {
 it('les audits de dépendances combinent brouillon et changements', function () {
     foreach (['composer-audit', 'pnpm-audit'] as $job) {
         $condition = (string) workflowLotG('security')['jobs'][$job]['if'];
-        expect($condition)->toContain('always()')
+        expect($condition)->toContain('!cancelled()')
             ->toContain("github.event_name != 'pull_request'")
             ->toContain('github.event.pull_request.draft == false')
             ->toContain("needs.changements.outputs.deps == 'true'");

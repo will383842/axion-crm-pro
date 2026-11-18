@@ -638,7 +638,8 @@ jobs:
         part: [1, 2]
     runs-on: ubuntu-24.04
     # F38-008 — plafond anti-gel. Durée mesurée ≈ 6-11 min par part (Postgres + 1/2 de la
-    # suite Pest) : 20 min = plus de 5× la durée utile, sans laisser un gel durer 1 h.
+    # suite Pest) : 20 min = environ 2× la durée de la part la plus longue (≈ 10 min),
+    # sans laisser un gel durer 1 h.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

@@ -54,10 +54,20 @@ function g0Sous(string $mode, string $ws, Closure $f): mixed
     }
 }
 
+/*
+ * Cause de l'instabilité (FLAKY-G0, run 44350614770) : tant que `contacts` n'a AUCUNE statistique (relpages = 0),
+ * le planificateur suppose 10 pages et choisit l'index partiel. Dès qu'un autre test de la même part a laissé des
+ * lignes validées puis qu'un ANALYZE (ou l'autovacuum) est passé, la table pèse 1 page et le plan le moins cher
+ * devient « Limit → Sort → Index Scan idx_contacts_workspace » (cost 4.29, rows=1) : l'index de la corbeille n'est
+ * plus cité. `enable_seqscan/bitmapscan = off` n'interdisent pas ce plan, car il n'utilise ni l'un ni l'autre.
+ * `enable_sort = off` retire le tri : le seul moyen de servir `ORDER BY deleted_at DESC, id DESC` est alors de lire
+ * l'index dans l'ordre, ce qui est exactement ce que le test doit prouver. L'index et la requête ne changent pas.
+ */
 function g0Plan(string $sql, array $bindings): string
 {
     DB::statement('SET LOCAL enable_seqscan = off');
     DB::statement('SET LOCAL enable_bitmapscan = off');
+    DB::statement('SET LOCAL enable_sort = off');
     $lignes = DB::select('EXPLAIN ' . $sql, $bindings);
 
     return implode("\n", array_map(fn ($l) => (string) ((array) $l)['QUERY PLAN'], $lignes));

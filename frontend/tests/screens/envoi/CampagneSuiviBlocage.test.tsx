@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, type HttpHandler } from 'msw';
 import { GestesCampagne } from '@/features/envoi/campagnes/composants/GestesCampagne';
 import { PHRASE_BLOCAGE_GENERIQUE, phraseBlocage } from '@/features/envoi/campagnes/composants/libelles';
 import type { Campagne } from '@/features/envoi/campagnes/api';
@@ -15,7 +15,7 @@ import { apiUrl } from '../../msw/handlers';
 const CAMPAGNE = { id: 7, nom: 'Campagne test', statut: 'programmee' } as unknown as Campagne;
 const CHEMIN = '/envoi/campagnes/test-blocage';
 
-async function monter(blocage?: { idRaison: string } | null, handlers: Parameters<typeof renderScreen>[1]['handlers'] = []) {
+async function monter(blocage?: { idRaison: string } | null, handlers: HttpHandler[] = []) {
   const Ecran = () => (
     <div>
       <p id="raison-test">Boîtes ou plafond : renvoyez à valider.</p>

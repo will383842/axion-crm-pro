@@ -25,27 +25,20 @@ name: E2E
 # `continue-on-error: true` recreerait exactement le defaut qu'il repare : une
 # porte qui alerte et n'empeche rien.
 
+# CI-F1 (#680) : ce workflow est APPELÉ par `a11y.yml` (workflow_call) et ne se
+# déclenche plus seul. Il ne construit plus le frontend : il lit l'artefact
+# `frontend-dist` du même run et recalcule son empreinte ; absent ou différent
+# ⇒ échec. Déclencheurs, filtre `paths` et concurrence : ceux de `a11y.yml`.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    branches: [main]
-    # Filtre conservateur (workflow NON exige par la protection de main) :
-    # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou ce
-    # workflow changent. push main / schedule / dispatch restent sans filtre.
-    paths:
-      - 'frontend/**'
-      - 'backend/openapi/**'
-      - '.github/workflows/e2e.yml'
+  workflow_call:
+    inputs:
+      empreinte:
+        description: "Empreinte sha256 du build frontend unique (calculée par a11y.yml)"
+        required: true
+        type: string
 
 permissions:
   contents: read
-
-concurrency:
-  group: e2e-${{ github.event.pull_request.number || github.ref }}
-  # N'annule que les runs de PR ; jamais un run de push sur main.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   suites-cablees:
@@ -53,6 +46,7 @@ jobs:
     # Lot G (#680) : sauté (donc vert) tant que la PR est en brouillon ; tourne au « prêt pour relecture ».
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 30  # F38-008
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -69,13 +63,22 @@ jobs:
       - name: Install Playwright browsers
         working-directory: frontend
         run: pnpm exec playwright install --with-deps chromium
-      # La cible doit EXISTER sur le runner. `playwright.config.ts` neutralise
-      # son `webServer` quand `CI=true`, SAUF si `E2E_PREVIEW=true` : dans ce
-      # cas il demarre et arrete lui-meme `vite preview` sur 127.0.0.1:4173.
-      # C'est pour cela qu'on construit d'abord.
-      - name: Build frontend (la cible que les suites doivent visiter)
-        working-directory: frontend
-        run: pnpm build
+      # Build unique : lu, jamais reconstruit ici. `playwright.config.ts` sert
+      # `frontend/dist` via `vite preview` quand `E2E_PREVIEW=true`.
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+      - name: Vérifier le build unique (absent ou différent ⇒ ÉCHEC)
+        env:
+          EMPREINTE_ATTENDUE: ${{ inputs.empreinte }}
+        run: |
+          set -euo pipefail
+          test -n "$EMPREINTE_ATTENDUE" || { echo "::error::empreinte attendue absente"; exit 1; }
+          test -f frontend/dist/index.html || { echo "::error::build frontend absent (index.html introuvable)"; exit 1; }
+          calculee=$(cd frontend/dist && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+          echo "attendue=$EMPREINTE_ATTENDUE calculee=$calculee"
+          test "$calculee" = "$EMPREINTE_ATTENDUE" || { echo "::error::le build lu n'est pas celui qui a été construit"; exit 1; }
       # Les 11 suites en une seule invocation : un seul demarrage de
       # `vite preview`, un seul rapport. Mesure locale du 2026-08-20 sur le
       # meme build : 36 cas, 56 s a 1 min 0 s.

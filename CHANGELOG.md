@@ -29,7 +29,7 @@ Journée de fusions sur le chantier « envoi » et la connexion. Aucun drapeau n
 - Un prénom retiré d'un commentaire de migration — NOM-MIG (#763).
 
 ### Proposé, en relecture
-- Commande locale `crm:compte-double-auth` : passe un compte en double authentification par courriel (refusée tant que le canal est faux) ou le ramène à l'application — G3-F (#792).
+- Commande locale `crm:compte:double-auth` : passe un compte en double authentification par courriel (refusée tant que le canal est faux ou le drapeau éteint ; le retour à l'application est refusé sans application inscrite) ou le ramène à l'application — G3-F (#792).
 
 ## [0.1.0-mocks-complete] — 2026-05-17
 

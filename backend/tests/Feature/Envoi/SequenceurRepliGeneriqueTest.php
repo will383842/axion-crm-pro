@@ -3,7 +3,8 @@
 /**
  * Lot L5b (PLAN ADRESSES GÉNÉRALES, #680) — le séquenceur et le repli sur l'adresse générale : UN seul message, jamais de relance ;
  * règle R7 revérifiée à l'envoi (interrupteur éteint, contact nommé apparu) ⇒ arrêt `repli_generique_caduc`, jamais de report.
- * Transport : FauxServeurEnvoi derrière la PasserelleLocale. Fixtures FICTIVES (`.example.invalid`), propriétaire de la base.
+ * Transport : FauxServeurEnvoi derrière la PasserelleLocale. Fixtures FICTIVES (`.example.invalid`, adresses `prenom.nom@`). Propriétaire de la base, et les trois cas de sécurité rejoués SOUS LE RÔLE
+ * APPLICATIF `pgsql_app` (SET LOCAL ROLE + RLS) en fin de fichier.
  */
 
 use App\Crm\FichesProtegees;
@@ -126,6 +127,18 @@ function srgRepli(object $t, array $plus = []): array
     return [$entreprise, $id];
 }
 
+/** Un passage du séquenceur SOUS LE RÔLE APPLICATIF (non propriétaire, RLS active) ; le rôle est toujours rendu. */
+function srgApp(object $t, string $ins): string
+{
+    WorkspaceContext::set($t->ws);
+    DB::statement('SET LOCAL ROLE "' . str_replace('"', '""', (string) config('database.connections.pgsql_app.username')) . '"');
+    try {
+        return ($t->seq)()->traiter($t->ws, $ins, $t->maintenant);
+    } finally {
+        DB::statement('RESET ROLE');
+    }
+}
+
 function srgEtat(string $id): array
 {
     $l = DB::table('envoi_inscriptions')->where('id', $id)->first();
@@ -166,7 +179,7 @@ test('L5b R7 : interrupteur supprimé de l\'espace ou allumé seulement ailleurs
 
 test('L5b R7 : un contact nommé (adresse nominative) apparu depuis l\'inscription ⇒ arrêt « repli_generique_caduc »', function () {
     [$entreprise, $ins] = srgRepli($this);
-    srgContact($this, 'jean.dupont@zz-repli.example.invalid', $entreprise);
+    srgContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ARRETEE);
 
@@ -177,8 +190,8 @@ test('L5b R7 : un contact nommé (adresse nominative) apparu depuis l\'inscripti
 test('L5b R7 : un autre générique, un contact supprimé ou d\'une autre entreprise ne rendent PAS le repli caduc', function () {
     [$entreprise, $ins] = srgRepli($this);
     srgContact($this, 'info@zz-repli.example.invalid', $entreprise);
-    [$autreEntreprise] = srgContact($this, 'marie.martin@zz-autre.example.invalid');
-    [, $supprime] = srgContact($this, 'paul.durand@zz-repli.example.invalid', $entreprise);
+    [$autreEntreprise] = srgContact($this, 'prenom.autre@zz-autre.example.invalid');
+    [, $supprime] = srgContact($this, 'prenom.supprime@zz-repli.example.invalid', $entreprise);
     DB::table('contacts')->where('id', $supprime)->update(['deleted_at' => $this->lundi->format('c')]);
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::ENVOYE);
@@ -187,7 +200,7 @@ test('L5b R7 : un autre générique, un contact supprimé ou d\'une autre entrep
 
 test('L5b : opposition d\'une autre personne de l\'entreprise ⇒ arrêt, rien ne part', function () {
     [$entreprise, $ins] = srgRepli($this);
-    [, $contact] = srgContact($this, 'jean.dupont@zz-repli.example.invalid', $entreprise);
+    [, $contact] = srgContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
     $autre = (new Inscriptions(new LecteurFicheDb))->inscrire($this->ws, srgSequence($this, 1), $contact, $this->maintenant);
     (new Inscriptions(new LecteurFicheDb))->evenement($this->ws, $autre, Evenement::OPPOSITION, $this->maintenant);
 
@@ -229,5 +242,34 @@ test('L5b non-régression : un `risque/generique` sur une inscription ORDINAIRE 
     DB::table('envoi_inscriptions')->where('id', $ins)->update(['prochaine_echeance' => $this->maintenant->format('c')]);
 
     expect(($this->seq)()->traiter($this->ws, $ins, $this->maintenant))->toBe(Sequenceur::REFUSE);
+    expect($this->faux->appels)->toBe(0);
+});
+
+test('L5b sous le rôle applicatif : un seul message au repli, puis « terminee »', function () {
+    [, $ins] = srgRepli($this);
+
+    expect(srgApp($this, $ins))->toBe(Sequenceur::ENVOYE);
+
+    expect(srgEtat($ins))->toBe(['terminee', null]);
+    expect($this->faux->appels)->toBe(1)->and(DB::table('envoi_messages')->where('inscription_id', $ins)->count())->toBe(1);
+});
+
+test('L5b sous le rôle applicatif : interrupteur éteint ⇒ arrêt « repli_generique_caduc », rien ne part', function () {
+    [, $ins] = srgRepli($this);
+    srgInterrupteur($this->ws, 'false');
+
+    expect(srgApp($this, $ins))->toBe(Sequenceur::ARRETEE);
+
+    expect(srgEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
+    expect($this->faux->appels)->toBe(0);
+});
+
+test('L5b sous le rôle applicatif : un contact nommé apparu ⇒ arrêt « repli_generique_caduc », rien ne part', function () {
+    [$entreprise, $ins] = srgRepli($this);
+    srgContact($this, 'prenom.nom@zz-repli.example.invalid', $entreprise);
+
+    expect(srgApp($this, $ins))->toBe(Sequenceur::ARRETEE);
+
+    expect(srgEtat($ins))->toBe(['arretee', 'repli_generique_caduc']);
     expect($this->faux->appels)->toBe(0);
 });

@@ -14,6 +14,7 @@ Aucun renommé, aucun retiré : Backend Laravel, Frontend React/Vite, Workers No
 ## Tests
 - Nouveau test : les conditions `if:` des deux audits commencent par `!cancelled()` et ne contiennent plus `always()` (vu rouge avant, vert après).
 - Une assertion existante exigeait `always()` : elle exige maintenant `!cancelled()` (même rigueur, autre fonction d'état). Les autres assertions sont inchangées.
+- Même alignement, autorisé par le pilotage sur #764, dans `CiBrouillonsGardesIndispensablesTest.php` (test « les audits de dépendances combinent brouillon et changements », une seule ligne ; les 3 autres assertions sont inchangées).
 
 ## Mutation
 `always()` remis sur `pnpm-audit` ⇒ 2 tests rouges. Restauré.

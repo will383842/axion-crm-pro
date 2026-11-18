@@ -3,6 +3,8 @@
 namespace App\Envoi\Sequence;
 
 use App\Crm\Campagnes\EligibiliteAdresse;
+use App\Crm\Emails\QualificationEmail;
+use App\Envoi\Campagnes\RepliGenerique;
 use App\Envoi\Contrat\ConsultationAcceptation;
 use App\Envoi\Contrat\MessageAEnvoyer;
 use App\Envoi\Contrat\NatureReport;
@@ -273,8 +275,10 @@ final class Sequenceur
         }
         $version = json_decode((string) $ins->version_figee, true, 512, JSON_THROW_ON_ERROR);
         $rang = (int) $ins->etape_courante;
+        $repli = self::estRepli($ins);
         $etape = $version['etapes'][$rang - 1] ?? null;
-        if ($etape === null) {
+        // L5b : un repli sur l'adresse générale n'a JAMAIS de relance. Défense en plus du CHECK « une seule étape » de la base.
+        if ($etape === null || ($repli && $rang > 1)) {
             return $this->arreter($ins, 'etape_inconnue', $maintenant);
         }
 
@@ -286,6 +290,11 @@ final class Sequenceur
         $this->relation ??= new RelationAvancee;
         if (($m = $this->relation->motif($ws, (int) $ins->entreprise_id, (int) $ins->contact_id, new DateTimeImmutable((string) $ins->inscrite_le))) !== null) {
             return $this->arreter($ins, $m, $maintenant);
+        }
+
+        // R7 (repli) : AVANT la fenêtre et la réservation, rien n'est réservé. Arrêt définitif, jamais un report.
+        if ($repli && $this->repliCaduc($ws, $ins)) {
+            return $this->arreter($ins, 'repli_generique_caduc', $maintenant);
         }
 
         $fenetre = new FenetreHoraire((int) $version['fenetre']['debut'], (int) $version['fenetre']['fin']);
@@ -335,7 +344,7 @@ final class Sequenceur
         if ($fiche->exclusion !== null) {
             return $this->refuserSaufDejaParti($ins, $rang, $fiche->exclusion, $reprise, $maintenant);
         }
-        $demande = $this->demande($ws, $fiche, $rang, (string) $ins->empreinte_adresse);
+        $demande = $this->demande($ws, $fiche, $rang, (string) $ins->empreinte_adresse, $repli);
         $verdict = EnvoiAutorise::verifier($demande, $maintenant);
         if (! $verdict->autorise()) {
             $motif = (string) $verdict->refus;
@@ -660,7 +669,7 @@ final class Sequenceur
         return null;
     }
 
-    private function demande(string $ws, Fiche $f, int $rang, string $empreinte): DemandeEnvoi
+    private function demande(string $ws, Fiche $f, int $rang, string $empreinte, bool $repli = false): DemandeEnvoi
     {
         $dejaEnvoye = DB::table('envoi_messages as m')->join('envoi_inscriptions as i', 'i.id', '=', 'm.inscription_id')
             ->where('m.workspace_id', $ws)->where('i.empreinte_adresse', $empreinte)->where('m.statut', 'envoye')->exists();
@@ -677,7 +686,35 @@ final class Sequenceur
             $f->premiereInfoLe,
             $f->segment,
             $rang === 1 && ! $dejaEnvoye,
+            false,
+            $repli, // L5b : la porte n'admet `risque/generique` que pour un repli (L5a)
         );
+    }
+
+    private static function estRepli(\stdClass $ins): bool
+    {
+        return in_array($ins->repli_generique ?? false, [true, 't', 'true', 1, '1'], true);
+    }
+
+    /**
+     * R7 : le repli n'a plus lieu d'être si l'interrupteur de l'espace n'est plus « true » (absent, illisible = éteint), ou si
+     * une personne NOMMÉE (adresse nominative, contact vivant) existe désormais dans l'entreprise. Toute erreur de lecture remonte :
+     * la transaction de réservation est défaite et rien ne part.
+     */
+    private function repliCaduc(string $ws, \stdClass $ins): bool
+    {
+        if (! RepliGenerique::ouvert($ws)) {
+            return true;
+        }
+        $adresses = DB::table('contacts')->where('workspace_id', $ws)->where('company_id', (int) $ins->entreprise_id)->whereNull('deleted_at')
+            ->whereNotNull('email')->orderBy('id')->selectRaw('email::text AS email')->pluck('email');
+        foreach ($adresses as $adresse) {
+            if (trim((string) $adresse) !== '' && QualificationEmail::type((string) $adresse) === 'nominatif') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function refuser(\stdClass $ins, int $rang, string $motif, DateTimeImmutable $maintenant): string

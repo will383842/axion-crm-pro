@@ -1,5 +1,10 @@
 <?php
 
+use Illuminate\Support\Facades\Artisan;
+use Tests\TestCase;
+
+uses(TestCase::class); // démarre l'application (Artisan::all()) ; aucune base n'est ouverte.
+
 // X9-A : chaque variable ENVOI_* lue par config/envoi.php est documentée dans .env.example ET dans
 // docs/envoi/JOUR-J.md. Test de fichiers seulement : aucune base, aucun réseau (donc pas de double passage
 // pgsql_app / propriétaire : rien n'est lu ni écrit en base).
@@ -87,4 +92,31 @@ it('ne met dans le bloc envoi aucune IP publique, aucun domaine réel, aucune lo
         $sansMarqueur = preg_replace('/<[^>]*>/', '', $valeur) ?? '';
         expect(preg_match('/[A-Za-z0-9+\/_=-]{17,}/', $sansMarqueur))->toBe(0, "clé suspecte dans : {$ligne}");
     }
+});
+
+// X9-B : la procédure du jour J ne cite que des commandes qui existent vraiment.
+it('ne cite dans docs/envoi/JOUR-J.md que des commandes envoi:* qui existent (Artisan::all())', function () {
+    $texte = (string) file_get_contents(x9Racine() . '/docs/envoi/JOUR-J.md');
+    preg_match_all('/(?<![A-Za-z0-9_:-])(envoi:[a-z0-9][a-z0-9:-]*)/', $texte, $m);
+    $citees = array_values(array_unique($m[1]));
+    $existantes = Artisan::all();
+    $inconnues = array_values(array_filter(
+        $citees,
+        fn (string $c) => ! array_key_exists($c, $existantes),
+    ));
+
+    expect(count($citees))->toBeGreaterThanOrEqual(10)->and($inconnues)->toBe([]);
+});
+
+it('ne laisse aucune marque « (lot X… » dans docs/envoi/JOUR-J.md', function () {
+    $texte = (string) file_get_contents(x9Racine() . '/docs/envoi/JOUR-J.md');
+
+    expect(preg_match('/\(lot X/u', $texte))->toBe(0);
+});
+
+it('documente PASSERELLE_KUMO_URL en marqueur dans RUNBOOK.md, sans vraie valeur', function () {
+    $texte = (string) file_get_contents(x9Racine() . '/infra/serveur-envoi/RUNBOOK.md');
+
+    expect($texte)->toContain('PASSERELLE_KUMO_URL=<')
+        ->and(preg_match('/PASSERELLE_KUMO_URL=(?!<)\S/', $texte))->toBe(0);
 });

@@ -7,13 +7,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
     # Filtre conservateur (workflow NON exige par la protection de main) :
-    # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou ce
-    # workflow changent. push main / schedule / dispatch restent sans filtre.
+    # ne tourne sur PR que si le frontend, le contrat d'API OpenAPI, ou les
+    # workflows (`.github/**`, dont e2e.yml appelé d'ici) changent. push main / schedule / dispatch restent sans filtre.
     paths:
       - 'frontend/**'
       - 'backend/openapi/**'
-      - '.github/workflows/a11y.yml'
-      - '.github/workflows/e2e.yml'
+      - '.github/**'
 
 permissions:
   contents: read

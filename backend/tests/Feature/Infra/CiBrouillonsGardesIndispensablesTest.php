@@ -50,24 +50,25 @@ function appelantsLotG(string $nom): array
 
 it('chaque workflow de PR écoute ready_for_review', function () {
     $types = ['opened', 'synchronize', 'reopened', 'ready_for_review'];
-    foreach (['ci', 'security', 'a11y', 'e2e', 'demo'] as $nom) {
-        $declencheurs = declencheursLotG(workflowLotG($nom));
-        if (isset($declencheurs['pull_request'])) {
-            // Tout workflow qui a ses propres déclencheurs PR garde les 4 types.
-            expect($declencheurs['pull_request']['types'])->toBe($types, $nom);
+    // `ci`, `security`, `a11y` et `demo` : exigence stricte, sans exception.
+    foreach (['ci', 'security', 'a11y', 'demo'] as $nom) {
+        expect(declencheursLotG(workflowLotG($nom))['pull_request']['types'] ?? null)->toBe($types, $nom);
+    }
 
-            continue;
-        }
-        // CI-F1 : un workflow seulement appelé (`workflow_call`) n'a pas de
-        // déclencheur propre ; au moins un appelant doit porter les 4 types.
-        expect(array_key_exists('workflow_call', $declencheurs))->toBeTrue($nom . ' : ni pull_request ni workflow_call, il ne tournerait jamais');
-        $appelants = appelantsLotG($nom);
-        expect($appelants !== [])->toBeTrue($nom . ' : workflow_call mais aucun appelant');
-        $porteurs = array_filter(
-            $appelants,
-            fn (string $appelant) => (declencheursLotG(workflowLotG($appelant))['pull_request']['types'] ?? null) === $types,
-        );
-        expect($porteurs !== [])->toBeTrue($nom . ' : aucun appelant ne porte ' . implode(',', $types));
+    // CI-F1 : UNE seule exception, `e2e`, et seulement s'il est appelé par `a11y`.
+    $e2e = declencheursLotG(workflowLotG('e2e'));
+    if (isset($e2e['pull_request'])) {
+        expect($e2e['pull_request']['types'])->toBe($types, 'e2e');
+
+        return;
+    }
+    expect(array_key_exists('workflow_call', $e2e))->toBeTrue('e2e : ni pull_request ni workflow_call, il ne tournerait jamais');
+    expect(appelantsLotG('e2e'))->toBe(['a11y'], 'e2e doit être appelé par a11y, et par lui seul');
+    $a11y = declencheursLotG(workflowLotG('a11y'))['pull_request'];
+    expect($a11y['types'])->toBe($types, 'a11y (appelant d\'e2e)');
+    // Les `paths` d'a11y couvrent ce qui déclenchait e2e : sans eux e2e ne tournerait plus.
+    foreach (['frontend/**', 'backend/openapi/**', '.github/**'] as $chemin) {
+        expect($a11y['paths'] ?? [])->toContain($chemin);
     }
 });
 

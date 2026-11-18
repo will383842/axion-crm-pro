@@ -24,7 +24,7 @@
     "sort en 2 (rouge) plutot que de le laisser passer sans reference — un lot",
     "oublie serait exactement le trou que ce fichier est cense fermer."
   ],
-  "mesure_le": "2026-08-21",
+  "mesure_le": "2026-11-17",
   "mesure_par": "pnpm audit --json, sur pnpm-lock.yaml seul (sans node_modules)",
   "_version_de_pnpm": [
     "Mesure faite DEUX FOIS, avec pnpm 10.33.4 et avec pnpm 9 (la version que le",
@@ -65,10 +65,17 @@
     "Le critique restant est a solder par une tache datee (montee majeure",
     "d une dependance cartographique) ; detail dans le registre prive."
   ],
+  "_resserrage_frontend_2026_11_17": [
+    "Resserre le 2026-11-17 (apres #737) : mesure `pnpm audit` sur frontend/pnpm-lock.yaml",
+    "= critical 0 (etait 1, maplibre-gl 6.4.1). Le critique est solde.",
+    "Les `high` ne sont PAS modifies : picomatch (GHSA-fc5q-39xc-vjpf) laisse high=1 sur",
+    "frontend ET sur workers, donc ces deux lots depassent le releve (0). Monter le releve",
+    "a 1 reviendrait a ajouter une exception : decision laissee au fondateur (ESCALADE)."
+  ],
   "lots": {
     "frontend": {
       "high": 0,
-      "critical": 1
+      "critical": 0
     },
     "workers": {
       "high": 0,

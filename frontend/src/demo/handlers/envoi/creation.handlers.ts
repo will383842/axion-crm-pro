@@ -441,7 +441,8 @@ export const handlers: HttpHandler[] = [
 
   http.get(api('/envoi/creation/contexte'), async () => {
     await delai();
-    return HttpResponse.json({ maintenant: MAINTENANT_ISO, fuseau: 'Europe/Paris' });
+    // La démo simule un envoi qui sait tout appliquer (comportement d'avant B8-F) ; le vrai serveur rend faux tant qu'il refuse ces réglages.
+    return HttpResponse.json({ maintenant: MAINTENANT_ISO, fuseau: 'Europe/Paris', capacites: { ab: true, boites: true, plafond: true } });
   }),
 
   http.get(api('/envoi/creation/destinataires-exemples'), async () => {

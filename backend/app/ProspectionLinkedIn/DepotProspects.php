@@ -19,6 +19,9 @@ use RuntimeException;
  */
 final class DepotProspects
 {
+    /** Gestes qui contactent la personne : l'opposition est relue sous verrou avant de les écrire. */
+    private const GESTES_DE_CONTACT = ['invitation_faite', 'message_fait'];
+
     public const SOURCES = ['recherche', 'commentaire_post', 'evenement', 'apporteur', 'base_crm'];
 
     public function __construct(
@@ -76,19 +79,32 @@ final class DepotProspects
 
             $rapproche = ($this->rapprochement ?? new Rapprochement)->contactPour($workspaceId, $slug);
             $id = (string) Str::uuid();
-            $insere = WorkspaceContext::run($workspaceId, static fn (): bool => DB::table('pl_prospects')->insertOrIgnore([
-                'id' => $id,
-                'workspace_id' => $workspaceId,
-                'expediteur_user_id' => $expediteurId,
-                'linkedin_slug' => $slug,
-                'contact_id' => $rapproche['contact_id'],
-                'entreprise' => $entreprise,
-                'siren' => $siren,
-                'source' => $source,
-                'source_ref' => $sourceRef,
-                'source_le' => $sourceLe,
-            ]) === 1);
-            if (! $insere) { // course perdue : l'autre écriture a gagné, on rend la sienne
+            $journal = $this->journal ?? new JournalProspection;
+
+            // Une seule transaction : le prospect n'existe JAMAIS sans sa ligne « ajout ». Journal faux ou en panne ⇒ retour arrière.
+            $resultat = WorkspaceContext::run($workspaceId, static fn (): ?array => DB::transaction(static function () use ($workspaceId, $expediteurId, $slug, $rapproche, $id, $journal, $entreprise, $siren, $source, $sourceRef, $sourceLe): ?array {
+                $insere = DB::table('pl_prospects')->insertOrIgnore([
+                    'id' => $id,
+                    'workspace_id' => $workspaceId,
+                    'expediteur_user_id' => $expediteurId,
+                    'linkedin_slug' => $slug,
+                    'contact_id' => $rapproche['contact_id'],
+                    'entreprise' => $entreprise,
+                    'siren' => $siren,
+                    'source' => $source,
+                    'source_ref' => $sourceRef,
+                    'source_le' => $sourceLe,
+                ]) === 1;
+                if (! $insere) {
+                    return null; // course perdue : l'autre écriture a gagné
+                }
+                if (! $journal->ecrire($workspaceId, $id, 'ajout', 'systeme', 'prospection_linkedin', 'ajout-' . $id, ['source' => $source, 'rapprochement_ambigu' => $rapproche['ambigu']], null, 'candidat')) {
+                    throw new RuntimeException('Journal de l’ajout non écrit : prospect annulé.');
+                }
+
+                return ['prospect_id' => $id];
+            }));
+            if ($resultat === null) { // on rend la ligne du gagnant
                 $gagnant = $this->trouver($workspaceId, $expediteurId, $slug);
                 if ($gagnant === null) {
                     throw new RuntimeException('Dépôt du prospect impossible.');
@@ -96,18 +112,6 @@ final class DepotProspects
 
                 return ['refus' => null, 'cree' => false, 'prospect_id' => (string) $gagnant->id, 'contact_id' => $gagnant->contact_id === null ? null : (int) $gagnant->contact_id];
             }
-
-            ($this->journal ?? new JournalProspection)->ecrire(
-                $workspaceId,
-                $id,
-                'ajout',
-                'systeme',
-                'prospection_linkedin',
-                'ajout-' . $id,
-                ['source' => $source, 'rapprochement_ambigu' => $rapproche['ambigu']],
-                null,
-                'candidat',
-            );
 
             return ['refus' => null, 'cree' => true, 'prospect_id' => $id, 'contact_id' => $rapproche['contact_id']];
         } catch (QueryException) {
@@ -145,9 +149,17 @@ final class DepotProspects
                         return ['etat' => (string) ($deja->etat_apres ?? $prospect->etat), 'sans_effet' => (bool) $deja->sans_effet, 'rejeu' => true];
                     }
 
+                    // Relue SOUS le verrou, juste avant d'écrire : un opposé ne reçoit ni invitation ni message. Lecture seule ; panne ⇒ échec fermé.
+                    if (in_array($geste, self::GESTES_DE_CONTACT, true)
+                        && (new ControlesProspect($this->opposition, $journal))->opposes($workspaceId, [$prospect]) !== []) {
+                        throw new RuntimeException('Prospect opposé : geste refusé.');
+                    }
+
                     $avant = (string) $prospect->etat;
                     $r = EtatsProspect::appliquer($avant, $geste);
-                    $journal->ecrire($workspaceId, $prospectId, $geste, 'humain', $auteur, $cleIdempotence, $details, $avant, $r['etat'], $r['sans_effet']);
+                    if (! $journal->ecrire($workspaceId, $prospectId, $geste, 'humain', $auteur, $cleIdempotence, $details, $avant, $r['etat'], $r['sans_effet'])) {
+                        throw new RuntimeException('Journal du geste non écrit : rien n’est changé.');
+                    }
                     if ($r['etat'] !== $avant) {
                         DB::table('pl_prospects')->where('workspace_id', $workspaceId)->where('id', $prospectId)
                             ->update(['etat' => $r['etat'], 'maj_le' => now()]);

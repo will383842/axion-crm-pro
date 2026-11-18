@@ -285,8 +285,14 @@ final class SiteSyncIngestService
         }
         $companyId = (int) $ligne->company_id;
 
-        $liee = DB::table('personnes')->where('workspace_id', $workspaceId)->where('person_key', $personKey)->value('contact_id');
-        if ($liee !== null && (int) DB::table('contacts')->where('id', $liee)->value('company_id') !== $companyId) {
+        // Fiche du contact auquel la personne est DÉJÀ liée (corbeille comprise :
+        // un lien existant n'est jamais déplacé, voir `lierPersonne`).
+        $ficheLiee = DB::table('personnes')
+            ->join('contacts', 'contacts.id', '=', 'personnes.contact_id')
+            ->where('personnes.workspace_id', $workspaceId)
+            ->where('personnes.person_key', $personKey)
+            ->value('contacts.company_id');
+        if ($ficheLiee !== null && (int) $ficheLiee !== $companyId) {
             return null;
         }
 

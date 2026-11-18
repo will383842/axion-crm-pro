@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 import { Button, Card, Modal } from '@/components/ui';
 import { GESTES, nouvelleCle, type Geste, type ProspectFile } from './api';
 
+/** Seule adresse rendue en lien : un profil public LinkedIn en https (jamais `javascript:`, `data:` ni un autre site). */
+export const PREFIXE_PROFIL_SUR = 'https://www.linkedin.com/in/';
+export const profilSur = (profil: string): boolean => profil.startsWith(PREFIXE_PROFIL_SUR);
+
 export function CarteProspect({ prospect, occupe, onGeste }: {
   prospect: ProspectFile;
   occupe: boolean;
@@ -39,14 +43,18 @@ export function CarteProspect({ prospect, occupe, onGeste }: {
           <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-800 dark:bg-slate-800 dark:text-slate-100">{prospect.texte}</p>
         )}
         <div className="flex flex-wrap gap-2">
-          <a
-            href={prospect.profil}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-produit ring-1 ring-slate-200 focus-visible:ring-2 dark:ring-slate-700"
-          >
-            Ouvrir le profil
-          </a>
+          {profilSur(prospect.profil) ? (
+            <a
+              href={prospect.profil}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-produit ring-1 ring-slate-200 focus-visible:ring-2 dark:ring-slate-700"
+            >
+              Ouvrir le profil
+            </a>
+          ) : (
+            <span className="inline-flex min-h-11 items-center px-3 text-sm text-amber-700 dark:text-amber-300">Profil non cliquable (adresse non reconnue)</span>
+          )}
           <Button variant="secondary" disabled={prospect.texte === null} onClick={() => void copier()}>Copier le texte</Button>
         </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Gestes">

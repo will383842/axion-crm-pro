@@ -310,12 +310,22 @@ export function Sidebar({ collapsed, onToggleCollapse, pleineLargeur = false }: 
   const espace = espaceDeLaBarre(produitCourant, visibles, dernierEspace());
   const identite = visibles.envoi;
   const deuxProduits = visibles.crm && visibles.envoi;
-  const { data: linkedin } = useQuery({
-    queryKey: ['menu', 'prospection-linkedin-disponible'],
-    queryFn: fileLinkedinDisponible,
-    enabled: espace !== 'envoi',
+  // UI-LI — la réponse de la sonde dépend de l'espace : la clé le porte (jamais de réponse d'un espace pour un autre),
+  // et sans espace connu on ne sonde pas. `staleTime` : la file n'est pas rechargée à chaque rendu.
+  const { data: moi } = useQuery<{ user?: { current_workspace_id?: string | null } }>({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => (await api.get<{ user?: { current_workspace_id?: string | null } }>('/auth/me')).data,
     retry: false,
     staleTime: 5 * 60_000,
+  });
+  const espaceCourant = moi?.user?.current_workspace_id ?? null;
+  const { data: linkedin } = useQuery({
+    queryKey: ['menu', 'prospection-linkedin-disponible', espaceCourant],
+    queryFn: fileLinkedinDisponible,
+    enabled: espace !== 'envoi' && espaceCourant !== null,
+    retry: false,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
   const sections = espace === 'envoi' ? sectionsEnvoi(features) : sectionsDeNavigation(features, owner, linkedin === true);
   const dansEnvoi = espace === 'envoi' && visibles.envoi;

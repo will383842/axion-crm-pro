@@ -166,8 +166,7 @@ test('L6b : erreur pendant l\'écriture du SIREN ⇒ jamais de page de succès, 
 
     $r = $this->post($chemin);
 
-    expect($r->getStatusCode())->toBe(500);
-    expect($r->getContent())->not->toContain('Désinscription confirmée');
+    expect($r->getStatusCode())->toBe(500);   // jamais le 200 « confirmée » (le corps n'est pas testé : en mode debug la page d'erreur cite le code source)
     expect(dlrAdresseOpposee($ws))->toBeTrue();         // l'adresse reste opposée
     expect(dlrSirenOppose($ws, $sirenA))->toBeFalse();  // tout ou rien : pas de trace partielle
     expect(dlrSirenOppose($ws, $sirenB))->toBeFalse();

@@ -307,8 +307,13 @@ test('B15-002 — l’inventaire des points de lecture est BALAYE, jamais recopi
     // `email_suppressions` en portée `business` (jamais le vivier), motif `hard_bounce` seul, pour classer une
     // adresse déjà rebondie `invalide/rebond_dur`. Lecture seule : il n'écrit, n'efface ni ne modifie rien ;
     // l'effacement couvre la liste elle-même (`ListeSuppression`), et la porte refuse toujours opposition et plainte.
+    // Filet modifié : pourquoi — C3 (#784, 2026-11-18) : +1. `crm:personnes-rattacher-depuis-dossiers` LIT
+    // `opt_out` en portée `business` (jamais le vivier) pour ne jamais lier ni solder une personne opposée
+    // (même garde que C1 dans `DossierClientIngest`). Lecture seule : il n'écrit, n'efface ni ne modifie rien
+    // dans cette table ; l'effacement couvre `personnes` comme avant. À blanc par défaut.
     expect($fichiers)->toBe([
         'app/Console/Commands/CrmEmailsVerifier.php',
+        'app/Console/Commands/CrmPersonnesRattacherDepuisDossiers.php',
         'app/Crm/Ingest/DossierClientIngest.php',
         'app/Crm/Ingest/PersonnesIngestService.php',
         'app/Crm/Ingest/SiteSyncIngestService.php',

@@ -4,6 +4,7 @@ namespace Tests\Feature\Envoi;
 
 use App\Crm\FichesProtegees;
 use App\Envoi\Campagnes\DepotCampagnes;
+use App\Envoi\Campagnes\SelectionDestinataires;
 use App\Envoi\Creation\AssistantCreation;
 use App\Support\ListeSuppression;
 use App\Support\WorkspaceContext;
@@ -159,9 +160,11 @@ test('cjo 3 : horloge dépassée au 2e lot ⇒ complet faux, chiffres du 1er lot
     DB::statement('SET session_replication_role = origin');
     $id = cjoBrouillon($this, $liste);
     $appels = 0;
+    // Seule l'horloge injectée décide de l'arrêt au 2e lot. Le délai SQL réel (3 s, `SET LOCAL statement_timeout`) est élargi ici :
+    // sinon un runner de CI ralenti plus de 3 s rendait 503 `estimation_trop_longue` (test instable). Ce délai est prouvé ailleurs.
     $this->app->bind(AssistantCreation::class, fn ($app) => new AssistantCreation($app->make(DepotCampagnes::class), function () use (&$appels) {
         return ++$appels === 1 ? 0 : 4_000_000_000;
-    }));
+    }, selection: new SelectionDestinataires(delaiSqlMs: 600_000)));
 
     $r = cjoEstimer($this, $mode, $id, $liste)->assertOk();
 

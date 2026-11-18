@@ -33,6 +33,7 @@ final class RattachementEnAttente
         private readonly SiteSyncClassifier $classifier,
         private readonly SiteSyncIngestService $ingestion,
         private readonly DossierClientIngest $dossiers,
+        private readonly SoldeDemandesEnAttente $solde,
     ) {}
 
     /**
@@ -159,7 +160,7 @@ final class RattachementEnAttente
         $soldes = $personKey === null || ! PersonnesIngestService::drapeauDemandesOuvert()
             || ($activity->kind ?? null) === DossierClient::EVENT_TYPE
             ? []
-            : $this->solderLesAutres($workspaceId, $activityId, $personKey, $companyId, $contactId, $parUtilisateur);
+            : $this->solde->solder($workspaceId, $personKey, $companyId, $contactId, ['attached_by' => $parUtilisateur, 'solde_avec' => $activityId], sauf: $activityId);
 
         return [
             'activity_id' => $activityId,
@@ -243,60 +244,6 @@ final class RattachementEnAttente
         }
 
         return $pending;
-    }
-
-    /**
-     * Les AUTRES événements en attente de la même personne rejoignent la même
-     * entreprise. Verrouillés, comme l'événement principal : deux opérateurs
-     * qui rattachent en même temps ne les soldent pas deux fois.
-     *
-     * @return list<int>
-     */
-    private function solderLesAutres(string $workspaceId, int $principal, string $personKey, int $companyId, ?int $contactId, string $parUtilisateur): array
-    {
-        $autres = FilesATraiter::aRattacher($workspaceId)
-            ->where('person_key', $personKey)
-            ->where('id', '!=', $principal)
-            // Seulement des DEMANDES : jamais une inscription à la lettre, une
-            // opposition ni un dossier client, que d'autres gestes traitent.
-            ->whereIn('kind', PersonnesIngestService::DEMANDE_EVENT_TYPES)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
-
-        $soldes = [];
-        foreach ($autres as $autre) {
-            $payload = $this->decoder($autre->payload ?? null);
-            if (! is_array($payload['pending_match'] ?? null)) {
-                continue;
-            }
-
-            $payload['arbitrage'] = [
-                'attached_at' => now()->toIso8601String(),
-                'attached_by' => $parUtilisateur,
-                'company_id' => $companyId,
-                'contact_id' => $contactId,
-                'solde_avec' => $principal,
-            ];
-
-            DB::table('activities')->where('id', $autre->id)->whereNull('subject_id')->update([
-                'subject_type' => 'company',
-                'subject_id' => $companyId,
-                'contact_id' => $contactId,
-                'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
-            ]);
-
-            $this->ingestion->etiqueterRendezVousRattache(
-                $workspaceId,
-                $companyId,
-                is_string($autre->kind ?? null) ? $autre->kind : '',
-                $payload,
-            );
-
-            $soldes[] = (int) $autre->id;
-        }
-
-        return $soldes;
     }
 
     /** Verrou de ligne : deux opérateurs sur le même événement produisent un 409, pas deux fiches. */

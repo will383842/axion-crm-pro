@@ -64,7 +64,11 @@ final class DossierClientIngest
     /** `metadata.console_recu` : empreinte de la dernière valeur reçue, par colonne. */
     public const CLE_RECU = 'console_recu';
 
-    public function __construct(private readonly SiteSyncClassifier $classifier) {}
+    public function __construct(
+        private readonly SiteSyncClassifier $classifier,
+        private readonly ContactUpserter $personnes,
+        private readonly SoldeDemandesEnAttente $solde,
+    ) {}
 
     public static function drapeauOuvert(): bool
     {
@@ -86,6 +90,16 @@ final class DossierClientIngest
         $ref = $event->subjectRef;
         $entreprise = $this->entrepriseDeclaree($event);
 
+        // C1 (#784) : drapeaux fermés = aucune requête (on ne lit que la config).
+        // Le verrou de personne est pris AVANT tout verrou de ligne (`rapprocher`).
+        $actif = PersonnesIngestService::drapeauOuvert() || PersonnesIngestService::drapeauDemandesOuvert();
+        if ($actif) {
+            SoldeDemandesEnAttente::verrouillerPersonnes(
+                $workspaceId,
+                ...array_values(array_filter(array_column($dossier->contacts, 'person_key'), 'is_string')),
+            );
+        }
+
         [$fiche, $motif] = $this->rapprocher($workspaceId, $ref, $event->siren());
 
         if ($motif !== null) {
@@ -103,14 +117,14 @@ final class DossierClientIngest
             }
             $statut = IngestOutcome::CREATED;
             $resultat = ['changements' => [], 'ignores' => []];
-            $resultat['contacts'] = $this->contacts($workspaceId, $fiche, $ref, $dossier, $event->occurredAt);
+            $resultat['contacts'] = $this->contacts($workspaceId, $fiche, $ref, $dossier, $event->occurredAt, $actif ? $activityRef : null);
         } else {
             if ((int) ($fiche->console_dossier_version ?? 0) >= $dossier->version) {
                 // Message PÉRIMÉ (désordre, rejeu tardif) : rien n'est touché,
                 // la ligne est soldée côté site.
                 return new IngestOutcome(status: IngestOutcome::IDEMPOTENT, subjectType: 'company', subjectId: (int) $fiche->id);
             }
-            $resultat = $this->appliquerSurFiche($workspaceId, $fiche, $ref, $dossier, $entreprise, $event->occurredAt);
+            $resultat = $this->appliquerSurFiche($workspaceId, $fiche, $ref, $dossier, $entreprise, $event->occurredAt, $actif ? $activityRef : null);
             $statut = IngestOutcome::UPDATED;
         }
 
@@ -403,7 +417,7 @@ final class DossierClientIngest
      * @param  array<string, mixed>  $entreprise
      * @return array{changements: list<array<string, mixed>>, ignores: list<array<string, mixed>>, contacts: array<string, mixed>}
      */
-    private function appliquerSurFiche(string $workspaceId, stdClass $fiche, string $ref, DossierClient $dossier, array $entreprise, DateTimeImmutable $quand): array
+    private function appliquerSurFiche(string $workspaceId, stdClass $fiche, string $ref, DossierClient $dossier, array $entreprise, DateTimeImmutable $quand, ?string $activityRef = null): array
     {
         $proposes = [
             'address' => $dossier->rue,
@@ -465,7 +479,7 @@ final class DossierClientIngest
         return [
             'changements' => $changements,
             'ignores' => $ignores,
-            'contacts' => $this->contacts($workspaceId, $fiche, $ref, $dossier, $quand),
+            'contacts' => $this->contacts($workspaceId, $fiche, $ref, $dossier, $quand, $activityRef),
         ];
     }
 
@@ -545,9 +559,12 @@ final class DossierClientIngest
      * référence console (`metadata.console_ref`) → `person_key` → e-mail →
      * prénom + nom. Une personne opposée n'est ni créée ni modifiée.
      *
-     * @return array{crees: list<int>, mis_a_jour: list<int>, ignores: list<array<string, mixed>>, changements: list<array<string, mixed>>}
+     * `$activityRef` non nul : C1 lie la personne et solde ses demandes (le chemin
+     * d'arbitrage humain passe `null`, voir `appliquerApresArbitrage`).
+     *
+     * @return array<string, list<mixed>>
      */
-    private function contacts(string $workspaceId, stdClass $fiche, string $ref, DossierClient $dossier, DateTimeImmutable $quand): array
+    private function contacts(string $workspaceId, stdClass $fiche, string $ref, DossierClient $dossier, DateTimeImmutable $quand, ?string $activityRef = null): array
     {
         $bilan = ['crees' => [], 'mis_a_jour' => [], 'ignores' => [], 'changements' => []];
         $companyId = (int) $fiche->id;
@@ -604,7 +621,7 @@ final class DossierClientIngest
                 }
                 $valeurs = array_filter($proposes, static fn (?string $v): bool => $v !== null);
                 $origines = OriginesDesChamps::marquer(null, null, array_keys($valeurs), Taxonomy::FIELD_ORIGIN_CONSOLE, $quand->format(DATE_ATOM));
-                $bilan['crees'][] = (int) DB::table('contacts')->insertGetId(array_merge([
+                $contactId = (int) DB::table('contacts')->insertGetId(array_merge([
                     'workspace_id' => $workspaceId,
                     'company_id' => $companyId,
                     'discovery_source' => self::DISCOVERY_SOURCE,
@@ -619,6 +636,8 @@ final class DossierClientIngest
                     'created_at' => now(),
                     'updated_at' => now(),
                 ], $origines, $valeurs));
+                $bilan['crees'][] = $contactId;
+                $this->lierPersonne($bilan, $workspaceId, $companyId, $contactId, $c, $activityRef);
 
                 continue;
             }
@@ -657,6 +676,7 @@ final class DossierClientIngest
             DB::table('contacts')->where('id', $existant->id)->update($maj);
 
             $bilan['mis_a_jour'][] = (int) $existant->id;
+            $this->lierPersonne($bilan, $workspaceId, $companyId, (int) $existant->id, $c, $activityRef, $existant->person_key ?? null);
             foreach ($changements as $ch) {
                 $bilan['changements'][] = ['contact_id' => (int) $existant->id] + $ch;
             }
@@ -666,6 +686,80 @@ final class DossierClientIngest
         }
 
         return $bilan;
+    }
+
+    /**
+     * C1 (#784) : lie la personne née d'une demande au contact du dossier et solde
+     * ses demandes en attente. Rien ne déplace jamais un lien existant.
+     *
+     * @param  array<string, list<mixed>>  $bilan
+     * @param  array<string, mixed>  $c
+     */
+    private function lierPersonne(array &$bilan, string $workspaceId, int $companyId, int $contactId, array $c, ?string $activityRef, ?string $cleExistante = null): void
+    {
+        $cle = $c['person_key'];
+        if ($activityRef === null || ! is_string($cle)) {
+            return;
+        }
+        $refus = static function (string $raison) use (&$bilan, $c): void {
+            $bilan['ignores'][] = ['ref' => $c['ref'], 'raison' => $raison];
+        };
+
+        if ($cleExistante !== null && $cleExistante !== $cle) {
+            $refus('person_key_divergente');
+
+            return;
+        }
+
+        $ailleurs = DB::table('contacts')
+            ->join('companies', 'companies.id', '=', 'contacts.company_id')
+            ->where('contacts.workspace_id', $workspaceId)
+            ->where('contacts.person_key', $cle)
+            ->whereNull('contacts.deleted_at')
+            ->whereNull('companies.deleted_at')
+            ->where('contacts.company_id', '<>', $companyId)
+            ->exists();
+        if ($ailleurs) {
+            $refus('personne_liee_ailleurs');
+
+            return;
+        }
+
+        $personne = DB::table('personnes')->where('workspace_id', $workspaceId)->where('person_key', $cle)
+            ->lockForUpdate()->first(['id', 'contact_id', 'email_hash', 'opposition_at']);
+        if ($personne !== null) {
+            $oppose = $personne->opposition_at !== null
+                || ($personne->email_hash !== null && DB::table('opt_out')->where('scope', 'business')->where('email_hash', $personne->email_hash)->exists());
+            if ($oppose) {
+                $refus('personne_opposee');
+
+                return;
+            }
+            if ($personne->contact_id !== null && (int) $personne->contact_id !== $contactId
+                && (int) DB::table('contacts')->where('id', $personne->contact_id)->value('company_id') !== $companyId) {
+                $refus('personne_liee_ailleurs');
+
+                return;
+            }
+            if ($personne->contact_id === null) {
+                $this->personnes->lierPersonne($workspaceId, $cle, $contactId, $companyId);
+                $bilan['personnes_liees'][] = $contactId;
+            }
+        }
+
+        // Même règle que `RattachementEnAttente` : seulement avec le drapeau des demandes.
+        if (PersonnesIngestService::drapeauDemandesOuvert()) {
+            $soldees = $this->solde->solder(
+                $workspaceId,
+                $cle,
+                $companyId,
+                $personne?->contact_id !== null ? (int) $personne->contact_id : $contactId,
+                ['attached_by' => 'automatique:dossier_client', 'dossier_event' => $activityRef],
+            );
+            foreach ($soldees as $id) {
+                $bilan['demandes_soldees'][] = $id;
+            }
+        }
     }
 
     /** Le tag PROTÉGÉ de provenance, posé verrouillé (idempotent). */

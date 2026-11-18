@@ -72,7 +72,7 @@ INSEE Sirene · annuaire-entreprises.data.gouv.fr · Infogreffe · Societe.com �
 
 - Le code de l'envoi est écrit et testé, mais **rien ne part** : `ENVOI_REEL_ACTIF=false`. Aucun agent ne le touche.
 - Fusionné le 18/11 : repli sur l'adresse générale (avec opposition sur l'adresse et le SIREN), LinkedIn (file, alertes, relevé), assistant et campagnes (écrans grisés tant qu'un refus s'applique), plafond d'IP et inventaire des IP, feu vert, santé par espace. Détail dans `CHANGELOG.md`.
-- Connexion : codes de secours et écrans du code courriel fusionnés ; un changement de mot de passe ferme les appareils de confiance. La double authentification par courriel reste éteinte ; la commande locale `crm:compte-double-auth` (PR #792, en relecture) refuse de l'activer tant que le canal est faux.
+- Connexion : codes de secours et écrans du code courriel fusionnés ; un changement de mot de passe ferme les appareils de confiance. La double authentification par courriel reste éteinte ; la commande locale `crm:compte:double-auth` (PR #792, en relecture) refuse de l'activer tant que le canal est faux.
 - Bilan de couverture du contrat d'envoi : `docs/envoi/lots/R19.md` (aucun trou réel).
 
 ## Ce qui reste au fondateur

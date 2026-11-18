@@ -29,7 +29,7 @@ final class RepliGenerique
     /** Liste blanche R1, dans l'ordre de préférence. */
     public const MOTS = ['contact', 'info', 'infos', 'accueil', 'bonjour', 'hello', 'secretariat', 'office', 'courrier', 'standard'];
 
-    /** Termes exclus par R1 : refusés même quand ils suivent un mot de la liste blanche (`contact.presse`, `info-rh`…). */
+    /** Termes exclus par R1 : cherchés en sous-chaîne après le mot de la liste blanche (`contact.presse`, `info-rh`, `contact.relationspresse`…). */
     public const EXCLUS = ['presse', 'press', 'media', 'juridique', 'legal', 'rh', 'hr', 'jobs', 'careers', 'compta', 'finance', 'billing', 'support', 'help', 'feedback', 'complaints', 'sales', 'marketing', 'newsletter', 'admin', 'direction', 'adherent', 'adherents', 'formation'];
 
     /** @return array{0: int, 1: string}|null [rang du mot dans MOTS, mot], null si refusée */
@@ -49,9 +49,12 @@ final class RepliGenerique
                 return [$rang, $mot];
             }
             if (str_starts_with($local, $mot) && preg_match('/^[0-9._-]/', substr($local, strlen($mot))) === 1) {
-                $suffixe = preg_split('/[0-9._-]+/', substr($local, strlen($mot)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                if (array_intersect($suffixe, self::EXCLUS) !== []) {
-                    return null;
+                // Sous-chaîne, pas mot entier : `contact.relationspresse` est une adresse de presse déguisée.
+                $suffixe = substr($local, strlen($mot));
+                foreach (self::EXCLUS as $exclu) {
+                    if (str_contains($suffixe, $exclu)) {
+                        return null;
+                    }
                 }
 
                 return [$rang, $mot];

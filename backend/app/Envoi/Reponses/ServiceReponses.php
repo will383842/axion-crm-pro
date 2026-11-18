@@ -195,7 +195,7 @@ final class ServiceReponses
             // Ligne de classement, puis arrêts, puis tâche : une seule transaction (rien d'écrit si la tâche échoue ; le rejeu refait tout).
             $tache = DB::transaction(function () use ($ws, $userId, $id, $classement, $creerTache, $l): ?string {
                 $this->verrou($ws, $id);
-                $courant = $this->courant($id);
+                $courant = $this->courant($ws, $id);
                 if ($courant !== null && $courant['geste'] === 'classement' && $courant['auteur'] === 'humain' && $courant['classement'] === 'stop' && $classement !== 'stop') {
                     throw new \DomainException(self::STOP_DEFINITIF); // course : un « stop » posé entre-temps
                 }
@@ -230,7 +230,7 @@ final class ServiceReponses
 
             $etat = DB::transaction(function () use ($ws, $userId, $id): string {
                 $this->verrou($ws, $id);
-                $courant = $this->courant($id);
+                $courant = $this->courant($ws, $id);
                 if ($courant === null || $courant['geste'] !== 'classement' || $courant['auteur'] !== 'humain') {
                     return 'pas_traitee';
                 }
@@ -256,9 +256,9 @@ final class ServiceReponses
      *
      * @return array{geste: string, classement: string, auteur: string}|null
      */
-    private function courant(int $id): ?array
+    private function courant(string $ws, int $id): ?array
     {
-        $l = DB::table('envoi_reponses_classements')->where('reponse_id', $id)->whereIn('geste', ['classement', 'annulation'])->orderByDesc('id')->first(['geste', 'classement', 'auteur']);
+        $l = DB::table('envoi_reponses_classements')->where('workspace_id', $ws)->where('reponse_id', $id)->whereIn('geste', ['classement', 'annulation'])->orderByDesc('id')->first(['geste', 'classement', 'auteur']);
 
         return $l === null ? null : ['geste' => (string) $l->geste, 'classement' => (string) $l->classement, 'auteur' => (string) $l->auteur];
     }

@@ -20,8 +20,8 @@ use Illuminate\Support\Facades\DB;
  *   n'a pas eu lieu).
  * - La corbeille (`deleted_at`) est un UPDATE : elle est gardée côté
  *   contrôleur, pas ici.
- * - Levée volontaire, pour l'annulation d'un import décidée par Will, dans la
- *   même transaction : `SET LOCAL app.autoriser_suppression_protegee = 'on'`.
+ * - Levée volontaire, pour l'annulation d'un import décidée par le responsable
+ *   du projet, dans la même transaction : `SET LOCAL app.autoriser_suppression_protegee = 'on'`.
  *   Toujours `SET LOCAL`, jamais `SET` : sur une connexion réutilisée (worker
  *   Horizon), la levée resterait active pour les jobs suivants. Aucun chemin
  *   applicatif ne la pose ; ce verrou arrête les ACCIDENTS de code, pas une

@@ -36,7 +36,8 @@ class GardeRoleApplicatif extends ServiceProvider
             return;
         }
 
-        if (! config('crm.db_app_role')) {
+        // Même lecture que `config/database.php` (`filter_var`) : « off » ou « no » y valent faux, la connexion reste alors sans rôle applicatif.
+        if (! filter_var(config('crm.db_app_role'), FILTER_VALIDATE_BOOLEAN)) {
             throw new RuntimeException("Démarrage refusé : le rôle applicatif n'est pas activé (CRM_DB_APP_ROLE_ENABLED).");
         }
 

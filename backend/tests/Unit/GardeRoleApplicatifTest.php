@@ -121,3 +121,9 @@ test('6. aucune requête SQL dans la source', function () {
         ->and(strtolower($source))->not->toContain('select')
         ->and($source)->not->toContain('PDO');
 });
+
+test('7. db_app_role écrit « off » ou « no » se lit faux, comme dans config/database.php ⇒ refus 1', function (string $valeur) {
+    graReglages(['crm.db_app_role' => $valeur, 'database.connections.pgsql_owner.username' => 'autre_proprietaire_fictif']);
+
+    expect(fn () => graVerifier())->toThrow(RuntimeException::class, 'CRM_DB_APP_ROLE_ENABLED');
+})->with(['off', 'no', '0', '']);

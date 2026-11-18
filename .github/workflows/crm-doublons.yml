@@ -76,10 +76,28 @@ jobs:
           # `--compteurs-seulement` pour les doublons ; la commande des personnes n'imprime déjà que des comptes.
           OPT_COMPTEURS="--compteurs-seulement"
           case "$MODE" in personnes-demandes-*) OPT_COMPTEURS="" ;; esac
+          # JOURNAL PUBLIC : la sortie brute de la commande ne s'affiche JAMAIS. Elle est
+          # capturée SUR LE SERVEUR ; seules les lignes de bilan (libellé + nombre) passent
+          # la liste blanche ci-dessous. En cas d'échec, une seule ligne « échec, code N »
+          # (une erreur Laravel peut contenir du SQL avec clés de personnes, espaces, e-mails).
+          L="[[:alpha:] ()'’,-]"
+          FILTRE_LIGNES="^\\+[-+]+\\+\$"
+          FILTRE_LIGNES="$FILTRE_LIGNES|^\\| [a-z0-9_]+ +\\| +[0-9]+ +\\|\$"
+          FILTRE_LIGNES="$FILTRE_LIGNES|^\\| compteur +\\| nombre +\\|\$"
+          FILTRE_LIGNES="$FILTRE_LIGNES|^═══ BILAN [[:alpha:] ()'’,:-]+ ═══\$"
+          FILTRE_LIGNES="$FILTRE_LIGNES|^Verrous tenus au plus [[:alpha:] ]+ : [0-9]+( .dont [0-9]+ d.identifiants de transaction.)?\$"
+          FILTRE_LIGNES="$FILTRE_LIGNES|^ *$L+ : [0-9]+\$"
+          FILTRE_SUR=$(printf '%q' "$FILTRE_LIGNES")
           ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
-            set -euo pipefail
-            cd "$PROJECT_PATH"
+            set -uo pipefail
+            cd "$PROJECT_PATH" || { echo "échec, code 1"; exit 1; }
             # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le
             # reste du heredoc comme stdin et avale les commandes suivantes.
-            docker compose exec -u root -T api php artisan $CMD $OPT_COMPTEURS < /dev/null
+            code=0
+            sortie=\$(docker compose exec -u root -T api php artisan $CMD $OPT_COMPTEURS < /dev/null 2>&1) || code=\$?
+            if [ "\$code" -ne 0 ]; then
+              echo "échec, code \$code"
+              exit "\$code"
+            fi
+            printf '%s\\n' "\$sortie" | LC_ALL=C.UTF-8 grep -E $FILTRE_SUR || true
           EOF

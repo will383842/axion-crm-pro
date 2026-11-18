@@ -87,6 +87,20 @@ final class AppareilsConfiance
             ->update(['retire_le' => CarbonImmutable::now()->toIso8601String()]) > 0;
     }
 
+    /**
+     * SEC-APP — retire (jamais DELETE) tous les appareils actifs de CE compte, sauf celui dont le jeton est donné.
+     * Un seul UPDATE. Rend le nombre de lignes retirées.
+     */
+    public function retirerTous(User $u, ?string $jetonAGarder = null): int
+    {
+        $requete = DB::table('appareils_confiance')->where('user_id', $u->id)->whereNull('retire_le');
+        if (is_string($jetonAGarder) && $jetonAGarder !== '') {
+            $requete->where('jeton_hash', '<>', $this->empreinte($jetonAGarder));
+        }
+
+        return $requete->update(['retire_le' => CarbonImmutable::now()->toIso8601String()]);
+    }
+
     private function empreinte(string $jeton): string
     {
         return hash('sha256', $jeton);

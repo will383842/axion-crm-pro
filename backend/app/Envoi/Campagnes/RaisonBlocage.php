@@ -36,10 +36,16 @@ final class RaisonBlocage
         'espace_non_emetteur' => 'Cet espace n’est pas encore autorisé à émettre.',
     ];
 
+    /** Interrupteur de code lu par une méthode (et non par une constante dans un `if`) : passe à vrai quand le transport applique boîtes et plafond. */
+    public static function reglagesAppliques(): bool
+    {
+        return self::REGLAGES_APPLIQUES;
+    }
+
     /** Prédicat UNIQUE (partagé avec `MaterialisationCampagne`) : boîtes non vides ou plafond du jour renseigné. */
     public static function reglageNonApplique(\stdClass $c): bool
     {
-        if (self::REGLAGES_APPLIQUES) { // @phpstan-ignore if.alwaysFalse (interrupteur de code : passe à vrai quand le transport applique boîtes et plafond)
+        if (self::reglagesAppliques()) {
             return false;
         }
         $contenu = json_decode((string) $c->saisie, true)['contenu'] ?? [];

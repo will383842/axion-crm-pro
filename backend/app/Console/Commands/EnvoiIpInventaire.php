@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Envoi\Chauffe\DepotIps;
+use App\Exceptions\MissingWorkspaceContextException;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
 use InvalidArgumentException;
@@ -42,6 +43,8 @@ class EnvoiIpInventaire extends Command
             }
         } catch (InvalidArgumentException $e) {
             $this->error('Refusé : ' . $e->getMessage() . '.');
+        } catch (MissingWorkspaceContextException) {
+            $this->error('Refusé : espace inconnu ou invalide.');
         } catch (QueryException) {
             $this->error('Refusé par la base (IP déjà inscrite, espace inconnu ou accès refusé).');
         }

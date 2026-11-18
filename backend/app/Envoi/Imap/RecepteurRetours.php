@@ -3,8 +3,8 @@
 namespace App\Envoi\Imap;
 
 /**
- * Point d'entrée des arrêts de L1 (L1 n'est pas encore là : interface seule,
- * plus `RecepteurRetoursCrm` qui applique les arrêts permanents via le CRM).
+ * Point d'entrée des retours détectés par la relève IMAP. Liaison actuelle : `RecepteurRetoursEnChaine`
+ * (CRM, freins, séquences, réponses ; voir `EnvoiServiceProvider`).
  *
  * Doit être IDEMPOTENT pour les oppositions (la relève peut rejouer).
  * Lève une exception si l'arrêt n'a pu être appliqué : la relève annule alors

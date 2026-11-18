@@ -34,7 +34,7 @@ K11 touche `Envoi/Imap/**` : c'est une extension de L6 (relève IMAP).
 - **Lot L1-RETOURS-SEQ (S11 réponse humaine, S13 absence du bureau)** — état après M3 :
   - **S11 réponse humaine : FAIT.** `RecepteurRetoursSequence` (3e maillon de la chaîne) arrête l'inscription du destinataire (motif `reponse`, via `Inscriptions::evenement`, donc aussi les autres inscriptions de la même entreprise, comme le séquenceur le prévoit). Rattachement exact : injection du retour → `envoi_messages.id_injection` → inscription. Une inscription arrêtée n'est plus tirée par le séquenceur (il ne traite que `statut = 'active'`). Idempotent, ajout seul, aucun envoi.
   - **S13 absence du bureau : FAIT par RR-4C.** Pas de pause ni de nouveau statut : une auto-réponse rattachée repousse la prochaine échéance des inscriptions `active` à 7 jours après la relève (`ReportAbsence`, `GREATEST` : jamais d'avance, pas de cumul ; une inscription arrêtée ou terminée n'est jamais touchée). Aucun arrêt, aucune opposition.
-  - Le séquenceur lui-même n'est pas branché au planificateur ici (hors périmètre M3).
+  - Le séquenceur est aujourd'hui planifié : la commande `envoi:cycle` (`EnvoiCycle`) l'appelle (derrière `ENVOI_REEL_ACTIF`). Il n'était pas branché au planificateur à l'époque de M3.
 
 - **Rotation de `envoi.cle_empreinte`** : elle invalide tous les VERP déjà émis (leurs retours tombent en « à rattacher »). Garder l'ancienne clé quelques jours, ou accepter la revue humaine.
 - `Verp::adressePour` exige désormais un UUID (`InvalidArgumentException` sinon).

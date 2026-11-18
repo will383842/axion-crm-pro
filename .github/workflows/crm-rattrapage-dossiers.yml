@@ -1,0 +1,89 @@
+name: CRM — Rattrapage des dossiers C3 (prod, à blanc ou appliquer)
+
+# Lot C3 — `crm:personnes-rattacher-depuis-dossiers` sur le serveur de
+# production, par SSH, LANCÉ À LA MAIN seulement (jamais de cron, jamais sur push).
+#
+# Par défaut : À BLANC — rien n'est écrit, la commande ne donne que des nombres.
+# `appliquer` écrit réellement ; il exige de taper APPLIQUER dans `confirmation`,
+# sinon le job échoue AVANT toute connexion.
+#
+# Ce dépôt est PUBLIC, ses journaux aussi : que des nombres, jamais d'adresse
+# ni de clé.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "À blanc (rien n'est écrit) ou appliquer"
+        type: choice
+        default: a-blanc
+        options:
+          - a-blanc
+          - appliquer
+      confirmation:
+        description: "Pour appliquer : taper APPLIQUER (sinon le job s'arrête)"
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crm-rattrapage-dossiers
+  cancel-in-progress: false
+
+jobs:
+  rattrapage:
+    name: Rattrapage C3 sur prod (${{ inputs.mode }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Vérifier la confirmation (avant toute connexion)
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          case "$MODE" in
+            a-blanc) ;;
+            appliquer)
+              if [ "$CONFIRMATION" != "APPLIQUER" ]; then
+                echo "::error::Pour appliquer, taper APPLIQUER dans « confirmation »."
+                exit 1
+              fi ;;
+            *) echo "::error::mode inconnu"; exit 1 ;;
+          esac
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Rattrapage via SSH
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER: ${{ secrets.HETZNER_USER || 'root' }}
+          PROJECT_PATH: ${{ secrets.HETZNER_PROJECT_PATH || '/opt/axion-crm-pro' }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set +x
+          set -euo pipefail
+          OPT=""
+          if [ "$MODE" = "appliquer" ]; then OPT="--appliquer"; fi
+          # Journal PUBLIC : la sortie brute reste sur le serveur (un plantage
+          # peut contenir du SQL avec des valeurs). On n'affiche que les lignes
+          # de bilan attendues (liste blanche, que des nombres) ; en cas
+          # d'échec : « échec, code N » seulement, et on sort avec ce code.
+          ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$USER@$HOST" bash <<EOF
+            set -uo pipefail
+            cd "$PROJECT_PATH" || exit 1
+            rc=0
+            # « < /dev/null » OBLIGATOIRE : sinon docker compose exec -T lit le
+            # reste du heredoc comme stdin et avale les commandes suivantes.
+            out=\$(docker compose exec -u root -T api php artisan crm:personnes-rattacher-depuis-dossiers $OPT 2>&1 < /dev/null) || rc=\$?
+            printf '%s\n' "\$out" | grep -E '^((APPLIQUÉ|À BLANC — rien n.a été écrit) · personnes sans lien examinées : [0-9]+|  (personnes à lier|personnes opposées \(laissées\)|clé dans plusieurs entreprises \(laissées\)|clé divergente \(laissées\)|sans contact actif|demandes de personnes déjà liées soldées) : [0-9]+|  demandes à solder : [0-9]+( \(drapeau des demandes fermé : laissées en attente\))?|  demandes de personnes déjà liées : [0-9]+( \(drapeau des demandes fermé : non examinées\))?|Personnes liées : [0-9]+ · demandes soldées : [0-9]+)\$' || true
+            if [ "\$rc" -ne 0 ]; then
+              echo "échec, code \$rc"
+              exit "\$rc"
+            fi
+          EOF

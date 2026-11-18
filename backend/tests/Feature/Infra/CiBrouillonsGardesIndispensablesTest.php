@@ -27,10 +27,48 @@ function declencheursLotG(array $wf): array
 
 const GARDE_BROUILLON_LOT_G = "github.event_name != 'pull_request' || github.event.pull_request.draft == false";
 
+/**
+ * CI-F1 : les workflows qui appellent le workflow `$nom` (jobs `uses: ./.github/workflows/<nom>.yml`).
+ *
+ * @return list<string>
+ */
+function appelantsLotG(string $nom): array
+{
+    $racine = realpath(base_path('..')) ?: base_path('..');
+    $appelants = [];
+    foreach (glob($racine . '/.github/workflows/*.yml') ?: [] as $chemin) {
+        $wf = Yaml::parseFile($chemin);
+        foreach ($wf['jobs'] ?? [] as $job) {
+            if (is_array($job) && ($job['uses'] ?? null) === './.github/workflows/' . $nom . '.yml') {
+                $appelants[] = basename($chemin, '.yml');
+            }
+        }
+    }
+
+    return array_values(array_unique($appelants));
+}
+
 it('chaque workflow de PR écoute ready_for_review', function () {
-    foreach (['ci', 'security', 'a11y', 'e2e', 'demo'] as $nom) {
-        expect(declencheursLotG(workflowLotG($nom))['pull_request']['types'])
-            ->toBe(['opened', 'synchronize', 'reopened', 'ready_for_review'], $nom);
+    $types = ['opened', 'synchronize', 'reopened', 'ready_for_review'];
+    // `ci`, `security`, `a11y` et `demo` : exigence stricte, sans exception.
+    foreach (['ci', 'security', 'a11y', 'demo'] as $nom) {
+        expect(declencheursLotG(workflowLotG($nom))['pull_request']['types'] ?? null)->toBe($types, $nom);
+    }
+
+    // CI-F1 : UNE seule exception, `e2e`, et seulement s'il est appelé par `a11y`.
+    $e2e = declencheursLotG(workflowLotG('e2e'));
+    if (isset($e2e['pull_request'])) {
+        expect($e2e['pull_request']['types'])->toBe($types, 'e2e');
+
+        return;
+    }
+    expect(array_key_exists('workflow_call', $e2e))->toBeTrue('e2e : ni pull_request ni workflow_call, il ne tournerait jamais');
+    expect(appelantsLotG('e2e'))->toBe(['a11y'], 'e2e doit être appelé par a11y, et par lui seul');
+    $a11y = declencheursLotG(workflowLotG('a11y'))['pull_request'];
+    expect($a11y['types'])->toBe($types, 'a11y (appelant d\'e2e)');
+    // Les `paths` d'a11y couvrent ce qui déclenchait e2e : sans eux e2e ne tournerait plus.
+    foreach (['frontend/**', 'backend/openapi/**', '.github/**'] as $chemin) {
+        expect($a11y['paths'] ?? [])->toContain($chemin);
     }
 });
 
@@ -55,7 +93,7 @@ it('les jobs lourds sautent en brouillon, jamais hors PR', function () {
 it('les audits de dépendances combinent brouillon et changements', function () {
     foreach (['composer-audit', 'pnpm-audit'] as $job) {
         $condition = (string) workflowLotG('security')['jobs'][$job]['if'];
-        expect($condition)->toContain('always()')
+        expect($condition)->toContain('!cancelled()')
             ->toContain("github.event_name != 'pull_request'")
             ->toContain('github.event.pull_request.draft == false')
             ->toContain("needs.changements.outputs.deps == 'true'");

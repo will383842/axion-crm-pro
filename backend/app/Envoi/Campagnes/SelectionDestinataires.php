@@ -618,8 +618,10 @@ final class SelectionDestinataires
                     $replisPasses[(int) $r->v] = true;
                 }
                 // D10 : une adresse générale portée par contacts de plusieurs fiches (cabinet, domiciliation) est exclue.
-                foreach (DB::select('SELECT min(email::text) AS adresse FROM contacts WHERE workspace_id = ? AND deleted_at IS NULL AND email = ANY(?::citext[]) GROUP BY email HAVING COUNT(DISTINCT company_id) > 1', [$ws, self::tableau(array_values($replis))]) as $r) {
-                    $partagees[mb_strtolower((string) $r->adresse)] = true; // email est CITEXT : regroupé sans tenir compte de la casse
+                // Comparé par l'empreinte (blancs retirés, minuscules) : « ␣Info@x » et « info@x » sont la même adresse (index idx_contacts_empreinte_email).
+                $empreintesReplis = array_values(array_unique(array_map(ListeSuppression::empreinte(...), array_values($replis))));
+                foreach (DB::select('SELECT min(email::text) AS adresse FROM contacts WHERE workspace_id = ? AND deleted_at IS NULL AND email IS NOT NULL AND public.empreinte_adresse_sql(email::text) = ANY(?::text[]) GROUP BY public.empreinte_adresse_sql(email::text) HAVING COUNT(DISTINCT company_id) > 1', [$ws, self::tableau($empreintesReplis)]) as $r) {
+                    $partagees[QualificationEmail::normaliser((string) $r->adresse)] = true; // même clé que la lecture (`normaliser`)
                 }
             }
         } catch (QueryException $e) {

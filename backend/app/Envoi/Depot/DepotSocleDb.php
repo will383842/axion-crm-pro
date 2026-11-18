@@ -201,9 +201,9 @@ final class DepotSocleDb implements DepotSocle
         });
     }
 
-    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine): array
+    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine, ?string $ip = null): array
     {
-        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $boite, $domaine): array {
+        return WorkspaceContext::run($workspaceId, function () use ($workspaceId, $jour, $boite, $domaine, $ip): array {
             // Réservations ni libérées, ni acceptées (donc notées dans la chauffe), ni confirmées : leur envoi n'est PAS encore compté.
             $base = fn () => DB::table('envoi_journal_commandes')->where('workspace_id', $workspaceId)->where('commande', 'injection')
                 ->where('statut', 'reservee')->where('jour', $jour->format('Y-m-d'))
@@ -216,7 +216,7 @@ final class DepotSocleDb implements DepotSocle
             $compter = fn (string $cle, ?string $valeur): int => $valeur === null ? 0
                 : (int) $base()->whereRaw("(CASE WHEN commande = 'injection' THEN details::jsonb->>? END) = ?", [$cle, $valeur])->count();
 
-            return ['boite' => $compter('boite', $boite), 'domaine' => $compter('domaine', $domaine)];
+            return ['boite' => $compter('boite', $boite), 'domaine' => $compter('domaine', $domaine), 'ip' => $compter('ip', $ip)];
         });
     }
 

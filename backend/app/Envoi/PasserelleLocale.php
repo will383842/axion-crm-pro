@@ -2,6 +2,7 @@
 
 namespace App\Envoi;
 
+use App\Envoi\Chauffe\DepotIps;
 use App\Envoi\Chauffe\GardeChauffe;
 use App\Envoi\Chauffe\ResolveurFournisseur;
 use App\Envoi\Contrat\ConsultationAcceptation;
@@ -142,7 +143,12 @@ final class PasserelleLocale implements ConsultationAcceptation, ServeurEnvoi
             // Chauffe et freins (lot L7) : pause ou quota => report, aucune réservation.
             // Les réservations en vol (ou d'issue incertaine) comptent dans les quotas : sous le même verrou, aucun dépassement.
             $ressources = $this->chauffe?->ressources($message) ?? [];
-            $enCours = $this->depot->reservationsEnCours($ws, $jour, $ressources['boite'] ?? null, $ressources['domaine'] ?? null);
+            // IP du domaine d'envoi (inventaire) : écrite avec la réservation, au même endroit que la boîte et le domaine, pour que
+            // le plafond de l'IP compte aussi les envois en vol des autres ouvriers. Sans IP connue : rien n'est écrit, compte 0.
+            if (isset($ressources['domaine'])) {
+                $ressources['ip'] = (new DepotIps)->ipDuDomaine($ws, $ressources['domaine']);
+            }
+            $enCours = $this->depot->reservationsEnCours($ws, $jour, $ressources['boite'] ?? null, $ressources['domaine'] ?? null, $ressources['ip'] ?? null);
             if ($this->chauffe?->refus($message, $jour, $this->instant(), $fournisseur, $enCours) !== null) {
                 return ResultatInjection::reporte($jour->modify('+1 day'));
             }

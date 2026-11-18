@@ -13,6 +13,7 @@ import { BOUTON_TACTILE, ChampChoix, ChampTexte, MessageErreur, MessageSucces } 
 export const MESSAGE_FINAL = 'Boîte créée en pause : réactivez-la quand le domaine est prêt.';
 const MESSAGE_503 = 'Le code ne peut pas partir pour le moment. Patientez quelques minutes avant de réessayer : cette demande compte dans la limite de 3 codes par 15 minutes.';
 const MESSAGE_429 = 'Trois codes ont déjà été envoyés ces 15 dernières minutes : patientez avant d’en demander un autre.';
+const MESSAGE_429_RENVOI = 'Patientez quelques minutes avant de demander un nouveau code : la limite de 3 codes par 15 minutes est atteinte.';
 const MESSAGE_GENERIQUE = 'La boîte n’a pas pu être ajoutée. Rien n’a été créé. Réessayez dans un instant.';
 
 /** Texte en clair d'une erreur de l'ajout ; le message du serveur n'est montré que pour 409 et 422 (jamais en 5xx). */
@@ -42,6 +43,7 @@ function Formulaire({ fermer }: { fermer: () => void }) {
   const [occupe, setOccupe] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [fini, setFini] = useState(false);
+  const [renvoye, setRenvoye] = useState(false);
 
   const demande = (): Demande => ({ adresse: adresse.trim(), hote: hote.trim(), port: Number(port), chiffrement, utilisateur: utilisateur.trim() });
   const etape1Complete = adresse.trim() !== '' && hote.trim() !== '' && utilisateur.trim() !== '' && Number.isInteger(Number(port)) && Number(port) > 0;
@@ -58,6 +60,24 @@ function Formulaire({ fermer }: { fermer: () => void }) {
     } catch (err) {
       setErreur(messageAjout(err));
     } finally {
+      setOccupe(false);
+    }
+  };
+
+  /** UI-BOITE : même demande qu'à l'étape 1 (sans mot de passe ni code) ; le secret et l'ancien code sont vidés dans tous les cas. */
+  const renvoyerCode = async () => {
+    if (occupe || !etape1Complete) return;
+    setOccupe(true);
+    setErreur(null);
+    setRenvoye(false);
+    try {
+      await api.post('/envoi/boites/ajout/code', demande());
+      setRenvoye(true);
+    } catch (err) {
+      setErreur(isAxiosError(err) && err.response?.status === 429 ? MESSAGE_429_RENVOI : messageAjout(err));
+    } finally {
+      setSecret('');
+      setCode('');
       setOccupe(false);
     }
   };
@@ -107,9 +127,13 @@ function Formulaire({ fermer }: { fermer: () => void }) {
           <ChampTexte label="Mot de passe de la boîte" type="password" value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="new-password" aide="Saisi une seule fois : il n’est ni affiché ni gardé sur cet écran." />
         </>
       ) : null}
+      {renvoye && !erreur ? <MessageSucces>Un nouveau code est parti. L’ancien ne sert plus.</MessageSucces> : null}
       {erreur ? <MessageErreur>{erreur}</MessageErreur> : null}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="secondary" className={BOUTON_TACTILE} onClick={fermer}>Annuler</Button>
+        {etape === 2 ? (
+          <Button type="button" variant="secondary" className={BOUTON_TACTILE} disabled={occupe} onClick={() => { void renvoyerCode(); }}>Recevoir un nouveau code</Button>
+        ) : null}
         {etape === 1 ? (
           <Button type="submit" variant="primary" className={BOUTON_TACTILE} loading={occupe} disabled={!etape1Complete}>Recevoir un code</Button>
         ) : (

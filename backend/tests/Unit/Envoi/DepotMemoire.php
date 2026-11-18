@@ -153,14 +153,15 @@ final class DepotMemoire implements DepotSocle
     /** @var array<string, string> */
     public array $ids = [];
 
-    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine): array
+    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine, ?string $ip = null): array
     {
-        $n = ['boite' => 0, 'domaine' => 0];
+        $n = ['boite' => 0, 'domaine' => 0, 'ip' => 0];
         foreach ($this->statuts as $cle => $statut) {
             if ($statut === 'reservee' || $statut === 'a_verifier') {
                 $r = $this->ressourcesReservees[$cle] ?? [];
                 $n['boite'] += $boite !== null && ($r['boite'] ?? null) === $boite ? 1 : 0;
                 $n['domaine'] += $domaine !== null && ($r['domaine'] ?? null) === $domaine ? 1 : 0;
+                $n['ip'] += $ip !== null && ($r['ip'] ?? null) === $ip ? 1 : 0;
             }
         }
 

@@ -11,7 +11,25 @@ export interface LigneSequence {
   delai_jours: number;
 }
 
+/** Ce que l'envoi sait appliquer (lu du serveur) : faux = refusé à la préparation, donc ni proposé ni envoyé. */
+export interface Capacites {
+  ab: boolean;
+  boites: boolean;
+  plafond: boolean;
+}
+
+/** Valeur tant que le serveur n'a pas répondu, ou s'il ne répond pas : tout est refusé (échec fermé). */
+export const CAPACITES_REFUSEES: Capacites = { ab: false, boites: false, plafond: false };
+
+/** Lit `capacites` de la réponse du contexte ; tout ce qui n'est pas exactement `true` reste refusé. */
+export function capacitesDe(contexte: unknown): Capacites {
+  const c = (contexte as { capacites?: Partial<Record<keyof Capacites, unknown>> } | null | undefined)?.capacites;
+  return { ab: c?.ab === true, boites: c?.boites === true, plafond: c?.plafond === true };
+}
+
 export interface Saisie {
+  /** Capacités de l'envoi ; ne vient jamais d'un brouillon. */
+  capacites: Capacites;
   nom: string;
   nomModifie: boolean;
   cible: { type: Cible['type']; reference: string; libelle: string } | null;
@@ -39,6 +57,7 @@ export interface Saisie {
 }
 
 export const SAISIE_INITIALE: Saisie = {
+  capacites: CAPACITES_REFUSEES,
   nom: '',
   nomModifie: false,
   cible: null,
@@ -90,7 +109,7 @@ export function sequenceDeContrat(s: Saisie): EtapeSequence[] {
     etape: i + 1,
     message_id: l.message_id,
     delai_jours: i === 0 ? 0 : l.delai_jours,
-    ...(i === 0 && s.ab && s.objetB.trim() !== '' ? { objet_b: s.objetB.trim() } : {}),
+    ...(i === 0 && s.capacites.ab && s.ab && s.objetB.trim() !== '' ? { objet_b: s.objetB.trim() } : {}),
   }));
 }
 
@@ -113,8 +132,8 @@ export function contenuEtape(etape: number, s: Saisie): ContenuEtape {
       ...(s.depart === 'programme' && s.jour !== '' ? { debut_le: parisVersIso(s.jour, s.heure) } : {}),
       jours,
       heures: { de: fenetre.de, a: fenetre.a },
-      boites: s.boites,
-      plafond_jour: Math.max(1, s.plafond),
+      ...(s.capacites.boites ? { boites: s.boites } : {}),
+      ...(s.capacites.plafond ? { plafond_jour: Math.max(1, s.plafond) } : {}),
     };
   }
   return {};

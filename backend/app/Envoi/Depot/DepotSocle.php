@@ -69,12 +69,12 @@ interface DepotSocle
     public function reserverPlaceEspace(string $workspaceId, DateTimeImmutable $jour, int $plafond): bool;
 
     /**
-     * Réservations qui n'ont PAS (encore) été notées dans la chauffe, sur la boîte et sur le domaine, pour ce jour :
-     * `reservee` et `a_verifier` non confirmée. À lire SOUS le verrou, avec les envois déjà notés.
+     * Réservations qui n'ont PAS (encore) été notées dans la chauffe, sur la boîte, sur le domaine et sur l'IP, pour ce jour :
+     * `reservee` et `a_verifier` non confirmée. À lire SOUS le verrou, avec les envois déjà notés. Une ressource inconnue (null) compte 0.
      *
-     * @return array{boite: int, domaine: int}
+     * @return array{boite: int, domaine: int, ip: int}
      */
-    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine): array;
+    public function reservationsEnCours(string $workspaceId, DateTimeImmutable $jour, ?string $boite, ?string $domaine, ?string $ip = null): array;
 
     /** Identifiant d'injection conservé à la conclusion `acceptee` (null si inconnu). */
     public function idInjection(string $workspaceId, string $cleIdempotence): ?string;

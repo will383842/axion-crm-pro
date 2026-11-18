@@ -10,6 +10,7 @@ use App\Providers\MockServicesProvider;
 use App\Providers\ProvenanceTiersServiceProvider;
 use App\Providers\RouteServiceProvider;
 use App\Providers\TelescopeServiceProvider;
+use App\Socle\Demarrage\GardeRoleApplicatif;
 use App\Socle\Demarrage\GardesDemarrage;
 
 return [
@@ -23,5 +24,6 @@ return [
     TelescopeServiceProvider::class,
     RouteServiceProvider::class,
     GardesDemarrage::class,
+    GardeRoleApplicatif::class,
     EnvoiServiceProvider::class,
 ];

@@ -236,3 +236,87 @@ test('F38-006 : les etapes muettes de a11y.yml sont nommees une par une', functi
         . 'Sinon, l\'etape a ete renommee et la garde ne surveille plus rien.',
     );
 });
+
+/**
+ * CI-F1 (#680) : UN SEUL build du frontend pour axe et e2e.
+ *
+ * `a11y.yml` construit une fois, publie `frontend-dist` avec une empreinte,
+ * appelle `e2e.yml` (workflow_call). Axe et e2e recalculent l'empreinte et
+ * échouent si le build est absent ou différent : jamais « vert sans mesure ».
+ */
+function etapesDuJobCiF1(string $fichier, string $job): array
+{
+    $wf = Yaml::parseFile(racineDepotA11yG3() . '/.github/workflows/' . $fichier);
+
+    return $wf['jobs'][$job]['steps'] ?? [];
+}
+
+const EMPREINTE_CI_F1 = 'find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum';
+
+test('CI-F1 : le build est produit UNE fois, par a11y.yml, avec une empreinte', function () {
+    $a11y = Yaml::parseFile(racineDepotA11yG3() . '/.github/workflows/a11y.yml');
+    $e2e = Yaml::parseFile(racineDepotA11yG3() . '/.github/workflows/e2e.yml');
+
+    $builds = 0;
+    foreach ([$a11y, $e2e] as $wf) {
+        foreach (etapesDuWorkflowA11yG3($wf) as $e) {
+            if (preg_match('/\bpnpm build\b/', (string) ($e['etape']['run'] ?? ''))) {
+                $builds++;
+                expect($e['job'])->toBe('build-frontend');
+            }
+        }
+    }
+    expect($builds)->toBe(1);
+
+    $job = $a11y['jobs']['build-frontend'];
+    expect($job['outputs']['empreinte'] ?? '')->toContain('steps.empreinte.outputs.empreinte');
+    expect(collect($job['steps'])->pluck('run')->filter()->implode("\n"))->toContain(EMPREINTE_CI_F1);
+    $upload = collect($job['steps'])->firstWhere('uses', 'actions/upload-artifact@v4');
+    expect($upload['with']['name'])->toBe('frontend-dist')
+        ->and($upload['with']['if-no-files-found'])->toBe('error')
+        ->and($upload['with']['include-hidden-files'])->toBeTrue();
+});
+
+test('CI-F1 : la porte a11y mesure le build partagé (même empreinte), e2e aussi', function () {
+    $a11y = Yaml::parseFile(racineDepotA11yG3() . '/.github/workflows/a11y.yml');
+    expect($a11y['jobs']['axe-playwright']['needs'])->toBe('build-frontend');
+    expect($a11y['jobs']['e2e']['uses'])->toBe('./.github/workflows/e2e.yml');
+    expect($a11y['jobs']['e2e']['needs'])->toBe('build-frontend');
+    expect($a11y['jobs']['e2e']['with']['empreinte'])->toContain('needs.build-frontend.outputs.empreinte');
+    expect($a11y['jobs']['e2e']['permissions'])->toBe(['contents' => 'read']);
+
+    foreach ([['a11y.yml', 'axe-playwright'], ['e2e.yml', 'suites-cablees']] as [$fichier, $job]) {
+        $etapes = etapesDuJobCiF1($fichier, $job);
+        $usesTous = collect($etapes)->pluck('uses')->filter()->all();
+        expect($usesTous)->toContain('actions/download-artifact@v4');
+        $dl = collect($etapes)->firstWhere('uses', 'actions/download-artifact@v4');
+        expect($dl['with']['name'])->toBe('frontend-dist')->and($dl['with']['path'])->toBe('frontend/dist');
+        $attendue = collect($etapes)->pluck('env.EMPREINTE_ATTENDUE')->filter()->implode('');
+        expect($attendue)->toMatch('/needs\.build-frontend\.outputs\.empreinte|inputs\.empreinte/');
+    }
+
+    $e2e = Yaml::parseFile(racineDepotA11yG3() . '/.github/workflows/e2e.yml');
+    $declencheurs = $e2e[true] ?? $e2e['on'];
+    expect(array_keys($declencheurs))->toBe(['workflow_call']);
+    expect($declencheurs['workflow_call']['inputs']['empreinte']['required'])->toBeTrue();
+});
+
+test('CI-F1 : un build absent ou différent fait ÉCHOUER la porte, avant toute mesure', function () {
+    foreach ([['a11y.yml', 'axe-playwright', 'Run a11y E2E'], ['e2e.yml', 'suites-cablees', 'Suites e2e cablees (BLOQUANT)']] as [$fichier, $job, $mesure]) {
+        $etapes = etapesDuJobCiF1($fichier, $job);
+        $noms = array_map(fn ($e) => $e['name'] ?? '', $etapes);
+        $iVerif = array_search('Vérifier le build unique (absent ou différent ⇒ ÉCHEC)', $noms, true);
+        $iMesure = array_search($mesure, $noms, true);
+        expect($iVerif)->not->toBeFalse($fichier)->and($iMesure)->not->toBeFalse($fichier);
+        expect($iVerif < $iMesure)->toBeTrue("$fichier : la vérification doit précéder la mesure");
+
+        $script = (string) $etapes[$iVerif]['run'];
+        expect($script)->toContain('set -euo pipefail')
+            ->toContain('frontend/dist/index.html')
+            ->toContain(EMPREINTE_CI_F1)
+            ->toContain('test -n "$EMPREINTE_ATTENDUE"')
+            ->toContain('test "$calculee" = "$EMPREINTE_ATTENDUE"');
+        expect(substr_count($script, 'exit 1'))->toBeGreaterThanOrEqual(3);
+        expect($etapes[$iVerif])->not->toHaveKey('continue-on-error');
+    }
+});

@@ -171,3 +171,59 @@ describe('F3-B2 — ajout d’une boîte', () => {
     expect(s.appels.creation).toHaveLength(1);
   });
 });
+
+describe('UI-BOITE — recevoir un nouveau code (étape 2)', () => {
+  beforeEach(() => { demoDb.reinitialiser(); });
+
+  /** Serveur dont la demande de code répond 202 la première fois, puis le statut demandé. */
+  const serveurRenvoi = (secondStatut: number) => {
+    const s = serveur();
+    const demandes: Array<Record<string, unknown>> = [];
+    const code = http.post(apiUrl('/envoi/boites/ajout/code'), async ({ request }) => {
+      demandes.push((await request.json()) as Record<string, unknown>);
+      if (demandes.length >= 2 && secondStatut !== 202) return HttpResponse.json({ error: 'x', message: 'technique interne' }, { status: secondStatut });
+      return HttpResponse.json({ expire_le: '2027-01-12T10:00:00.000Z' }, { status: 202 });
+    });
+    return { s: { appels: s.appels, reponses: [code, ...s.reponses] }, demandes };
+  };
+
+  it('le bouton renvoie la même demande, sans mot de passe ni code, et vide les deux champs', async () => {
+    const { s, demandes } = serveurRenvoi(202);
+    await monter(PROPRIETAIRE, s);
+    const u = userEvent.setup();
+    const d = await remplirEtape1(u);
+    await u.type(await within(d).findByLabelText('Code reçu par courriel'), '123456');
+    await u.type(within(d).getByLabelText('Mot de passe de la boîte'), SECRET);
+    await u.click(within(d).getByRole('button', { name: 'Recevoir un nouveau code' }));
+    await waitFor(() => { expect(demandes).toHaveLength(2); });
+    expect(demandes[1]).toEqual(demandes[0]);
+    expect(JSON.stringify(demandes)).not.toContain(SECRET);
+    expect(Object.keys(demandes[1]!).sort()).toEqual(['adresse', 'chiffrement', 'hote', 'port', 'utilisateur']);
+    await waitFor(() => { expect(within(d).getByLabelText('Mot de passe de la boîte')).toHaveValue(''); });
+    expect(within(d).getByLabelText('Code reçu par courriel')).toHaveValue('');
+    expect(s.appels.creation).toHaveLength(0);
+    expect(await within(d).findByText(/Un nouveau code est parti/)).toBeVisible();
+  });
+
+  it('429 : message « Patientez quelques minutes », le formulaire reste à l’étape 2 et le mot de passe est vidé', async () => {
+    const { s } = serveurRenvoi(429);
+    await monter(PROPRIETAIRE, s);
+    const u = userEvent.setup();
+    const d = await remplirEtape1(u);
+    await u.type(await within(d).findByLabelText('Code reçu par courriel'), '123456');
+    await u.type(within(d).getByLabelText('Mot de passe de la boîte'), SECRET);
+    await u.click(within(d).getByRole('button', { name: 'Recevoir un nouveau code' }));
+    expect(await within(d).findByRole('alert')).toHaveTextContent('Patientez quelques minutes');
+    expect(within(d).getByRole('alert')).not.toHaveTextContent(/technique interne/);
+    expect(within(d).getByLabelText('Mot de passe de la boîte')).toHaveValue('');
+  });
+
+  it('pas de bouton « nouveau code » à l’étape 1', async () => {
+    await monter(PROPRIETAIRE);
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole('button', { name: 'Ajouter une boîte' }));
+    const d = await screen.findByRole('dialog');
+    expect(within(d).queryByRole('button', { name: 'Recevoir un nouveau code' })).toBeNull();
+  });
+});
+

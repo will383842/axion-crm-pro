@@ -63,6 +63,20 @@ describe('FiltreReseau (étape 1)', () => {
     await waitFor(() => { expect(screen.queryByText(/Filtre par réseau inactif/)).toBeNull(); });
   });
 
+  it('2 bis. « Retirer le filtre » retire aussi les mots et les guides : origine: null, bandeau disparu', async () => {
+    const corps: unknown[] = [];
+    await ouvrir([http.get('*/crm/origines/par-reseau', () => HttpResponse.json({ actif: false })), brouillon({ reseaux: ['linkedin'], mots: ['a'], guides: ['g1'] }), etape1(corps)]);
+    expect(await screen.findByText(/Filtre par réseau inactif : cette campagne ne partira pas tant qu’il est posé/)).toBeVisible();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Retirer le filtre' }));
+    await user.click(screen.getByRole('button', { name: /Continuer : message/ }));
+    await waitFor(() => { expect(corps).toHaveLength(1); });
+    const cible = (corps[0] as { cible: Record<string, unknown> }).cible;
+    expect(cible).toHaveProperty('origine', null);
+    expect(JSON.stringify(cible)).not.toMatch(/"mots"|"guides"|"g1"/);
+    await waitFor(() => { expect(screen.queryByText(/Filtre par réseau inactif/)).toBeNull(); });
+  });
+
   it('actif: false sans filtre posé : ni bloc ni bandeau', async () => {
     await ouvrir([http.get('*/crm/origines/par-reseau', () => HttpResponse.json({ actif: false })), brouillon()]);
     await screen.findByRole('radio', { name: /salon-artisans-2026/ });

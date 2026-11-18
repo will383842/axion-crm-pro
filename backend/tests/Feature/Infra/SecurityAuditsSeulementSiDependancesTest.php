@@ -57,8 +57,8 @@ it('les audits sautent sur PR sans dépendances, jamais ailleurs', function () {
     foreach (['composer-audit', 'pnpm-audit'] as $nom) {
         expect($jobs[$nom]['needs'])->toBe('changements');
         $condition = (string) $jobs[$nom]['if'];
-        // always() : sans lui, un `changements` en échec/annulé ferait SAUTER l'audit (même sur main et la nuit).
-        expect($condition)->toContain('always()')
+        // !cancelled() : sans fonction d'état, un `changements` en échec ferait SAUTER l'audit (même sur main et la nuit).
+        expect($condition)->toContain('!cancelled()')
             ->toContain("needs.changements.result != 'success'")
             ->toContain("github.event_name != 'pull_request'")
             ->toContain("needs.changements.outputs.deps == 'true'");
@@ -84,5 +84,17 @@ it('la liste deps couvre chaque lockfile, manifeste, Dockerfile et la matrice pn
     }
     foreach (['backend/app/Foo.php', 'docs/x.md', '.github/workflows/ci.yml'] as $f) {
         expect(correspondDepsLotA($f))->toBeFalse($f);
+    }
+});
+
+it('les audits utilisent !cancelled() et jamais always() (un run annulé ne lance plus d\'audit)', function () {
+    $jobs = securiteLotA()['jobs'];
+    foreach (['composer-audit', 'pnpm-audit'] as $nom) {
+        $condition = trim((string) preg_replace('/^\$\{\{\s*|\s*\}\}$/', '', (string) $jobs[$nom]['if']));
+        expect(str_starts_with($condition, '!cancelled()'))->toBeTrue($nom . ' : la condition doit commencer par !cancelled()');
+        expect($condition)->not->toContain('always()');
+        // Le filtre « PR sans dépendances » reste en place.
+        expect($condition)->toContain("needs.changements.result != 'success'")
+            ->toContain("needs.changements.outputs.deps == 'true'");
     }
 });

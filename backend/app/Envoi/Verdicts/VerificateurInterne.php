@@ -59,6 +59,7 @@ final class VerificateurInterne implements VerificateurAdresse
             $sortie[$emp] = new VerdictAdresse(VerdictAdresse::INVALIDE, 'rebond_dur', $maintenant);
             unset($restantes[$emp]);
         }
+        $generiques = []; // empreinte => true : adresses générales, qui passent AUSSI par le DNS (L2)
         foreach ($restantes as $emp => $n) {
             $local = (string) strstr($n, '@', true);
             $local = explode('+', $local, 2)[0];
@@ -66,13 +67,20 @@ final class VerificateurInterne implements VerificateurAdresse
                 $sortie[$emp] = new VerdictAdresse(VerdictAdresse::INVALIDE, 'role_technique', $maintenant);
                 unset($restantes[$emp]);
             } elseif (QualificationEmail::type($n) === 'generique') {
-                // ESCALADE 1 : choix par défaut du cahier, jamais inscrite.
-                $sortie[$emp] = new VerdictAdresse(VerdictAdresse::RISQUE, 'generique', $maintenant);
-                unset($restantes[$emp]);
+                // Reste dans $restantes : son domaine est vérifié (PLAN ADRESSES GÉNÉRALES, R5). Jamais `valide`.
+                $generiques[$emp] = true;
             }
         }
 
-        return $this->dns($restantes, $sortie, $maintenant);
+        $sortie = $this->dns($restantes, $sortie, $maintenant);
+        foreach (array_keys($generiques) as $emp) {
+            // « Ne reçoit pas » reste invalide (plus protecteur). Reçoit, panne, indéterminé, quota : risque/generique.
+            if ($sortie[$emp]?->verdict !== VerdictAdresse::INVALIDE) {
+                $sortie[$emp] = new VerdictAdresse(VerdictAdresse::RISQUE, 'generique', $maintenant);
+            }
+        }
+
+        return $sortie;
     }
 
     /**

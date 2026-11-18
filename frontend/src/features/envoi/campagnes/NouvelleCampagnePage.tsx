@@ -1,6 +1,6 @@
 /**
  * Nouvelle campagne : l'assistant en 5 étapes (cible, message, quand,
- * vérification, lancement). Pré-remplie par `?etiquette=` ou `?entreprise=`,
+ * vérification, lancement). Pré-remplie par `?etiquette=`, `?audience=` ou `?entreprise=`,
  * reprise d'un brouillon par `?brouillon=`. Lot DM2-ASS.
  */
 import { useState } from 'react';
@@ -9,7 +9,7 @@ import { Tags } from 'lucide-react';
 import { EmptyState, PageHeader, QueryErrorState, Skeleton } from '@/components/ui';
 import { NOM_DU_PRODUIT, useProduitCourant } from '@/features/socle/produit/useProduitCourant';
 import { Assistant } from '../creation/Assistant';
-import { useBrouillon, useCibles } from '../creation/api';
+import { AUDIENCE_VALIDE, useBrouillon, useCibles } from '../creation/api';
 
 function texte(valeur: unknown): string | null {
   return typeof valeur === 'string' || typeof valeur === 'number' ? String(valeur) : null;
@@ -21,9 +21,13 @@ export function NouvelleCampagnePage() {
   // Lus une fois : l'adresse change ensuite (le brouillon s'y ajoute) sans rien recharger.
   const [etiquette] = useState(() => texte(recherche['etiquette']));
   const [entreprise] = useState(() => texte(recherche['entreprise']));
+  const [audience] = useState(() => {
+    const a = texte(recherche['audience']);
+    return a !== null && AUDIENCE_VALIDE.test(a) ? a : null;
+  });
   const [idBrouillon] = useState(() => texte(recherche['brouillon']));
 
-  const cibles = useCibles(entreprise);
+  const cibles = useCibles(entreprise, audience);
   const brouillon = useBrouillon(idBrouillon);
 
   const entete = (
@@ -80,6 +84,7 @@ export function NouvelleCampagnePage() {
 
   const cibleInitiale =
     (etiquette !== null ? cibles.data.find((c) => c.type === 'etiquette' && c.reference === etiquette) : undefined) ??
+    (audience !== null ? cibles.data.find((c) => c.type === 'audience' && c.reference === audience) : undefined) ??
     (entreprise !== null ? cibles.data.find((c) => c.type === 'carnet') : undefined) ??
     null;
 

@@ -143,6 +143,8 @@ beforeEach(function () {
 
         public function findAvecMethode(Company $company, bool $sansBrave = false, bool $garderAnnuaires = false): ?array
         {
+            DdCompteurs::$n['sansBrave'] = (int) $sansBrave;
+
             return null;
         }
     });
@@ -183,18 +185,18 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-function ddEnrichir(string $espace): int
+function ddEnrichir(string $espace, bool $avecSite = true): int
 {
     $id = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $espace,
-        'siren' => '950000001',
+        'siren' => $avecSite ? '950000001' : '950000002',
         'denomination' => 'ZZ dormante',
         'naf' => '47.73Z',
         'address' => '1 rue ZZ',
         'postcode' => '75001',
         'prospection_status' => 'ready_for_outreach',
         'discovery_source' => 'insee',
-        'website' => 'https://zz.example/',
+        'website' => $avecSite ? 'https://zz.example/' : null,
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -237,6 +239,12 @@ it('enrich() par défaut : ni Google Places, ni LLM, ni e-mail payant, aucun Dis
         ->and(DdCompteurs::get('llm'))->toBe(0)
         ->and(DdCompteurs::get('hunter'))->toBe(0);
     Bus::assertNotDispatched(DispatchScrapeJob::class);
+
+    // Étape 3b (recherche de domaine) : sans site, payant fermé coupe Brave.
+    DdCompteurs::$n = [];
+    ddEnrichir($this->espace, false);
+
+    expect(DdCompteurs::get('sansBrave'))->toBe(1);
 });
 
 it('témoin : payant_actif ouvert, les étapes payantes repartent', function () {
@@ -248,6 +256,11 @@ it('témoin : payant_actif ouvert, les étapes payantes repartent', function () 
     expect(DdCompteurs::get('places'))->toBe(1)
         ->and(DdCompteurs::get('llm'))->toBeGreaterThan(0)
         ->and(DdCompteurs::get('hunter'))->toBeGreaterThan(0);
+
+    DdCompteurs::$n = [];
+    ddEnrichir($this->espace, false);
+
+    expect(DdCompteurs::get('sansBrave'))->toBe(0);
 });
 
 it('enrich() par défaut : une entreprise radiée est toujours archivée', function () {

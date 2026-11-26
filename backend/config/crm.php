@@ -585,7 +585,8 @@ return [
     |  - payant_actif : étapes payantes du waterfall (Google Places, LLM,
     |    recherche d'e-mails payante). Faux : enrich() saute Places, Hunter, LLM et Brave ; INSEE, triage et auto-segment inchangés.
     |  - annuaires_actifs : Pages Jaunes et google-search (scrapes Node du
-    |    waterfall, stratégie Pages Jaunes du DomainFinder).
+    |    waterfall, stratégie Pages Jaunes du DomainFinder). Fermé, il coupe
+    |    aussi le scrape « website » gratuit en mode normal (enrich()).
     */
     'enrichissement' => [
         'payant_actif' => (bool) env('CRM_ENRICHISSEMENT_PAYANT_ACTIF', false),

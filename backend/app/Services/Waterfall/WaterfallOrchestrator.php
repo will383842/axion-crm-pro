@@ -307,7 +307,7 @@ class WaterfallOrchestrator
             // Lot N4 (03/10/2026) — la MÉTHODE est écrite avec le site : un
             // site deviné (`guess`) posé sans méthode passait pour fiable
             // (`SiteFiable`), alors qu'il n'est pas vérifié.
-            $trouve = $this->domainFinder->findAvecMethode($company, $this->payantCoupe());
+            $trouve = $this->domainFinder->findAvecMethode($company, $this->payantCoupe(), $this->sansPayant);
             if ($trouve !== null) {
                 $company->website = $trouve['url'];
                 $company->website_method = $trouve['methode'];
@@ -531,7 +531,7 @@ class WaterfallOrchestrator
     private function step4_dispatch_node_scrapes(Company $company): void
     {
         // PR 0 : sans l'interrupteur, ni Pages Jaunes, ni google-search, ni site.
-        if (! config('crm.enrichissement.annuaires_actifs', false)) {
+        if (! $this->sansPayant && ! config('crm.enrichissement.annuaires_actifs', false)) {
             return;
         }
         if (env('MOCK_MODE', true) || env('MOCK_SCRAPERS', true)) {

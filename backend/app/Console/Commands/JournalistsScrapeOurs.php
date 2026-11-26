@@ -55,7 +55,7 @@ class JournalistsScrapeOurs extends Command
 
     public function handle(): int
     {
-        if (! config('services.media.journalists_enabled', false)) {
+        if (! config('services.media.journalists_enabled', false) || ! config('crm.enrichissement.payant_actif')) {
             $this->error('Refusé : MEDIA_JOURNALISTS_ENABLED=false (donnée personnelle RGPD). Activez le flag après validation.');
 
             return self::FAILURE;

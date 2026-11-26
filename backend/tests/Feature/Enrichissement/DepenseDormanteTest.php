@@ -24,6 +24,7 @@ use App\Data\Sources\InseeCompanyData;
 use App\Jobs\DispatchScrapeJob;
 use App\Models\Company;
 use App\Models\Workspace;
+use App\Services\Audiences\AudienceBuilderService;
 use App\Services\Domain\DomainFinderService;
 use App\Services\Email\EmailFinderService;
 use App\Services\Legal\MentionsLegalesScraperService;
@@ -42,6 +43,19 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 /** Compteurs des doublures. */
+/** Doublure d'AudienceBuilderService : compte les appels, sans toucher la base. */
+final class DdAudienceCompteur extends AudienceBuilderService
+{
+    public function __construct() {}
+
+    public function evaluateForCompany(Company $company): array
+    {
+        DdCompteurs::inc('audience');
+
+        return [];
+    }
+}
+
 final class DdCompteurs
 {
     /** @var array<string, int> */
@@ -266,6 +280,14 @@ it('enrich() par défaut : le triage tourne', function () {
     ddEnrichir($this->espace);
 
     expect(DdCompteurs::get('triage'))->toBeGreaterThanOrEqual(1);
+});
+
+it('enrich() par défaut : l\'auto-segment tourne', function () {
+    $this->app->instance(AudienceBuilderService::class, new DdAudienceCompteur);
+
+    ddEnrichir($this->espace);
+
+    expect(DdCompteurs::get('audience'))->toBeGreaterThanOrEqual(1);
 });
 
 it('témoin : annuaires_actifs ouvert et scrapers réels, les scrapes Node sont lancés', function () {

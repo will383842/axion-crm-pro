@@ -72,19 +72,16 @@ final class DdCompteurs
     }
 }
 
-beforeEach(function () {
-    Carbon::setTestNow(Carbon::parse('2026-11-26 10:00:00', 'UTC'));
-    DdCompteurs::$n = [];
-    $this->espace = (string) Str::uuid();
-    Workspace::create(['id' => $this->espace, 'slug' => 'zz-dd-' . Str::random(6), 'name' => 'ZZ depense dormante']);
-    config()->set('services.google.places.smart_skip', false);
-    Http::preventStrayRequests();
-
-    $this->app->instance(InseeClient::class, new class implements InseeClient
+/** Doublure d'InseeClient : renvoie toujours la même fiche (ou rien). */
+function ddInsee(?InseeCompanyData $fiche): void
+{
+    app()->instance(InseeClient::class, new class($fiche) implements InseeClient
     {
+        public function __construct(private ?InseeCompanyData $fiche) {}
+
         public function fetchBySiren(string $siren): ?InseeCompanyData
         {
-            return null;
+            return $this->fiche;
         }
 
         public function searchByCriteria(array $criteria): array
@@ -97,6 +94,17 @@ beforeEach(function () {
             yield from [];
         }
     });
+}
+
+beforeEach(function () {
+    Carbon::setTestNow(Carbon::parse('2026-11-26 10:00:00', 'UTC'));
+    DdCompteurs::$n = [];
+    $this->espace = (string) Str::uuid();
+    Workspace::create(['id' => $this->espace, 'slug' => 'zz-dd-' . Str::random(6), 'name' => 'ZZ depense dormante']);
+    config()->set('services.google.places.smart_skip', false);
+    Http::preventStrayRequests();
+
+    ddInsee(null);
     $this->app->instance(AnnuaireEntreprisesClient::class, new class implements AnnuaireEntreprisesClient
     {
         public function fetchBySiren(string $siren): ?AnnuaireEntrepriseData
@@ -220,6 +228,18 @@ function ddScrapersReels(): void
     $_ENV['MOCK_SCRAPERS'] = $_SERVER['MOCK_SCRAPERS'] = 'false';
 }
 
+/** Exécute `$f` avec les scrapers réels ouverts, puis remet les mocks. */
+function ddAvecScrapersReels(callable $f): void
+{
+    ddScrapersReels();
+
+    try {
+        $f();
+    } finally {
+        ddRemettreMocks();
+    }
+}
+
 function ddRemettreMocks(): void
 {
     putenv('MOCK_MODE=true');
@@ -230,13 +250,7 @@ function ddRemettreMocks(): void
 
 it('enrich() par défaut : ni Google Places, ni LLM, ni e-mail payant, aucun DispatchScrapeJob', function () {
     Bus::fake();
-    ddScrapersReels();
-
-    try {
-        ddEnrichir($this->espace);
-    } finally {
-        ddRemettreMocks();
-    }
+    ddAvecScrapersReels(fn () => ddEnrichir($this->espace));
 
     expect(DdCompteurs::get('places'))->toBe(0)
         ->and(DdCompteurs::get('llm'))->toBe(0)
@@ -267,23 +281,7 @@ it('témoin : payant_actif ouvert, les étapes payantes repartent', function () 
 });
 
 it('enrich() par défaut : une entreprise radiée est toujours archivée', function () {
-    $this->app->instance(InseeClient::class, new class implements InseeClient
-    {
-        public function fetchBySiren(string $siren): ?InseeCompanyData
-        {
-            return new InseeCompanyData(siren: $siren, denomination: 'ZZ dormante', naf: '47.73Z', legalForm: '9999', effectifRange: '53', etatAdministratif: 'C');
-        }
-
-        public function searchByCriteria(array $criteria): array
-        {
-            return [];
-        }
-
-        public function iterateByCriteria(array $criteria): Generator
-        {
-            yield from [];
-        }
-    });
+    ddInsee(new InseeCompanyData(siren: '950000001', denomination: 'ZZ dormante', naf: '47.73Z', legalForm: '9999', effectifRange: '53', etatAdministratif: 'C'));
 
     $id = ddEnrichir($this->espace);
 
@@ -309,26 +307,14 @@ it('enrich() par défaut : l\'auto-segment tourne', function () {
 it('témoin : annuaires_actifs ouvert et scrapers réels, les scrapes Node sont lancés', function () {
     Bus::fake();
     config()->set('crm.enrichissement.annuaires_actifs', true);
-    ddScrapersReels();
-
-    try {
-        ddEnrichir($this->espace);
-    } finally {
-        ddRemettreMocks();
-    }
+    ddAvecScrapersReels(fn () => ddEnrichir($this->espace));
 
     Bus::assertDispatched(DispatchScrapeJob::class);
 });
 
 it('enrichSansPayant() avec les deux interrupteurs fermés : garde les annuaires et le scrape Node, aucun compteur payant', function () {
     Bus::fake();
-    ddScrapersReels();
-
-    try {
-        ddEnrichir($this->espace, false, true);
-    } finally {
-        ddRemettreMocks();
-    }
+    ddAvecScrapersReels(fn () => ddEnrichir($this->espace, false, true));
 
     expect(config('crm.enrichissement.payant_actif'))->toBeFalse()
         ->and(config('crm.enrichissement.annuaires_actifs'))->toBeFalse()
@@ -352,12 +338,18 @@ it('DomainFinder : interrupteur fermé, aucune requête vers pagesjaunes.fr', fu
 });
 
 it('le plafond Google Places vaut 0 par défaut', function () {
-    $services = (static function (): array {
-        putenv('GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT');
-        unset($_ENV['GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT'], $_SERVER['GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT']);
+    $cle = 'GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT';
+    $avant = [getenv($cle), $_ENV[$cle] ?? null, $_SERVER[$cle] ?? null];
 
-        return require config_path('services.php');
-    })();
+    try {
+        putenv($cle);
+        unset($_ENV[$cle], $_SERVER[$cle]);
+        $services = require config_path('services.php');
+    } finally {
+        $avant[0] === false ? putenv($cle) : putenv($cle . '=' . $avant[0]);
+        $avant[1] === null ? null : $_ENV[$cle] = $avant[1];
+        $avant[2] === null ? null : $_SERVER[$cle] = $avant[2];
+    }
 
     expect($services['google']['places']['monthly_quota_limit'])->toBe(0);
 });

@@ -158,7 +158,8 @@ class DomainFinderService
         }
 
         // Stratégie 4 : Pages Jaunes — uniquement quand scrapers réels activés
-        if (config('services.scrapers.mock', true) === false) {
+        // ET interrupteur `crm.enrichissement.annuaires_actifs` ouvert (PR 0).
+        if (config('crm.enrichissement.annuaires_actifs', false) && config('services.scrapers.mock', true) === false) {
             return self::trouve($this->searchPagesJaunes($company->denomination, $ville), self::METHODE_PAGES_JAUNES);
         }
 

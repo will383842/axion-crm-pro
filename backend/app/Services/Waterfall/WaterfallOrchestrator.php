@@ -106,6 +106,22 @@ class WaterfallOrchestrator
             return;
         }
 
+        // PR 0 : interrupteur fermé (défaut) = jamais d'étape payante, même par
+        // les chemins qui appellent `enrich()` en mode normal.
+        $payantActif = (bool) config('crm.enrichissement.payant_actif', false);
+        $precedentSansPayant = $this->sansPayant;
+        if (! $payantActif) {
+            $this->sansPayant = true;
+        }
+        try {
+            $this->enrichirEtapes($company);
+        } finally {
+            $this->sansPayant = $precedentSansPayant;
+        }
+    }
+
+    private function enrichirEtapes(Company $company): void
+    {
         Log::info('Waterfall start', ['company_id' => $company->id, 'siren' => $company->siren]);
 
         // Sprint H3 — Si étape INSEE détecte entreprise radiée → archive + SKIP tout le waterfall.
@@ -503,6 +519,10 @@ class WaterfallOrchestrator
 
     private function step4_dispatch_node_scrapes(Company $company): void
     {
+        // PR 0 : sans l'interrupteur, ni Pages Jaunes, ni google-search, ni site.
+        if (! config('crm.enrichissement.annuaires_actifs', false)) {
+            return;
+        }
         if (env('MOCK_MODE', true) || env('MOCK_SCRAPERS', true)) {
             return;
         }

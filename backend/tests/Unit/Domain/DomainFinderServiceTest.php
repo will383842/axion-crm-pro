@@ -42,6 +42,7 @@ it('returns first non-blacklist URL from Brave Search', function () {
 });
 
 it('falls back to Pages Jaunes when MOCK_SCRAPERS=false and Brave empty', function () {
+    Config::set('crm.enrichissement.annuaires_actifs', true);
     Config::set('services.brave.api_key', null);
     Config::set('services.scrapers.mock', false);
     Http::fake([

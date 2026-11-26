@@ -579,4 +579,17 @@ return [
         'taille_lot' => (int) env('CRM_AUDIENCES_TAILLE_LOT', 5000),
     ],
 
+    /*
+    | PR 0 — dépense dormante. Interrupteurs FERMÉS par défaut (lus par
+    | `config()`, jamais par `env()` dans le code).
+    |  - payant_actif : étapes payantes du waterfall (Google Places, LLM,
+    |    recherche d'e-mails payante). Faux : `enrich()` = `enrichSansPayant()`.
+    |  - annuaires_actifs : Pages Jaunes et google-search (scrapes Node du
+    |    waterfall, stratégie Pages Jaunes du DomainFinder).
+    */
+    'enrichissement' => [
+        'payant_actif' => (bool) env('CRM_ENRICHISSEMENT_PAYANT_ACTIF', false),
+        'annuaires_actifs' => (bool) env('CRM_ENRICHISSEMENT_ANNUAIRES_ACTIFS', false),
+    ],
+
 ];

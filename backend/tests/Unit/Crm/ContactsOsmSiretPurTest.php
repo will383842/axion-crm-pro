@@ -6,21 +6,7 @@
  */
 
 use App\Crm\Entreprises\ContactsOsmSiret;
-
-/** @param list<array<string, string>> $lignes */
-function csvSiret(array $lignes): string
-{
-    $chemin = tempnam(sys_get_temp_dir(), 'zzsiret');
-    $f = fopen($chemin, 'w');
-    $defauts = ['siret' => '', 'telephone' => '', 'email' => '', 'site' => ''];
-    fputcsv($f, array_keys($defauts), ',', '"', '');
-    foreach ($lignes as $l) {
-        fputcsv($f, array_values(array_merge($defauts, $l)), ',', '"', '');
-    }
-    fclose($f);
-
-    return $chemin;
-}
+use Tests\Support\DoublonsFixtures as F;
 
 it('n\'accepte qu\'un SIRET de 14 chiffres exacts (espaces retirés)', function () {
     expect(ContactsOsmSiret::normaliserSiret('940 000 000 00012'))->toBe('94000000000012')
@@ -31,7 +17,7 @@ it('n\'accepte qu\'un SIRET de 14 chiffres exacts (espaces retirés)', function 
 });
 
 it('ignore les lignes sans SIRET valide et garde seulement l\'e-mail générique', function () {
-    $csv = csvSiret([
+    $csv = F::csvSiret([
         ['siret' => '94000000000012', 'email' => 'contact@zz-entreprise.test', 'telephone' => '01 40 00 00 01'],
         ['siret' => '94000000000020', 'email' => 'jean.dupont@zz-entreprise.test'],
         ['siret' => 'pas-un-siret', 'email' => 'contact@zz-autre.test'],
@@ -47,7 +33,7 @@ it('ignore les lignes sans SIRET valide et garde seulement l\'e-mail générique
 });
 
 it('met de côté un SIRET porté par deux objets OSM (ambigu, rien n\'est retenu)', function () {
-    $csv = csvSiret([
+    $csv = F::csvSiret([
         ['siret' => '94000000000012', 'email' => 'contact@zz-a.test'],
         ['siret' => '94000000000012', 'email' => 'contact@zz-b.test'],
         ['siret' => '94000000000020', 'email' => 'contact@zz-c.test'],
@@ -61,7 +47,7 @@ it('met de côté un SIRET porté par deux objets OSM (ambigu, rien n\'est reten
 });
 
 it('garde le site comme simple candidat et écarte réseaux sociaux et annuaires', function () {
-    $csv = csvSiret([
+    $csv = F::csvSiret([
         ['siret' => '94000000000012', 'site' => 'www.zz-entreprise.test'],
         ['siret' => '94000000000020', 'site' => 'https://www.facebook.com/zz'],
     ]);

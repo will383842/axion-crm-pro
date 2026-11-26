@@ -140,7 +140,7 @@ final class ContactsOsmSiret
                 ->where('workspace_id', $workspaceId)
                 ->whereNull('deleted_at')
                 ->whereIn('siret', $morceau)
-                ->select(['id', 'siret', 'phone', 'email_generic', 'legal_form', 'metadata', 'field_origins', 'insee_ferme_le'])
+                ->select(['id', 'siret', 'phone', 'email_generic', 'legal_form', 'metadata', 'field_origins', 'insee_ferme_le', 'website'])
                 ->selectRaw('CASE WHEN ' . FichesProtegees::conditionSql('companies.id', null, 'companies.workspace_id') . ' THEN 1 ELSE 0 END AS non_protegee')
                 ->get();
             foreach ($lignes as $c) {
@@ -150,6 +150,7 @@ final class ContactsOsmSiret
                     'id' => (int) $c->id,
                     'phone' => trim((string) $c->phone),
                     'email' => trim((string) $c->email_generic),
+                    'website' => trim((string) $c->website),
                     'origines' => is_array($origines) ? $origines : [],
                     'eligible' => $c->insee_ferme_le === null
                         && (int) $c->non_protegee === 1
@@ -177,7 +178,7 @@ final class ContactsOsmSiret
         if ($p['tels'] !== [] && $libre('phone', $f['phone'])) {
             $plan['phone'] = $p['tels'][0];
         }
-        if ($p['site'] !== '') {
+        if ($p['site'] !== '' && $f['website'] === '') {
             $plan['site_candidat'] = $p['site'];
         }
 

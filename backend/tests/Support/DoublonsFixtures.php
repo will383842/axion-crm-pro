@@ -133,4 +133,22 @@ final class DoublonsFixtures
 
         return implode("\n", $m[0]);
     }
+
+    /** CSV temporaire FICTIF (colonnes siret, telephone, email, site) pour `crm:entreprises:contacts-osm`.
+     *
+     * @param  list<array<string, string>>  $lignes
+     */
+    public static function csvSiret(array $lignes): string
+    {
+        $chemin = (string) tempnam(sys_get_temp_dir(), 'zzsiret');
+        $f = fopen($chemin, 'w');
+        $defauts = ['siret' => '', 'telephone' => '', 'email' => '', 'site' => ''];
+        fputcsv($f, array_keys($defauts), ',', '"', '');
+        foreach ($lignes as $l) {
+            fputcsv($f, array_values(array_merge($defauts, $l)), ',', '"', '');
+        }
+        fclose($f);
+
+        return $chemin;
+    }
 }

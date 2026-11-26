@@ -158,6 +158,8 @@ beforeEach(function () {
 
         public function triage(Company $company): array
         {
+            DdCompteurs::inc('triage');
+
             return [];
         }
     });
@@ -167,7 +169,7 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-function ddEnrichir(string $espace): void
+function ddEnrichir(string $espace): int
 {
     $id = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $espace,
@@ -178,12 +180,16 @@ function ddEnrichir(string $espace): void
         'postcode' => '75001',
         'prospection_status' => 'ready_for_outreach',
         'discovery_source' => 'insee',
+        'website' => 'https://zz.example/',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+    DB::table('contacts')->insert(['workspace_id' => $espace, 'company_id' => $id, 'last_name' => 'ZZ', 'created_at' => now(), 'updated_at' => now()]);
     WorkspaceContext::run($espace, function () use ($id): void {
         app(WaterfallOrchestrator::class)->enrich(Company::findOrFail($id));
     });
+
+    return $id;
 }
 
 /** Ouvre les scrapers « réels » : sans l'interrupteur, ils partiraient. */
@@ -226,7 +232,40 @@ it('témoin : payant_actif ouvert, les étapes payantes repartent', function () 
     ddEnrichir($this->espace);
 
     expect(DdCompteurs::get('places'))->toBe(1)
-        ->and(DdCompteurs::get('llm'))->toBeGreaterThan(0);
+        ->and(DdCompteurs::get('llm'))->toBeGreaterThan(0)
+        ->and(DdCompteurs::get('hunter'))->toBeGreaterThan(0);
+});
+
+it('enrich() par défaut : une entreprise radiée est toujours archivée', function () {
+    $this->app->instance(InseeClient::class, new class implements InseeClient
+    {
+        public function fetchBySiren(string $siren): ?InseeCompanyData
+        {
+            return new InseeCompanyData(siren: $siren, denomination: 'ZZ dormante', naf: '47.73Z', legalForm: '9999', effectifRange: '53', etatAdministratif: 'C');
+        }
+
+        public function searchByCriteria(array $criteria): array
+        {
+            return [];
+        }
+
+        public function iterateByCriteria(array $criteria): Generator
+        {
+            yield from [];
+        }
+    });
+
+    $id = ddEnrichir($this->espace);
+
+    $ligne = DB::table('companies')->where('id', $id)->first();
+    expect($ligne->prospection_status)->toBe('archived_no_email')
+        ->and($ligne->archive_reason)->toBe('entreprise_radiee');
+});
+
+it('enrich() par défaut : le triage tourne', function () {
+    ddEnrichir($this->espace);
+
+    expect(DdCompteurs::get('triage'))->toBeGreaterThanOrEqual(1);
 });
 
 it('témoin : annuaires_actifs ouvert et scrapers réels, les scrapes Node sont lancés', function () {

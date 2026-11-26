@@ -141,7 +141,7 @@ beforeEach(function () {
     {
         public function __construct() {}
 
-        public function findAvecMethode(Company $company, bool $sansBrave = false): ?array
+        public function findAvecMethode(Company $company, bool $sansBrave = false, bool $garderAnnuaires = false): ?array
         {
             return null;
         }

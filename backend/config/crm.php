@@ -583,7 +583,7 @@ return [
     | PR 0 — dépense dormante. Interrupteurs FERMÉS par défaut (lus par
     | `config()`, jamais par `env()` dans le code).
     |  - payant_actif : étapes payantes du waterfall (Google Places, LLM,
-    |    recherche d'e-mails payante). Faux : `enrich()` = `enrichSansPayant()`.
+    |    recherche d'e-mails payante). Faux : enrich() saute Places, Hunter, LLM et Brave ; INSEE, triage et auto-segment inchangés.
     |  - annuaires_actifs : Pages Jaunes et google-search (scrapes Node du
     |    waterfall, stratégie Pages Jaunes du DomainFinder).
     */

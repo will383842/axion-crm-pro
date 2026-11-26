@@ -105,6 +105,8 @@ jobs:
 
       - name: Installer Claude Code et identité git
         run: |
+          # Bac à sable de Claude Code (activé par .claude/settings.json) : il lui faut bubblewrap et socat sur Linux.
+          sudo apt-get install -y -qq bubblewrap socat >/dev/null 2>&1
           npm i -g --no-audit --no-fund @anthropic-ai/claude-code >/dev/null 2>&1
           claude --version >/dev/null
           git config user.name "github-actions[bot]"

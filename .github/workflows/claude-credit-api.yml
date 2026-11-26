@@ -89,6 +89,7 @@ jobs:
       c1: ${{ steps.bilan.outputs.c1 }}
       c2: ${{ steps.bilan.outputs.c2 }}
       suivant: ${{ steps.bascule.outputs.suivant }}
+      resume: ${{ steps.bilan.outputs.resume }}
     steps:
       - uses: actions/checkout@v4
 
@@ -182,8 +183,17 @@ jobs:
           F2: ${{ steps.run2.outputs.execution_file }}
           C1: ${{ steps.run1.outputs.conclusion }}
           C2: ${{ steps.run2.outputs.conclusion }}
+          CLE_CONSIGNE: ${{ secrets.CLE_CONSIGNE }}
         run: |
           rm -f .consigne-claude.md
+          # Résumé de la réponse de Claude (fin du texte, tours, outils refusés), CHIFFRÉ car le dépôt est public :
+          # seul le job noter le déchiffre et le range sur le serveur. Rien n'est affiché ici.
+          r="$RUNNER_TEMP/resume.json"
+          jq -s '[.[] | .[]? | select(.type=="result") | {subtype, is_error, num_turns, duration_ms, total_cost_usd,
+                  refus: [.permission_denials[]? | .tool_name], fin: ((.result // "") | tostring | .[-3000:])}]' \
+            "${F1:-/dev/null}" "${F2:-/dev/null}" > "$r" 2>/dev/null || echo '[]' > "$r"
+          echo "resume=$(openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:CLE_CONSIGNE -in "$r" | base64 -w0)" >> "$GITHUB_OUTPUT"
+          rm -f "$r"
           cout() { [ -n "$1" ] && [ -f "$1" ] && jq -r '[.[] | select(.type=="result") | .total_cost_usd // 0] | add // 0' "$1" 2>/dev/null || echo 0; }
           # Copie du 1er run faite par le pas de bascule (chemins distincts depuis #804, copie gardée par prudence).
           if [ -n "$SUIVANT" ]; then f1="$RUNNER_TEMP/execution-1.json"; else f1="$F1"; fi
@@ -230,6 +240,20 @@ jobs:
           fi
           printf '%s\n' "$lignes" | ssh "$USER_SSH@$HOST" "cat >> /opt/axion-crm-pro/depenses-code-claude.csv"
           echo "Coût noté sur le serveur."
+
+      - name: Ranger le résumé chiffré sur le serveur (privé)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER_SSH: ${{ secrets.HETZNER_USER || 'root' }}
+          RESUME: ${{ needs.claude.outputs.resume }}
+          CLE_CONSIGNE: ${{ secrets.CLE_CONSIGNE }}
+        run: |
+          [ -n "$RESUME" ] || exit 0
+          printf '%s' "$RESUME" | base64 -d 2>/dev/null \
+            | openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:CLE_CONSIGNE 2>/dev/null \
+            | head -c 200000 \
+            | ssh "$USER_SSH@$HOST" "mkdir -p -m 700 /opt/axion-crm-pro/.claude-taches/journal && cat > /opt/axion-crm-pro/.claude-taches/journal/${GITHUB_RUN_ID}.json" || true
+          echo "Résumé rangé."
 
       - name: Résultat
         env:

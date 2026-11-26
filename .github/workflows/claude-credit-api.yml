@@ -35,7 +35,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: claude-credit-api
+  group: claude-credit-api-${{ inputs.tache }}
   cancel-in-progress: false
 
 jobs:

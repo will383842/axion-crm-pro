@@ -30,6 +30,9 @@ use Tests\Support\QuotaBraveEnMemoire;
 beforeEach(function () {
     Config::set('services.brave.api_key', 'fausse-cle-brave');
     Config::set('services.scrapers.mock', true);
+    // Ces tests vérifient le quota Brave quand l'interrupteur est ouvert
+    // (PR 0 : fermé par défaut, ce qui est voulu).
+    Config::set('crm.enrichissement.payant_actif', true);
 });
 
 /** @param  array<string, int>  $quotas  usage => sous-quota */
@@ -82,6 +85,17 @@ test('sous-quota enrichissement a 0 (defaut) : find() n envoie AUCUNE requete Br
     expect(dfbqRequetesBrave())->toBe(0)
         ->and($url)->toBeNull()
         ->and($requetesSql)->toBe(0);
+});
+
+test('interrupteur payant_actif ferme : find() n envoie AUCUNE requete Brave, meme avec cle et quota', function () {
+    dfbqQuota(100, ['enrichissement' => 10]);
+    Config::set('crm.enrichissement.payant_actif', false);
+    dfbqBraveRepond();
+
+    $url = (new DomainFinderService)->find(dfbqEntreprise());
+
+    expect(dfbqRequetesBrave())->toBe(0)
+        ->and($url)->toBeNull();
 });
 
 test('le defaut de configuration du sous-quota enrichissement est 0', function () {

@@ -6,7 +6,6 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 
 /**
  * LE CLIENT CLAUDE HAIKU — appel HTTP brut `POST /v1/messages` (comme
@@ -48,6 +47,11 @@ class ClientClaude
      */
     public function appeler(string $poste, string $prompt, array $schema): array
     {
+        // Interrupteur payant : fermé par défaut, aucun appel payant tant qu'il n'est pas ouvert.
+        if (! (bool) config('crm.enrichissement.payant_actif', false)) {
+            throw new ErreurClaude(ErreurClaude::PAYANT_INACTIF, 'Enrichissement payant désactivé : aucun appel.');
+        }
+
         $modele = (string) config('services.anthropic.modele');
         PrixClaude::verifierModele($modele);
 
@@ -57,14 +61,16 @@ class ClientClaude
 
         $recherche = $poste === self::POSTE_RECHERCHE;
         $maxTokens = $recherche ? 300 : 100;
-        $reserve = PrixClaude::coutMaximal((int) ceil(strlen($prompt) / 3) + ($recherche ? 20_000 : 0), $maxTokens, $recherche ? 1 : 0);
+        $reserve = PrixClaude::coutMaximal((int) ceil(strlen($prompt) / 3) + ($recherche ? 50_000 : 0), $maxTokens, $recherche ? 1 : 0);
         if (! ($this->reserver)($poste, $reserve)) {
             throw new ErreurClaude(ErreurClaude::BUDGET, 'Budget Claude atteint : aucun appel.');
         }
 
         $corps = $this->corps($modele, $prompt, $schema, $maxTokens, $recherche);
 
-        while (($alias = $this->rotation->courante()) !== null) {
+        // Borne : au plus un tour par clé valide, même si l'état de la clé n'est pas enregistré.
+        $toursMax = count($this->rotation->aliasValides());
+        for ($tour = 0; $tour < $toursMax && ($alias = $this->rotation->courante()) !== null; $tour++) {
             try {
                 $rep = Http::withHeaders([
                     'x-api-key' => $this->rotation->cle($alias),
@@ -84,9 +90,14 @@ class ClientClaude
                 continue;
             }
             if ($type === 'pause') {
+                // Une réponse non 200 ne coûte rien : on rend la réservation.
+                ($this->regler)($poste, $reserve, 0);
+
                 throw new ErreurClaude(ErreurClaude::PAUSE, 'Claude : trop de débit (429 ou surcharge).', $rep->status(), $alias);
             }
             if (! $rep->successful()) {
+                ($this->regler)($poste, $reserve, 0);
+
                 throw new ErreurClaude(ErreurClaude::API, 'Claude : erreur API.', $rep->status(), $alias);
             }
 
@@ -209,33 +220,5 @@ class ClientClaude
         }
 
         return true;
-    }
-}
-
-/** Erreur typée du client : `type` dit quoi faire (pause, arrêt code 6, etc.). Jamais de clé dans le message. */
-class ErreurClaude extends RuntimeException
-{
-    public const AUCUNE_CLE = 'aucune_cle';
-
-    public const BUDGET = 'budget';
-
-    public const TOUTES_EPUISEES = 'toutes_epuisees';
-
-    public const PAUSE = 'pause';
-
-    public const RECHERCHE = 'erreur_recherche';
-
-    public const SORTIE_INVALIDE = 'sortie_invalide';
-
-    public const RESEAU = 'reseau';
-
-    public const API = 'api';
-
-    /** Code de sortie de la commande quand plus aucune clé n'est utilisable. */
-    public const CODE_SORTIE_TOUTES_EPUISEES = 6;
-
-    public function __construct(public readonly string $type, string $message, int $statut = 0, public readonly ?string $alias = null)
-    {
-        parent::__construct($message, $statut);
     }
 }

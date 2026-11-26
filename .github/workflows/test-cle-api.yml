@@ -7,8 +7,7 @@ name: Test des clés API Claude
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   tester:
@@ -27,9 +26,9 @@ jobs:
             if [ -z "$cle" ]; then echo "Compte $compte : secret vide"; continue; fi
             code=$(curl -s -o "$RUNNER_TEMP/r.json" -w '%{http_code}' https://api.anthropic.com/v1/messages \
               -H "x-api-key: $cle" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
-              -d '{"model":"claude-haiku-5-5","max_tokens":1,"messages":[{"role":"user","content":"ok"}]}')
-            type=$(jq -r '.error.type // "aucune"' "$RUNNER_TEMP/r.json" 2>/dev/null)
-            msg=$(jq -r '.error.message // ""' "$RUNNER_TEMP/r.json" 2>/dev/null | cut -c1-120)
+              -d '{"model":"claude-haiku-5-5","max_tokens":1,"messages":[{"role":"user","content":"ok"}]}') || code="echec-curl"
+            type=$(jq -r '.error.type // "aucune"' "$RUNNER_TEMP/r.json" 2>/dev/null || echo "non-JSON")
+            msg=$(jq -r '.error.message // ""' "$RUNNER_TEMP/r.json" 2>/dev/null | cut -c1-120 || true)
             echo "Compte $compte : HTTP $code, erreur=$type ${msg}"
             rm -f "$RUNNER_TEMP/r.json"
           done

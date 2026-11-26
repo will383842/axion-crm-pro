@@ -20,6 +20,11 @@ Dès qu'elles sont fusionnées, on repart de `main` et on code ce plan.
 ## Livrables prévus
 1. Config sous `backend/config/` : interrupteur `CRM_MEDIAS_ENRICHIR_ACTIF`
    (faux par défaut), lu par `config()`.
+   Interrupteur payant : tout appel à `ClientClaude` exige aussi
+   `config('crm.enrichissement.payant_actif', false)` à `true`. S'il est fermé,
+   aucun appel n'est fait (refus propre ou étapes gratuites seulement).
+   Cette clé est créée par la PR #807, pas par ce lot : on ne l'ajoute pas dans
+   `config/crm.php` ici, on la lit seulement (fermée par défaut).
 2. Service sous `backend/app/Crm/Medias/` + constantes des listes fermées
    (périodicité, thème, zone de diffusion, types par défaut).
 3. Commande `crm:medias:enrichir-region {--region=} {--limite=} {--a-blanc} {--types=}`.
@@ -30,6 +35,8 @@ Dès qu'elles sont fusionnées, on repart de `main` et on code ce plan.
    - Étape A : ClientClaude Haiku, recherche web 1 fois, lieu FR, JSON {site, confiance} ;
      vérification gratuite (`LecturePageAccueil`, `SsrfGuard`, `verifyBody`) ;
      sinon `website_status='not_found'`, `website_method='claude'`, rien d'autre.
+     La vérification gratuite reste la seule à décider avant toute écriture :
+     aucune source payante (Places, Hunter, Brave, autre LLM).
    - Étape B : logique de `media:enrich`, puis e-mails génériques validés MX.
    - Étape C : journalistes (rôles publics) via ClientClaude sans recherche web,
      300 jetons max ; aucun e-mail personnel deviné ; `source`, `source_url`,
@@ -39,6 +46,8 @@ Dès qu'elles sont fusionnées, on repart de `main` et on code ce plan.
      Haiku sans recherche web (150 jetons) sur l'accueil. Hors liste = ignoré ;
      jamais d'écrasement d'une valeur ARCOM/CPPAP ; reclassement seulement de
      `presse_autre` et `portail_web`.
+   - Le coût de la recherche web de Claude, facturé à part des jetons, est compté
+     dans le compteur et vérifié avant l'appel (étape A).
    - Chaque appel passe par le compteur global avant envoi ; plafond atteint =
      arrêt propre, code 6 ; bascule de clé gérée par la PR 2.
    - Mode à blanc : aucune écriture, aucun appel Claude.
@@ -52,4 +61,7 @@ Refus sans région ; refus interrupteur faux ; production audiovisuelle ignorée
 site non vérifié = rien écrit ; média déjà passé jamais retraité ; plafond atteint =
 arrêt avant l'appel suivant ; bascule de clé ; journaliste sans e-mail deviné ;
 classement (hors liste ignoré, ARCOM/CPPAP intact, `presse_autre` reclassé) ;
-mode à blanc n'écrit rien.
+mode à blanc n'écrit rien ;
+interrupteur payant fermé = aucune requête vers l'API Claude
+(`Http::assertNothingSent`) ; mode à blanc = aucun appel Claude. On vérifie les
+requêtes elles-mêmes, pas seulement les écritures.

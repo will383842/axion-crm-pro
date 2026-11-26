@@ -103,6 +103,21 @@ jobs:
           echo ".consigne-claude.md" >> .git/info/exclude
           test -s .consigne-claude.md
 
+      - name: PHP 8.3 (pour que le robot lance Pint, PHPStan et les tests unitaires)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
+          coverage: none
+          tools: composer:v2
+
+      - name: Dépendances backend AVANT Claude (le bac à sable ne peut pas les installer)
+        working-directory: backend
+        run: |
+          mkdir -p bootstrap/cache storage/app/private storage/framework/cache/data storage/framework/sessions storage/framework/testing storage/framework/views storage/logs
+          cp ../.env.example .env
+          composer install --no-interaction --prefer-dist --no-progress >/dev/null 2>&1 || echo "::warning::composer install a échoué : le robot travaillera sans vendor/"
+
       - name: Installer Claude Code et identité git
         run: |
           # Bac à sable de Claude Code (actif sur ce runner) : il lui faut bubblewrap et socat sur Linux.

@@ -579,4 +579,21 @@ return [
         'taille_lot' => (int) env('CRM_AUDIENCES_TAILLE_LOT', 5000),
     ],
 
+    /*
+    | Dépense Claude (chantier d'enrichissement) : `App\Crm\Claude\BudgetClaude`.
+    | Les plafonds sont CODÉS EN DUR dans la classe ; ces clés (en dollars) ne
+    | peuvent que les ABAISSER. Une valeur plus haute est ignorée et signalée au
+    | journal. `null` = on garde le plafond codé en dur.
+    */
+    'claude' => [
+        'plafond_total_usd' => env('CRM_CLAUDE_PLAFOND_TOTAL_USD'),
+        'plafond_jour_usd' => env('CRM_CLAUDE_PLAFOND_JOUR_USD'),
+        'plafond_execution_usd' => env('CRM_CLAUDE_PLAFOND_EXECUTION_USD'),
+        'plafonds_postes_usd' => [
+            'recherche-web' => env('CRM_CLAUDE_PLAFOND_RECHERCHE_WEB_USD'),
+            'arbitrage' => env('CRM_CLAUDE_PLAFOND_ARBITRAGE_USD'),
+            'extraction' => env('CRM_CLAUDE_PLAFOND_EXTRACTION_USD'),
+        ],
+    ],
+
 ];

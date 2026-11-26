@@ -41,5 +41,6 @@
     "serveur-envoi-socle.yml",
     "surveillance-canaux.yml",
     "surveillance-sauvegarde.yml",
+    "test-cle-api.yml",
     "vendor-cloud.yml"
 ]

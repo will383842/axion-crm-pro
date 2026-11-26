@@ -17,6 +17,10 @@ use InvalidArgumentException;
  * TOUS les jours et TOUS les postes, quelle que soit la clé (le budget n'est
  * pas par compte).
  *
+ * `reserver()` refuse tout tant que `crm.enrichissement.payant_actif` est
+ * fermé (défaut). Si le coût réel dépasse le maximum réservé, la réserve peut
+ * dépasser un plafond : l'argent est déjà dépensé, on le compte quand même.
+ *
  * Après l'appel, `ajuster()` remplace la réservation par le coût réel. Si la
  * réponse est illisible (coupure, 5xx), on n'appelle pas `ajuster()` avec un
  * réel : la réservation maximale est GARDÉE (prudence).
@@ -59,6 +63,10 @@ class BudgetClaude
         $this->verifierPoste($poste);
         if ($microMax < 0) {
             throw new InvalidArgumentException('Une réservation ne peut pas être négative.');
+        }
+        // Interrupteur général : fermé par défaut, aucun appel payant sans accord.
+        if (! config('crm.enrichissement.payant_actif', false)) {
+            return null;
         }
 
         $jour = Carbon::now('UTC')->toDateString();
@@ -111,13 +119,16 @@ class BudgetClaude
 
         DB::transaction(function () use ($poste, $jour, $microMax, $microReel): void {
             DB::select('SELECT pg_advisory_xact_lock(hashtext(?))', [self::VERROU]);
-            DB::statement(
+            $lignes = DB::update(
                 'UPDATE depenses_claude_jour
                     SET reserve_micro = GREATEST(reserve_micro - ? + ?, 0),
                         reel_micro = reel_micro + ?, updated_at = now()
                   WHERE jour = ? AND poste = ?',
                 [$microMax, $microReel, $microReel, $jour, $poste],
             );
+            if ($lignes === 0) {
+                Log::warning('Ajustement Claude sans ligne : la dépense réelle n\'est pas comptée.', ['jour' => $jour, 'poste' => $poste]);
+            }
         });
         $this->reserveExecution = max(0, $this->reserveExecution - $microMax + $microReel);
     }

@@ -23,6 +23,7 @@ const BC_M = 1_000_000;
 
 beforeEach(function () {
     Carbon::setTestNow(Carbon::parse('2026-12-14 10:00:00', 'UTC'));
+    Config::set('crm.enrichissement.payant_actif', true);
     Config::set('crm.claude', [
         'plafond_total_usd' => null,
         'plafond_jour_usd' => null,
@@ -54,13 +55,15 @@ it('refuse une réservation au-delà du total, tous jours et tous postes confond
 });
 
 it('refuse une réservation au-delà du plafond du jour', function () {
+    // 14 M déjà réservés aujourd'hui : reste 1 M sous le plafond du jour (15 M),
+    // alors que l'exécution (5 M), le poste et le total auraient de la marge.
     bcLigne('2026-12-14', 'arbitrage', 10 * BC_M);
-    bcLigne('2026-12-13', 'arbitrage', 5 * BC_M);
+    bcLigne('2026-12-14', 'extraction', 4 * BC_M);
 
     $budget = new BudgetClaude;
 
-    expect($budget->reserver('recherche-web', 5 * BC_M + 1))->toBeNull()
-        ->and($budget->reserver('recherche-web', 5 * BC_M))->not->toBeNull();
+    expect($budget->reserver('recherche-web', BC_M + 1))->toBeNull()
+        ->and($budget->reserver('recherche-web', BC_M))->toBe('2026-12-14');
 });
 
 it('refuse une réservation au-delà du plafond du poste', function () {
@@ -139,6 +142,49 @@ it('deux réservations successives ne dépassent jamais le plafond', function ()
         ->and($b->reserver('extraction', 3 * BC_M))->toBeNull()
         ->and($b->reserver('extraction', BC_M))->not->toBeNull()
         ->and((int) DB::table('depenses_claude_jour')->sum('reserve_micro'))->toBe(4 * BC_M);
+});
+
+it('refuse tout quand l\'interrupteur payant est fermé', function () {
+    Config::set('crm.enrichissement.payant_actif', false);
+
+    expect((new BudgetClaude)->reserver('extraction', 1))->toBeNull()
+        ->and(DB::table('depenses_claude_jour')->count())->toBe(0);
+
+    Config::set('crm.enrichissement', []); // clé absente : fermé par défaut
+    expect((new BudgetClaude)->reserver('extraction', 1))->toBeNull();
+});
+
+it('demande le verrou consultatif à chaque réservation et chaque ajustement', function () {
+    $requetes = [];
+    DB::listen(function ($q) use (&$requetes) {
+        $requetes[] = $q->sql;
+    });
+
+    $budget = new BudgetClaude;
+    $jour = $budget->reserver('extraction', BC_M);
+    $budget->ajuster('extraction', $jour, BC_M, 100);
+
+    $verrous = array_filter($requetes, fn ($sql) => str_contains($sql, 'pg_advisory_xact_lock'));
+    expect(count($verrous))->toBe(2);
+});
+
+it('ajuster sans ligne écrit un avertissement', function () {
+    Log::spy();
+
+    (new BudgetClaude)->ajuster('extraction', '2026-01-01', BC_M, 100);
+
+    Log::shouldHaveReceived('warning')->once();
+});
+
+it('un coût réel supérieur au maximum est compté, même au-dessus du plafond', function () {
+    Config::set('crm.claude.plafond_total_usd', '2');
+    $budget = new BudgetClaude;
+    $jour = $budget->reserver('extraction', 2 * BC_M);
+
+    $budget->ajuster('extraction', $jour, 2 * BC_M, 3 * BC_M);
+
+    expect((int) DB::table('depenses_claude_jour')->value('reserve_micro'))->toBe(3 * BC_M)
+        ->and($budget->reserver('extraction', 1))->toBeNull();
 });
 
 it('restant rend la borne la plus basse', function () {

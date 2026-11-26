@@ -6,9 +6,9 @@
  * `metadata`), licence ODbL et attribution, essai à blanc par défaut, fiche protégée et opposition respectées.
  */
 
+use App\Crm\FichesProtegees;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-use App\Crm\FichesProtegees;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\DoublonsFixtures as F;
 use Tests\TestCase;

@@ -76,6 +76,12 @@ jobs:
           delim="FIN_CONSIGNE_$(openssl rand -hex 12)"
           { echo "texte<<$delim"; cat "$RUNNER_TEMP/consigne.md"; echo; echo "$delim"; } >> "$GITHUB_OUTPUT"
 
+      - name: Retirer l'accès au serveur avant Claude
+        run: |
+          # Claude a l'outil Bash : il ne doit JAMAIS pouvoir joindre le serveur de prod.
+          ssh-add -D
+          rm -f ~/.ssh/known_hosts
+
       - name: Claude (premier compte)
         id: run1
         continue-on-error: true
@@ -84,7 +90,7 @@ jobs:
           anthropic_api_key: ${{ inputs.compte == 'B' && secrets.ANTHROPIC_API_KEY_COMPTE_B || inputs.compte == 'C' && secrets.ANTHROPIC_API_KEY_COMPTE_C || secrets.ANTHROPIC_API_KEY_COMPTE_A }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: ${{ steps.consigne.outputs.texte }}
-          claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,WebFetch,TodoWrite"
+          claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,TodoWrite"
 
       - name: Crédit épuisé ? choisir le compte suivant
         id: bascule
@@ -109,7 +115,7 @@ jobs:
           anthropic_api_key: ${{ steps.bascule.outputs.suivant == 'B' && secrets.ANTHROPIC_API_KEY_COMPTE_B || secrets.ANTHROPIC_API_KEY_COMPTE_A }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: ${{ steps.consigne.outputs.texte }}
-          claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,WebFetch,TodoWrite"
+          claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,TodoWrite"
 
       - name: Noter le coût sur le serveur
         if: always()
@@ -124,7 +130,11 @@ jobs:
           SUIVANT: ${{ steps.bascule.outputs.suivant }}
           C1: ${{ steps.run1.outputs.conclusion }}
           C2: ${{ steps.run2.outputs.conclusion }}
+          CLE_SSH: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
         run: |
+          printf '%s
+' "$CLE_SSH" | ssh-add - >/dev/null 2>&1
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           cout() { [ -n "$1" ] && [ -f "$1" ] && jq -r '[.[] | select(.type=="result") | .total_cost_usd // 0] | add // 0' "$1" 2>/dev/null || echo 0; }
           l1="$(date -u +%FT%TZ);${GITHUB_RUN_ID};${TACHE};${MODELE};${COMPTE};$(cout "$F1");${C1:-inconnu}"
           lignes="$l1"

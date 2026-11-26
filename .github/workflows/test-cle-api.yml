@@ -32,3 +32,29 @@ jobs:
             echo "Compte $compte : HTTP $code, erreur=$type ${msg}"
             rm -f "$RUNNER_TEMP/r.json"
           done
+
+      - name: Tester Sonnet en direct, Claude Code et l'Agent SDK (compte A)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_COMPTE_A }}
+        run: |
+          code=$(curl -s -o "$RUNNER_TEMP/s.json" -w '%{http_code}' https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
+            -d '{"model":"claude-sonnet-5-5","max_tokens":1,"messages":[{"role":"user","content":"ok"}]}') || code="echec-curl"
+          echo "Sonnet direct : HTTP $code, erreur=$(jq -r '.error.type // "aucune"' "$RUNNER_TEMP/s.json" 2>/dev/null || echo non-JSON)"
+          rm -f "$RUNNER_TEMP/s.json"
+          cd "$RUNNER_TEMP"
+          npm i -s --no-audit --no-fund @anthropic-ai/claude-code @anthropic-ai/claude-agent-sdk >/dev/null 2>&1 || echo "installation npm en échec"
+          ./node_modules/.bin/claude -p "Réponds juste ok" --model claude-haiku-5-5 --max-turns 1 --output-format json > cc.json 2>/dev/null || true
+          echo "Claude Code CLI : is_error=$(jq -r '.is_error' cc.json 2>/dev/null || echo ?) credit=$(grep -qi 'credit balance' cc.json && echo REFUSE || echo ok) cout=$(jq -r '.total_cost_usd // 0' cc.json 2>/dev/null || echo ?)"
+          rm -f cc.json
+          cat > sdk.mjs <<'JS'
+          import { query } from '@anthropic-ai/claude-agent-sdk';
+          let r = null;
+          try {
+            for await (const m of query({ prompt: 'Réponds juste ok', options: { model: 'claude-haiku-5-5', maxTurns: 1, allowedTools: [] } })) {
+              if (m.type === 'result') r = m;
+            }
+          } catch (e) { console.log('Agent SDK : exception ' + String(e && e.name)); }
+          if (r) console.log(`Agent SDK : is_error=${r.is_error} credit=${/credit balance/i.test(String(r.result ?? '')) ? 'REFUSE' : 'ok'} cout=${r.total_cost_usd}`);
+          JS
+          node sdk.mjs || true

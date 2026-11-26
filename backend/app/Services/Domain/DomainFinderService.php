@@ -93,7 +93,7 @@ class DomainFinderService
      */
     public function find(Company $company): ?string
     {
-        return $this->findAvecMethode($company)['url'] ?? null;
+        return $this->findAvecMethode($company, ! config('crm.enrichissement.payant_actif', false))['url'] ?? null;
     }
 
     /**

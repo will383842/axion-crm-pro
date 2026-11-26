@@ -8,3 +8,4 @@
 - Les deux doublures de `findAvecMethode` reprennent le 3e paramètre `$garderAnnuaires` (erreur PHP « Declaration must be compatible » corrigée).
 - `journalists:scrape-ours` : deux `if` séparés, chacun avec son message (`MEDIA_JOURNALISTS_ENABLED`, `CRM_ENRICHISSEMENT_PAYANT_ACTIF`).
 - Commentaire de `config/crm.php` précisé : enrich() saute Places, Hunter, LLM et Brave ; INSEE, triage et auto-segment inchangés.
+- En mode normal, `annuaires_actifs=false` coupe aussi le scrape website gratuit (voulu).

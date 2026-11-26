@@ -144,6 +144,7 @@ beforeEach(function () {
         public function findAvecMethode(Company $company, bool $sansBrave = false, bool $garderAnnuaires = false): ?array
         {
             DdCompteurs::$n['sansBrave'] = (int) $sansBrave;
+            DdCompteurs::$n['garderAnnuaires'] = (int) $garderAnnuaires;
 
             return null;
         }
@@ -185,7 +186,7 @@ afterEach(function () {
     Carbon::setTestNow();
 });
 
-function ddEnrichir(string $espace, bool $avecSite = true): int
+function ddEnrichir(string $espace, bool $avecSite = true, bool $sansPayant = false): int
 {
     $id = (int) DB::table('companies')->insertGetId([
         'workspace_id' => $espace,
@@ -201,8 +202,10 @@ function ddEnrichir(string $espace, bool $avecSite = true): int
         'updated_at' => now(),
     ]);
     DB::table('contacts')->insert(['workspace_id' => $espace, 'company_id' => $id, 'last_name' => 'ZZ', 'created_at' => now(), 'updated_at' => now()]);
-    WorkspaceContext::run($espace, function () use ($id): void {
-        app(WaterfallOrchestrator::class)->enrich(Company::findOrFail($id));
+    WorkspaceContext::run($espace, function () use ($id, $sansPayant): void {
+        $orchestrateur = app(WaterfallOrchestrator::class);
+        $company = Company::findOrFail($id);
+        $sansPayant ? $orchestrateur->enrichSansPayant($company) : $orchestrateur->enrich($company);
     });
 
     return $id;
@@ -314,6 +317,25 @@ it('témoin : annuaires_actifs ouvert et scrapers réels, les scrapes Node sont 
         ddRemettreMocks();
     }
 
+    Bus::assertDispatched(DispatchScrapeJob::class);
+});
+
+it('enrichSansPayant() avec les deux interrupteurs fermés : garde les annuaires et le scrape Node, aucun compteur payant', function () {
+    Bus::fake();
+    ddScrapersReels();
+
+    try {
+        ddEnrichir($this->espace, false, true);
+    } finally {
+        ddRemettreMocks();
+    }
+
+    expect(config('crm.enrichissement.payant_actif'))->toBeFalse()
+        ->and(config('crm.enrichissement.annuaires_actifs'))->toBeFalse()
+        ->and(DdCompteurs::get('garderAnnuaires'))->toBe(1)
+        ->and(DdCompteurs::get('places'))->toBe(0)
+        ->and(DdCompteurs::get('llm'))->toBe(0)
+        ->and(DdCompteurs::get('hunter'))->toBe(0);
     Bus::assertDispatched(DispatchScrapeJob::class);
 });
 

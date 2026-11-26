@@ -192,6 +192,18 @@ const NR17_RETOUR_INERTE_VOULU = [
     '2026_12_12_000110_envoi_inscriptions_repli_entreprise_unique.php',
 ];
 
+/**
+ * Filet modifié : pourquoi — compteur de dépense Claude : migration NOUVELLE dont le down() est
+ * réel quand les tables sont vides, mais REFUSE (exception) d'effacer une dépense déjà écrite,
+ * comme `brave_quota_mensuel` (migration ancienne, déjà dans l'instantané). Une migration nouvelle
+ * ne peut pas entrer dans l'instantané (il ne peut que baisser) ; liste EXPLICITE et FERMÉE.
+ * Pour ces fichiers on exige que le retour soit bien classé « refuse » et on joue quand même
+ * l'aller-retour-aller (base de test vide : le retour est alors réel).
+ */
+const NR17_RETOUR_REFUSE_SI_DONNEES = [
+    '2026_12_13_000100_depenses_claude_jour.php',
+];
+
 /** @return list<string> noms de fichiers (sans dossier), triés */
 function nr17Migrations(): array
 {
@@ -259,7 +271,7 @@ function nr17SansRetour(): array
 {
     return array_values(array_filter(
         nr17Migrations(),
-        fn (string $f) => nr17ClasseRetour($f) !== 'reel' && ! in_array($f, NR17_RETOUR_INERTE_VOULU, true),
+        fn (string $f) => nr17ClasseRetour($f) !== 'reel' && ! in_array($f, NR17_RETOUR_INERTE_VOULU, true) && ! in_array($f, NR17_RETOUR_REFUSE_SI_DONNEES, true),
     ));
 }
 
@@ -289,6 +301,13 @@ test('NR-17 toute migration NOUVELLE a un retour réel et fait aller, retour, al
             $migration->down();
             $migration->up();
             $migration->up();
+
+            continue;
+        }
+        if (in_array($fichier, NR17_RETOUR_REFUSE_SI_DONNEES, true)) {
+            // Refuse si des données existent ; base de test vide : aller-retour-aller réel.
+            expect(nr17ClasseRetour($fichier))->toBe('refuse');
+            nr17AllerRetourAller($fichier);
 
             continue;
         }
@@ -343,6 +362,14 @@ test('NR-17 la liste des retours inertes voulus est fermée : fichiers existants
         expect(nr17Migrations())->toContain($fichier)
             ->and(strcmp(substr($fichier, 0, 17), NR17_DERNIERE_ANCIENNE))->toBeGreaterThan(0)
             ->and(nr17ClasseRetour($fichier))->toBe('vide');
+    }
+});
+
+test('NR-17 la liste « refuse si données » est fermée : fichiers existants, nouveaux, classés refuse', function () {
+    foreach (NR17_RETOUR_REFUSE_SI_DONNEES as $fichier) {
+        expect(nr17Migrations())->toContain($fichier)
+            ->and(strcmp(substr($fichier, 0, 17), NR17_DERNIERE_ANCIENNE))->toBeGreaterThan(0)
+            ->and(nr17ClasseRetour($fichier))->toBe('refuse');
     }
 });
 

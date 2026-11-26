@@ -11,7 +11,8 @@ Vérifications : `php -l` OK. `vendor/` absent dans cet environnement : Pint, PH
 
 ## Correctifs CI (filet de non-régression)
 
-- NR-17 : le `down()` de `2026_12_13_000100_depenses_claude_jour.php` levait une exception (classé « refuse »). Il est maintenant réel : il retire les colonnes de `llm_usage` et la table `depenses_claude_jour` seulement si elles ne contiennent aucune donnée, sinon il les conserve et écrit un avertissement (jamais d'effacement de dépense). Aucun instantané NR-17 modifié, rien ajouté à la liste des anciennes migrations.
+- NR-17 : le `down()` de `2026_12_13_000100_depenses_claude_jour.php` REFUSE (exception `RuntimeException`) si `depenses_claude_jour` ou les quatre colonnes de `llm_usage` contiennent des données, sur le modèle de `brave_quota_mensuel` ; vides, il les supprime pour de vrai. Aucune dépense n'est jamais effacée.
+- Filet modifié : pourquoi → `brave_quota_mensuel` passe NR-17 parce qu'elle est ANCIENNE : son retour « refuse » est dans l'instantané `nr17-migrations-sans-retour.json`, qui ne peut que baisser. La nôtre est NOUVELLE (exige un retour réel). Ajout dans `Nr17MigrationsTest.php` d'une liste fermée `NR17_RETOUR_REFUSE_SI_DONNEES` (un seul fichier) : on exige le classement « refuse » ET l'aller-retour-aller réel sur base vide, plus un test de fermeture de la liste. L'instantané n'est pas modifié.
 - NR-16 : instantané `nr16-drapeaux.json` mis à jour, 6 ajouts `CRM_CLAUDE_PLAFOND_*_USD`. Ils n'ont aucun défaut (`null` = plafond codé en dur, qu'ils ne peuvent qu'abaisser) : rien de payant ne s'ouvre.
 - Filet modifié : pourquoi → ajout de variables de config voulu par ce lot, instantané régénéré en local (`CI=` vidé pour le geste), diff en clair.
 - NR-17 aller-retour-aller non joué ici : pas de base PostgreSQL disponible.

@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 /**
  * LE COMPTEUR GLOBAL DE DÉPENSE CLAUDE (chantier d'enrichissement).
@@ -55,28 +54,31 @@ return new class extends Migration
     }
 
     /**
-     * Retour réel, sans jamais effacer de dépense déjà écrite : une table ou une
-     * colonne qui contient des données est laissée en place (journal d'alerte).
+     * Retour réel, mais qui REFUSE d'effacer une dépense déjà écrite (même motif
+     * que `brave_quota_mensuel`) : une table ou des colonnes qui contiennent des
+     * données ne sont jamais supprimées. Vides, elles sont retirées pour de vrai.
      */
     public function down(): void
     {
-        DB::statement("SET LOCAL lock_timeout = '30s'");
-
         $remplies = (int) DB::table('llm_usage')
             ->where(fn ($q) => $q->whereNotNull('cout_usd_micro')->orWhereNotNull('recherches_web')
                 ->orWhereNotNull('cle_alias')->orWhereNotNull('poste'))
             ->count();
-        if ($remplies === 0) {
-            DB::statement('ALTER TABLE llm_usage DROP COLUMN IF EXISTS cout_usd_micro, DROP COLUMN IF EXISTS recherches_web, DROP COLUMN IF EXISTS cle_alias, DROP COLUMN IF EXISTS poste');
-        } else {
-            Log::warning("Retour arrière : {$remplies} ligne(s) de llm_usage portent le journal Claude, colonnes conservées.");
+        if ($remplies > 0) {
+            throw new RuntimeException(
+                "Retour arrière refusé : {$remplies} ligne(s) de llm_usage portent le journal Claude (colonnes cout_usd_micro, recherches_web, cle_alias, poste).",
+            );
         }
 
         $lignes = (int) DB::table('depenses_claude_jour')->count();
-        if ($lignes === 0) {
-            DB::statement('DROP TABLE IF EXISTS depenses_claude_jour');
-        } else {
-            Log::warning("Retour arrière : depenses_claude_jour contient {$lignes} ligne(s), table conservée.");
+        if ($lignes > 0) {
+            throw new RuntimeException(
+                "Retour arrière refusé : depenses_claude_jour contient {$lignes} ligne(s) de dépense.",
+            );
         }
+
+        DB::statement("SET LOCAL lock_timeout = '30s'");
+        DB::statement('ALTER TABLE llm_usage DROP COLUMN IF EXISTS cout_usd_micro, DROP COLUMN IF EXISTS recherches_web, DROP COLUMN IF EXISTS cle_alias, DROP COLUMN IF EXISTS poste');
+        DB::statement('DROP TABLE IF EXISTS depenses_claude_jour');
     }
 };

@@ -3,6 +3,7 @@
     "banc-envoi.yml",
     "build-postgres-image.yml",
     "ci.yml",
+    "claude-credit-api.yml",
     "crm-doublons.yml",
     "crm-presse.yml",
     "crm-rattrapage-dossiers.yml",

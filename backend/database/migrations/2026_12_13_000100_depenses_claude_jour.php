@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * LE COMPTEUR GLOBAL DE DÉPENSE CLAUDE (chantier d'enrichissement).
@@ -53,27 +54,29 @@ return new class extends Migration
         DB::statement('ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS poste TEXT');
     }
 
+    /**
+     * Retour réel, sans jamais effacer de dépense déjà écrite : une table ou une
+     * colonne qui contient des données est laissée en place (journal d'alerte).
+     */
     public function down(): void
     {
-        $lignes = (int) DB::table('depenses_claude_jour')->count();
-        if ($lignes > 0) {
-            throw new RuntimeException(
-                "Retour arrière refusé : depenses_claude_jour contient {$lignes} ligne(s) de dépense.",
-            );
-        }
+        DB::statement("SET LOCAL lock_timeout = '30s'");
 
         $remplies = (int) DB::table('llm_usage')
             ->where(fn ($q) => $q->whereNotNull('cout_usd_micro')->orWhereNotNull('recherches_web')
                 ->orWhereNotNull('cle_alias')->orWhereNotNull('poste'))
             ->count();
-        if ($remplies > 0) {
-            throw new RuntimeException(
-                "Retour arrière refusé : {$remplies} ligne(s) de llm_usage portent déjà le journal Claude.",
-            );
+        if ($remplies === 0) {
+            DB::statement('ALTER TABLE llm_usage DROP COLUMN IF EXISTS cout_usd_micro, DROP COLUMN IF EXISTS recherches_web, DROP COLUMN IF EXISTS cle_alias, DROP COLUMN IF EXISTS poste');
+        } else {
+            Log::warning("Retour arrière : {$remplies} ligne(s) de llm_usage portent le journal Claude, colonnes conservées.");
         }
 
-        DB::statement("SET LOCAL lock_timeout = '30s'");
-        DB::statement('ALTER TABLE llm_usage DROP COLUMN IF EXISTS cout_usd_micro, DROP COLUMN IF EXISTS recherches_web, DROP COLUMN IF EXISTS cle_alias, DROP COLUMN IF EXISTS poste');
-        DB::statement('DROP TABLE IF EXISTS depenses_claude_jour');
+        $lignes = (int) DB::table('depenses_claude_jour')->count();
+        if ($lignes === 0) {
+            DB::statement('DROP TABLE IF EXISTS depenses_claude_jour');
+        } else {
+            Log::warning("Retour arrière : depenses_claude_jour contient {$lignes} ligne(s), table conservée.");
+        }
     }
 };

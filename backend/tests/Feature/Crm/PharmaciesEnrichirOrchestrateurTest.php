@@ -237,6 +237,7 @@ function poLigne(int $id): object
 
 function poEnrichir(string $espace, int $id, bool $sansPayant): void
 {
+    config()->set('crm.enrichissement.payant_actif', true);
     WorkspaceContext::run($espace, function () use ($id, $sansPayant): void {
         $w = app(WaterfallOrchestrator::class);
         $c = Company::findOrFail($id);

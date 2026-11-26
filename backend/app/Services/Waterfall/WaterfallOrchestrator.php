@@ -75,9 +75,22 @@ class WaterfallOrchestrator
      * triage (11) et l'auto-segment (12) ; Brave a un plafond 0 ; l'étape INSEE
      * (1) ne réécrit ni dénomination, NAF, forme juridique ni effectif ; le
      * géocodage (8) ne remplit que lat/lon/insee encore NULL ; l'AutoTagger ne
-     * retire aucune étiquette. Le mode normal (`enrich()`) reste inchangé.
+     * retire aucune étiquette.
      */
     private bool $sansPayant = false;
+
+    /**
+     * PR 0 : true quand `crm.enrichissement.payant_actif` est faux (défaut).
+     * Coupe SEULEMENT les étapes qui peuvent coûter (Google Places 3d, Hunter 7,
+     * LLM 10, Brave dans la recherche de domaine) ; le reste du mode normal
+     * (INSEE qui archive les radiées, triage, auto-segment) est gardé.
+     */
+    private bool $coupePayant = false;
+
+    private function payantCoupe(): bool
+    {
+        return $this->sansPayant || $this->coupePayant;
+    }
 
     /**
      * Même waterfall, sans les étapes qui peuvent coûter de l'argent. La
@@ -109,14 +122,12 @@ class WaterfallOrchestrator
         // PR 0 : interrupteur fermé (défaut) = jamais d'étape payante, même par
         // les chemins qui appellent `enrich()` en mode normal.
         $payantActif = (bool) config('crm.enrichissement.payant_actif', false);
-        $precedentSansPayant = $this->sansPayant;
-        if (! $payantActif) {
-            $this->sansPayant = true;
-        }
+        $precedentCoupe = $this->coupePayant;
+        $this->coupePayant = ! $payantActif;
         try {
             $this->enrichirEtapes($company);
         } finally {
-            $this->sansPayant = $precedentSansPayant;
+            $this->coupePayant = $precedentCoupe;
         }
     }
 
@@ -145,16 +156,16 @@ class WaterfallOrchestrator
         $this->safe(fn () => $this->step3_bodacc($company), 'step3_bodacc', $company);
         $this->step3b_find_domain($company);
         $this->step3c_mentions_legales($company);
-        if (! $this->sansPayant) {
+        if (! $this->payantCoupe()) {
             $this->step3d_google_places($company);
         }
         $this->step4_dispatch_node_scrapes($company);
-        if (! $this->sansPayant) {
+        if (! $this->payantCoupe()) {
             $this->step7_email_finder($company);
         }
         $this->safe(fn () => $this->step8_geocode($company), 'step8_geocode', $company);
         $this->step9_france_travail($company);
-        if (! $this->sansPayant) {
+        if (! $this->payantCoupe()) {
             $this->step10_classify($company);
         }
         $this->step10b_auto_classify($company);
@@ -296,7 +307,7 @@ class WaterfallOrchestrator
             // Lot N4 (03/10/2026) — la MÉTHODE est écrite avec le site : un
             // site deviné (`guess`) posé sans méthode passait pour fiable
             // (`SiteFiable`), alors qu'il n'est pas vérifié.
-            $trouve = $this->domainFinder->findAvecMethode($company, $this->sansPayant);
+            $trouve = $this->domainFinder->findAvecMethode($company, $this->payantCoupe());
             if ($trouve !== null) {
                 $company->website = $trouve['url'];
                 $company->website_method = $trouve['methode'];

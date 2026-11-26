@@ -132,8 +132,7 @@ jobs:
           C2: ${{ steps.run2.outputs.conclusion }}
           CLE_SSH: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
         run: |
-          printf '%s
-' "$CLE_SSH" | ssh-add - >/dev/null 2>&1
+          ssh-add - <<< "$CLE_SSH" >/dev/null 2>&1
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
           cout() { [ -n "$1" ] && [ -f "$1" ] && jq -r '[.[] | select(.type=="result") | .total_cost_usd // 0] | add // 0' "$1" 2>/dev/null || echo 0; }
           l1="$(date -u +%FT%TZ);${GITHUB_RUN_ID};${TACHE};${MODELE};${COMPTE};$(cout "$F1");${C1:-inconnu}"

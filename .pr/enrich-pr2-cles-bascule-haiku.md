@@ -14,3 +14,9 @@
 
 ## Non vérifié
 Pas de `vendor/` dans cet environnement : Pint, PHPStan et Pest n'ont pas pu être lancés (seulement `php -l`).
+
+## Filet modifié : pourquoi (CI rouge NR-16 / NR-17)
+- NR-16 : `instantanes/nr16-drapeaux.json` met à jour l'instantané avec 3 variables nouvelles de `config/services.php` : `CRM_CLAUDE_CLES_ENRICHISSEMENT` (vide), `CRM_CLAUDE_DOMAINES_BLOQUES` (vide), `CRM_CLAUDE_PLAFOND_TOTAL_USD` (aucun défaut). Défauts FERMÉS : aucune clé choisie, donc aucun appel payant. Aucun booléen allumé.
+- NR-17 : le `down()` de `2026_12_13_000010_cles_claude_etat.php` contenait un `throw` (classé « refuse »). Il fait maintenant un vrai `DROP TABLE IF EXISTS` de cette seule table d'état (créée par cette migration, aucune clé ni donnée métier). Aller-retour-aller possible (`up()` en `CREATE TABLE IF NOT EXISTS`). Instantané NR-17 inchangé, liste des anciennes migrations inchangée.
+- Instantané édité à la main (la régénération est refusée quand `CI` est défini) ; NR-16 vérifié vert.
+- Pint et PHPStan : verts. NR-17 non rejoué : pas de base PostgreSQL ici.

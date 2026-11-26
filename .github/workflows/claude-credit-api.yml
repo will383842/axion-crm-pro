@@ -1,11 +1,13 @@
-name: Claude (crédit API)
-
 # Lance Claude Code sur un runner GitHub, payé par le crédit de l'API Claude (pas un abonnement).
-# Déclenchement MANUEL seulement (workflow_dispatch), et seulement par le propriétaire du dépôt.
-# Dépôt public : la consigne n'est PAS passée en entrée (les entrées sont visibles de tous) ;
-# elle est lue sur le serveur, dans un dossier privé, à partir de son seul nom.
-# Le coût de chaque exécution est noté sur le serveur, pas dans ce dépôt.
-# Si le compte choisi n'a plus de crédit, l'exécution repart automatiquement sur le compte suivant.
+# Déclenchement MANUEL seulement, par le propriétaire du dépôt, depuis main.
+# Trois jobs sur trois machines distinctes :
+#   lire   : a la clé SSH, lit la consigne sur le serveur et la CHIFFRE (dépôt public : rien en clair dans les journaux) ;
+#   claude : n'a JAMAIS la clé SSH ; déchiffre la consigne dans un fichier non suivi, lance Claude, calcule le coût ;
+#   noter  : a la clé SSH sur une machine neuve, revalide les nombres et note le coût sur le serveur.
+# Si le compte choisi n'a plus de crédit (erreur finale seulement), l'exécution repart sur le compte suivant.
+# Ne JAMAIS activer le mode debug sur ce workflow, ni publier d'artefact.
+
+name: Claude (crédit API)
 
 on:
   workflow_dispatch:
@@ -30,15 +32,19 @@ on:
         default: "80"
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: read
+
+concurrency:
+  group: claude-credit-api
+  cancel-in-progress: false
 
 jobs:
-  claude:
-    if: github.actor == github.repository_owner
+  lire:
+    if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 10
+    outputs:
+      chiffre: ${{ steps.consigne.outputs.chiffre }}
     steps:
       - name: Vérifier le nom de la consigne
         env:
@@ -48,48 +54,63 @@ jobs:
             echo "::error::Nom de consigne invalide."; exit 1
           fi
 
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Agent SSH
         uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
 
-      - name: Faire confiance à l'hôte
-        env:
-          HOST: ${{ secrets.HETZNER_HOST }}
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-      - name: Lire la consigne sur le serveur
+      - name: Lire et chiffrer la consigne
         id: consigne
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER_SSH: ${{ secrets.HETZNER_USER || 'root' }}
           TACHE: ${{ inputs.tache }}
+          CLE_CONSIGNE: ${{ secrets.CLE_CONSIGNE }}
         run: |
-          ssh "$USER_SSH@$HOST" "cat /opt/axion-crm-pro/.claude-taches/$TACHE.md" > "$RUNNER_TEMP/consigne.md"
-          if [ ! -s "$RUNNER_TEMP/consigne.md" ]; then echo "::error::Consigne absente ou vide."; exit 1; fi
-          delim="FIN_CONSIGNE_$(openssl rand -hex 12)"
-          { echo "texte<<$delim"; cat "$RUNNER_TEMP/consigne.md"; echo; echo "$delim"; } >> "$GITHUB_OUTPUT"
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh "$USER_SSH@$HOST" "cat /opt/axion-crm-pro/.claude-taches/$TACHE.md" > "$RUNNER_TEMP/c.md"
+          if [ ! -s "$RUNNER_TEMP/c.md" ]; then echo "::error::Consigne absente ou vide."; exit 1; fi
+          chiffre="$(openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:CLE_CONSIGNE -in "$RUNNER_TEMP/c.md" | base64 -w0)"
+          rm -f "$RUNNER_TEMP/c.md"
+          echo "chiffre=$chiffre" >> "$GITHUB_OUTPUT"
 
-      - name: Retirer l'accès au serveur avant Claude
+  claude:
+    needs: lire
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      cout1: ${{ steps.bilan.outputs.cout1 }}
+      cout2: ${{ steps.bilan.outputs.cout2 }}
+      c1: ${{ steps.bilan.outputs.c1 }}
+      c2: ${{ steps.bilan.outputs.c2 }}
+      suivant: ${{ steps.bascule.outputs.suivant }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Déchiffrer la consigne (fichier non suivi par git)
+        env:
+          CHIFFRE: ${{ needs.lire.outputs.chiffre }}
+          CLE_CONSIGNE: ${{ secrets.CLE_CONSIGNE }}
         run: |
-          # Claude a l'outil Bash : il ne doit JAMAIS pouvoir joindre le serveur de prod.
-          ssh-add -D
-          rm -f ~/.ssh/known_hosts
+          printf '%s' "$CHIFFRE" | base64 -d \
+            | openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:CLE_CONSIGNE > .consigne-claude.md
+          echo ".consigne-claude.md" >> .git/info/exclude
+          test -s .consigne-claude.md
 
       - name: Claude (premier compte)
         id: run1
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
           anthropic_api_key: ${{ inputs.compte == 'B' && secrets.ANTHROPIC_API_KEY_COMPTE_B || inputs.compte == 'C' && secrets.ANTHROPIC_API_KEY_COMPTE_C || secrets.ANTHROPIC_API_KEY_COMPTE_A }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          prompt: ${{ steps.consigne.outputs.texte }}
+          prompt: "Ta consigne est dans le fichier .consigne-claude.md à la racine du dépôt. Lis-le et exécute-le. Ne le committe jamais et ne recopie jamais son contenu dans un commit, une PR ou un commentaire."
           claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,TodoWrite"
 
       - name: Crédit épuisé ? choisir le compte suivant
@@ -100,9 +121,12 @@ jobs:
           COMPTE: ${{ inputs.compte }}
         run: |
           suivant=""
-          if [ -n "$FICHIER" ] && [ -f "$FICHIER" ] && grep -qi 'credit balance' "$FICHIER"; then
+          if [ -n "$FICHIER" ] && [ -f "$FICHIER" ] && jq -e '
+               any(.[]; .type == "result" and .is_error == true
+                        and ((.result // "") | test("credit balance"; "i")))' "$FICHIER" >/dev/null 2>&1; then
             case "$COMPTE" in A) suivant=B ;; B) suivant=A ;; C) suivant=A ;; esac
             echo "Crédit épuisé sur le compte $COMPTE : bascule vers $suivant."
+            cp "$FICHIER" "$RUNNER_TEMP/execution-1.json"
           fi
           echo "suivant=$suivant" >> "$GITHUB_OUTPUT"
 
@@ -111,45 +135,77 @@ jobs:
         if: steps.bascule.outputs.suivant != ''
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
+        env:
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
         with:
           anthropic_api_key: ${{ steps.bascule.outputs.suivant == 'B' && secrets.ANTHROPIC_API_KEY_COMPTE_B || secrets.ANTHROPIC_API_KEY_COMPTE_A }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          prompt: ${{ steps.consigne.outputs.texte }}
+          prompt: "Ta consigne est dans le fichier .consigne-claude.md à la racine du dépôt. Lis-le et exécute-le. Ne le committe jamais et ne recopie jamais son contenu dans un commit, une PR ou un commentaire."
           claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,TodoWrite"
 
-      - name: Noter le coût sur le serveur
+      - name: Bilan (nombres seulement)
+        id: bilan
         if: always()
+        env:
+          SUIVANT: ${{ steps.bascule.outputs.suivant }}
+          F1: ${{ steps.run1.outputs.execution_file }}
+          F2: ${{ steps.run2.outputs.execution_file }}
+          C1: ${{ steps.run1.outputs.conclusion }}
+          C2: ${{ steps.run2.outputs.conclusion }}
+        run: |
+          rm -f .consigne-claude.md
+          cout() { [ -n "$1" ] && [ -f "$1" ] && jq -r '[.[] | select(.type=="result") | .total_cost_usd // 0] | add // 0' "$1" 2>/dev/null || echo 0; }
+          # Le fichier du 1er run est écrasé par le 2e (même chemin) : on lit la copie faite avant.
+          if [ -n "$SUIVANT" ]; then f1="$RUNNER_TEMP/execution-1.json"; else f1="$F1"; fi
+          echo "cout1=$(cout "$f1")" >> "$GITHUB_OUTPUT"
+          echo "cout2=$(cout "$F2")" >> "$GITHUB_OUTPUT"
+          echo "c1=${C1:-inconnu}" >> "$GITHUB_OUTPUT"
+          echo "c2=${C2:-inconnu}" >> "$GITHUB_OUTPUT"
+
+  noter:
+    needs: [lire, claude]
+    if: always() && needs.lire.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Agent SSH
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Noter le coût sur le serveur
         env:
           HOST: ${{ secrets.HETZNER_HOST }}
           USER_SSH: ${{ secrets.HETZNER_USER || 'root' }}
-          F1: ${{ steps.run1.outputs.execution_file }}
-          F2: ${{ steps.run2.outputs.execution_file }}
           TACHE: ${{ inputs.tache }}
           MODELE: ${{ inputs.modele }}
           COMPTE: ${{ inputs.compte }}
-          SUIVANT: ${{ steps.bascule.outputs.suivant }}
-          C1: ${{ steps.run1.outputs.conclusion }}
-          C2: ${{ steps.run2.outputs.conclusion }}
-          CLE_SSH: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+          SUIVANT: ${{ needs.claude.outputs.suivant }}
+          COUT1: ${{ needs.claude.outputs.cout1 }}
+          COUT2: ${{ needs.claude.outputs.cout2 }}
+          C1: ${{ needs.claude.outputs.c1 }}
+          C2: ${{ needs.claude.outputs.c2 }}
         run: |
-          ssh-add - <<< "$CLE_SSH" >/dev/null 2>&1
+          # Les sorties du job claude viennent d'une machine où Claude avait Bash : on revalide tout.
+          num() { printf '%s' "$1" | grep -Eq '^[0-9]+(\.[0-9]+)?$' && printf '%s' "$1" || printf 0; }
+          mot() { printf '%s' "$1" | grep -Eq '^(success|failure|inconnu)$' && printf '%s' "$1" || printf inconnu; }
+          printf '%s' "$TACHE" | grep -Eq '^[a-z0-9-]{3,60}$' || exit 1
+          printf '%s' "$SUIVANT" | grep -Eq '^(A|B|)$' || SUIVANT=""
+          mkdir -p ~/.ssh
           ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          cout() { [ -n "$1" ] && [ -f "$1" ] && jq -r '[.[] | select(.type=="result") | .total_cost_usd // 0] | add // 0' "$1" 2>/dev/null || echo 0; }
-          l1="$(date -u +%FT%TZ);${GITHUB_RUN_ID};${TACHE};${MODELE};${COMPTE};$(cout "$F1");${C1:-inconnu}"
-          lignes="$l1"
+          d="$(date -u +%FT%TZ)"
+          lignes="$d;${GITHUB_RUN_ID};${TACHE};${MODELE};${COMPTE};$(num "$COUT1");$(mot "$C1")"
           if [ -n "$SUIVANT" ]; then
-            lignes="$lignes
-          $(date -u +%FT%TZ);${GITHUB_RUN_ID};${TACHE};${MODELE};${SUIVANT};$(cout "$F2");${C2:-inconnu}"
+            lignes="$lignes"$'\n'"$d;${GITHUB_RUN_ID};${TACHE};${MODELE};${SUIVANT};$(num "$COUT2");$(mot "$C2")"
           fi
-          printf '%s\n' "$lignes" | sed 's/^ *//' | ssh "$USER_SSH@$HOST" "cat >> /opt/axion-crm-pro/depenses-code-claude.csv"
+          printf '%s\n' "$lignes" | ssh "$USER_SSH@$HOST" "cat >> /opt/axion-crm-pro/depenses-code-claude.csv"
           echo "Coût noté sur le serveur."
 
       - name: Résultat
-        if: always()
         env:
-          C1: ${{ steps.run1.outputs.conclusion }}
-          C2: ${{ steps.run2.outputs.conclusion }}
-          SUIVANT: ${{ steps.bascule.outputs.suivant }}
+          C1: ${{ needs.claude.outputs.c1 }}
+          C2: ${{ needs.claude.outputs.c2 }}
+          SUIVANT: ${{ needs.claude.outputs.suivant }}
         run: |
           if [ -n "$SUIVANT" ]; then fin="$C2"; else fin="$C1"; fi
           echo "Conclusion : ${fin:-inconnue}"

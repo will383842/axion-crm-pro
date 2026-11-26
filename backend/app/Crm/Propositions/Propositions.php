@@ -174,14 +174,19 @@ final class Propositions
     /**
      * Les champs qu'un AUTOMATISME peut proposer (`proposerAutomatisme()`),
      * jamais un tiers : l'e-mail générique relevé sur un site VÉRIFIÉ (SIREN
-     * prouvé) — c'est cette preuve qui manque à un tiers. Une proposition de
-     * ce champ ne vient que d'une origine de `ORIGINES_AUTOMATISMES`.
+     * prouvé) — c'est cette preuve qui manque à un tiers — et, depuis la PR 5a,
+     * le site web et le téléphone trouvés par la recherche de site (site
+     * `probable-ia`, téléphone en conflit). Une proposition de ces champs ne
+     * vient que d'une origine de `ORIGINES_AUTOMATISMES`. Accepter un site
+     * d'automatisme ne pose PAS `website_method` : il n'est pas rendu fiable.
      *
      * @var array<string, array<string, string>>
      */
     public const CHAMPS_AUTOMATISMES = [
         self::ENTREPRISE => [
             'email_generic' => 'E-mail générique',
+            'website' => 'Site web',
+            'phone' => 'Téléphone',
         ],
     ];
 

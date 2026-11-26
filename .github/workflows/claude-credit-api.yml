@@ -1,0 +1,147 @@
+name: Claude (crédit API)
+
+# Lance Claude Code sur un runner GitHub, payé par le crédit de l'API Claude (pas un abonnement).
+# Déclenchement MANUEL seulement (workflow_dispatch), et seulement par le propriétaire du dépôt.
+# Dépôt public : la consigne n'est PAS passée en entrée (les entrées sont visibles de tous) ;
+# elle est lue sur le serveur, dans un dossier privé, à partir de son seul nom.
+# Le coût de chaque exécution est noté sur le serveur, pas dans ce dépôt.
+# Si le compte choisi n'a plus de crédit, l'exécution repart automatiquement sur le compte suivant.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tache:
+        description: "Nom de la consigne sur le serveur (lettres minuscules, chiffres, tirets)"
+        required: true
+      modele:
+        description: "Modèle"
+        type: choice
+        options: [claude-sonnet-5-5, claude-opus-5-5]
+        default: claude-sonnet-5-5
+      compte:
+        description: "Compte API essayé en premier"
+        type: choice
+        options: [A, B, C]
+        default: A
+      tours_max:
+        description: "Nombre maximal de tours"
+        type: choice
+        options: ["40", "80", "150"]
+        default: "80"
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Vérifier le nom de la consigne
+        env:
+          TACHE: ${{ inputs.tache }}
+        run: |
+          if ! printf '%s' "$TACHE" | grep -Eq '^[a-z0-9-]{3,60}$'; then
+            echo "::error::Nom de consigne invalide."; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Agent SSH
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+      - name: Faire confiance à l'hôte
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Lire la consigne sur le serveur
+        id: consigne
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER_SSH: ${{ secrets.HETZNER_USER || 'root' }}
+          TACHE: ${{ inputs.tache }}
+        run: |
+          ssh "$USER_SSH@$HOST" "cat /opt/axion-crm-pro/.claude-taches/$TACHE.md" > "$RUNNER_TEMP/consigne.md"
+          if [ ! -s "$RUNNER_TEMP/consigne.md" ]; then echo "::error::Consigne absente ou vide."; exit 1; fi
+          delim="FIN_CONSIGNE_$(openssl rand -hex 12)"
+          { echo "texte<<$delim"; cat "$RUNNER_TEMP/consigne.md"; echo; echo "$delim"; } >> "$GITHUB_OUTPUT"
+
+      - name: Claude (premier compte)
+        id: run1
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ inputs.compte == 'B' && secrets.ANTHROPIC_API_KEY_COMPTE_B || inputs.compte == 'C' && secrets.ANTHROPIC_API_KEY_COMPTE_C || secrets.ANTHROPIC_API_KEY_COMPTE_A }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: ${{ steps.consigne.outputs.texte }}
+          claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,WebFetch,TodoWrite"
+
+      - name: Crédit épuisé ? choisir le compte suivant
+        id: bascule
+        if: always()
+        env:
+          FICHIER: ${{ steps.run1.outputs.execution_file }}
+          COMPTE: ${{ inputs.compte }}
+        run: |
+          suivant=""
+          if [ -n "$FICHIER" ] && [ -f "$FICHIER" ] && grep -qi 'credit balance' "$FICHIER"; then
+            case "$COMPTE" in A) suivant=B ;; B) suivant=A ;; C) suivant=A ;; esac
+            echo "Crédit épuisé sur le compte $COMPTE : bascule vers $suivant."
+          fi
+          echo "suivant=$suivant" >> "$GITHUB_OUTPUT"
+
+      - name: Claude (compte suivant)
+        id: run2
+        if: steps.bascule.outputs.suivant != ''
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ steps.bascule.outputs.suivant == 'B' && secrets.ANTHROPIC_API_KEY_COMPTE_B || secrets.ANTHROPIC_API_KEY_COMPTE_A }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: ${{ steps.consigne.outputs.texte }}
+          claude_args: "--model ${{ inputs.modele }} --max-turns ${{ inputs.tours_max }} --allowedTools Bash,Read,Edit,Write,Glob,Grep,Agent,WebFetch,TodoWrite"
+
+      - name: Noter le coût sur le serveur
+        if: always()
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER_SSH: ${{ secrets.HETZNER_USER || 'root' }}
+          F1: ${{ steps.run1.outputs.execution_file }}
+          F2: ${{ steps.run2.outputs.execution_file }}
+          TACHE: ${{ inputs.tache }}
+          MODELE: ${{ inputs.modele }}
+          COMPTE: ${{ inputs.compte }}
+          SUIVANT: ${{ steps.bascule.outputs.suivant }}
+          C1: ${{ steps.run1.outputs.conclusion }}
+          C2: ${{ steps.run2.outputs.conclusion }}
+        run: |
+          cout() { [ -n "$1" ] && [ -f "$1" ] && jq -r '[.[] | select(.type=="result") | .total_cost_usd // 0] | add // 0' "$1" 2>/dev/null || echo 0; }
+          l1="$(date -u +%FT%TZ);${GITHUB_RUN_ID};${TACHE};${MODELE};${COMPTE};$(cout "$F1");${C1:-inconnu}"
+          lignes="$l1"
+          if [ -n "$SUIVANT" ]; then
+            lignes="$lignes
+          $(date -u +%FT%TZ);${GITHUB_RUN_ID};${TACHE};${MODELE};${SUIVANT};$(cout "$F2");${C2:-inconnu}"
+          fi
+          printf '%s\n' "$lignes" | sed 's/^ *//' | ssh "$USER_SSH@$HOST" "cat >> /opt/axion-crm-pro/depenses-code-claude.csv"
+          echo "Coût noté sur le serveur."
+
+      - name: Résultat
+        if: always()
+        env:
+          C1: ${{ steps.run1.outputs.conclusion }}
+          C2: ${{ steps.run2.outputs.conclusion }}
+          SUIVANT: ${{ steps.bascule.outputs.suivant }}
+        run: |
+          if [ -n "$SUIVANT" ]; then fin="$C2"; else fin="$C1"; fi
+          echo "Conclusion : ${fin:-inconnue}"
+          [ "$fin" = "success" ]

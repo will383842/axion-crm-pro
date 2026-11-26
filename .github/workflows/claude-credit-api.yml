@@ -89,6 +89,7 @@ jobs:
       c1: ${{ steps.bilan.outputs.c1 }}
       c2: ${{ steps.bilan.outputs.c2 }}
       suivant: ${{ steps.bascule.outputs.suivant }}
+      resume: ${{ steps.bilan.outputs.resume }}
     steps:
       - uses: actions/checkout@v4
 
@@ -182,8 +183,18 @@ jobs:
           F2: ${{ steps.run2.outputs.execution_file }}
           C1: ${{ steps.run1.outputs.conclusion }}
           C2: ${{ steps.run2.outputs.conclusion }}
+          SHA: ${{ github.sha }}
         run: |
           rm -f .consigne-claude.md
+          # Résumé de la réponse de Claude (fin du texte, tours, outils refusés), CHIFFRÉ car le dépôt est public.
+          # Chiffrement par CLÉ PUBLIQUE (certificat versionné, lu dans le commit d'origine) : aucun secret sur
+          # cette machine où Claude a eu Bash ; la clé privée n'existe que sur le serveur. Rien n'est affiché.
+          r="$RUNNER_TEMP/resume.json"; c="$RUNNER_TEMP/resume-cert.pem"
+          fichiers=(); for x in "$F1" "$F2"; do [ -n "$x" ] && [ -f "$x" ] && fichiers+=("$x"); done
+          jq -s '[.[] | .[]? | select(.type=="result") | {subtype, is_error, num_turns, duration_ms, total_cost_usd,
+                  refus: [.permission_denials[]? | .tool_name], fin: ((.result // "") | tostring | .[-3000:])}]'             "${fichiers[@]}" /dev/null > "$r" 2>/dev/null || echo '[]' > "$r"
+          git show "$SHA:.github/resume-claude-cert.pem" > "$c" 2>/dev/null             && echo "resume=$(openssl cms -encrypt -aes256 -binary -outform DER -in "$r" "$c" 2>/dev/null | base64 -w0)" >> "$GITHUB_OUTPUT"
+          rm -f "$r" "$c"
           cout() { [ -n "$1" ] && [ -f "$1" ] && jq -r '[.[] | select(.type=="result") | .total_cost_usd // 0] | add // 0' "$1" 2>/dev/null || echo 0; }
           # Copie du 1er run faite par le pas de bascule (chemins distincts depuis #804, copie gardée par prudence).
           if [ -n "$SUIVANT" ]; then f1="$RUNNER_TEMP/execution-1.json"; else f1="$F1"; fi
@@ -230,6 +241,21 @@ jobs:
           fi
           printf '%s\n' "$lignes" | ssh "$USER_SSH@$HOST" "cat >> /opt/axion-crm-pro/depenses-code-claude.csv"
           echo "Coût noté sur le serveur."
+
+      - name: Ranger le résumé chiffré sur le serveur (privé)
+        env:
+          HOST: ${{ secrets.HETZNER_HOST }}
+          USER_SSH: ${{ secrets.HETZNER_USER || 'root' }}
+          RESUME: ${{ needs.claude.outputs.resume }}
+        run: |
+          # Déchiffré SUR LE SERVEUR seulement (clé privée resume-cle.pem). Contenu non fiable : jamais exécuté.
+          [[ "$RESUME" =~ ^[A-Za-z0-9+/=]+$ ]] || { echo "Pas de résumé."; exit 0; }
+          d=/opt/axion-crm-pro/.claude-taches
+          if printf '%s' "$RESUME" | ssh "$USER_SSH@$HOST" "base64 -d | openssl cms -decrypt -inform DER -binary -inkey $d/resume-cle.pem 2>/dev/null | head -c 200000 > $d/journal/${GITHUB_RUN_ID}.json && [ -s $d/journal/${GITHUB_RUN_ID}.json ]"; then
+            echo "Résumé rangé."
+          else
+            echo "Résumé non rangé."
+          fi
 
       - name: Résultat
         env:

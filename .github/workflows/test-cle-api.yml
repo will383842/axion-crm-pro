@@ -1,0 +1,35 @@
+name: Test des clés API Claude
+
+# Diagnostic : appelle l'API Claude en direct (1 jeton, coût < 0,01 $) avec chaque clé,
+# pour distinguer « clé invalide », « crédit épuisé » et « Claude Code non couvert ».
+# N'affiche jamais la clé ni la réponse du modèle : seulement le code HTTP et le type d'erreur.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tester:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Tester chaque compte
+        env:
+          CLE_A: ${{ secrets.ANTHROPIC_API_KEY_COMPTE_A }}
+          CLE_B: ${{ secrets.ANTHROPIC_API_KEY_COMPTE_B }}
+          CLE_C: ${{ secrets.ANTHROPIC_API_KEY_COMPTE_C }}
+        run: |
+          for compte in A B C; do
+            var="CLE_$compte"; cle="${!var}"
+            if [ -z "$cle" ]; then echo "Compte $compte : secret vide"; continue; fi
+            code=$(curl -s -o "$RUNNER_TEMP/r.json" -w '%{http_code}' https://api.anthropic.com/v1/messages \
+              -H "x-api-key: $cle" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
+              -d '{"model":"claude-haiku-5-5","max_tokens":1,"messages":[{"role":"user","content":"ok"}]}')
+            type=$(jq -r '.error.type // "aucune"' "$RUNNER_TEMP/r.json" 2>/dev/null)
+            msg=$(jq -r '.error.message // ""' "$RUNNER_TEMP/r.json" 2>/dev/null | cut -c1-120)
+            echo "Compte $compte : HTTP $code, erreur=$type ${msg}"
+            rm -f "$RUNNER_TEMP/r.json"
+          done

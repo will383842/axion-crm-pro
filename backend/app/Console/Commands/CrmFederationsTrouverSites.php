@@ -123,6 +123,12 @@ class CrmFederationsTrouverSites extends Command
 
     public function handle(QuotaBrave $quota, RechercheBrave $brave, AppartenanceSite $appartenance, DomainFinderService $finder): int
     {
+        if (! config('crm.enrichissement.payant_actif')) {
+            $this->warn('Rien à faire : CRM_ENRICHISSEMENT_PAYANT_ACTIF=false (aucune requête Brave envoyée). Activez le flag après validation.');
+
+            return self::SUCCESS;
+        }
+
         $slug = (string) config('crm.ingest.business_workspace', 'axion-ia');
         $espace = DB::table('workspaces')->where('slug', $slug)->whereNull('deleted_at')->value('id');
         if ($espace === null) {

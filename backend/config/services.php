@@ -75,10 +75,11 @@ return [
         'places' => [
             'api_key' => env('GOOGLE_PLACES_API_KEY'),
             'cache_ttl_days' => (int) env('GOOGLE_PLACES_CACHE_TTL_DAYS', 30),
-            // Sprint H12 — Quota mensuel max d'appels (free tier ~$200 crédit/mois
-            // ≈ 11500 Text Search Pro). Au-delà, GooglePlacesClient skip + marque
-            // signals.google_places_pending=true pour retraitement le mois suivant.
-            'monthly_quota_limit' => (int) env('GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT', 11500),
+            // Sprint H12 — Quota mensuel max d'appels. PR 0 : le défaut passe à 0
+            // (aucun appel) pour couper la dépense dormante ; il faut le monter
+            // explicitement dans le .env pour réactiver Google Places. Au-delà,
+            // GooglePlacesClient skip + marque signals.google_places_pending=true.
+            'monthly_quota_limit' => (int) env('GOOGLE_PLACES_MONTHLY_QUOTA_LIMIT', 0),
             // Sprint H14 — Smart skip : ne pas appeler Google Places si l'entreprise
             // a DÉJÀ email exploitable + phone + website. Économise quota sans
             // perdre de leads exploitables (la note Google + photos sont "nice to

@@ -59,6 +59,7 @@ function fakeLlmReturning(string $jsonText): void
 
 beforeEach(function () {
     config()->set('services.media.journalists_enabled', true);
+    config()->set('crm.enrichissement.payant_actif', true);
     // Page ours fakee : >= 500 caracteres de texte pour passer MIN_BODY_LENGTH.
     Http::fake([
         '*' => Http::response(
@@ -115,5 +116,29 @@ it('refuse si MEDIA_JOURNALISTS_ENABLED est false', function () {
     makeJournoMedia($ws);
 
     $this->artisan('journalists:scrape-ours')->assertExitCode(1);
+    expect(Journalist::count())->toBe(0);
+});
+
+it('ne fait rien quand l\'interrupteur payant est fermé', function () {
+    config()->set('crm.enrichissement.payant_actif', false);
+    makeJournoMedia(makeJournoWorkspace());
+    $llm = new class implements LLMClient
+    {
+        public int $appels = 0;
+
+        public function complete(LLMRequestData $request): LLMResponseData
+        {
+            $this->appels++;
+
+            return new LLMResponseData(text: '{}', providerUsed: 'mock', modelUsed: 'mock', promptTemplateSlug: $request->useCaseSlug);
+        }
+    };
+    app()->instance(LLMClient::class, $llm);
+
+    // Tâche planifiée chaque jour : l'interrupteur fermé n'est pas une panne (code 0).
+    $this->artisan('journalists:scrape-ours')->assertExitCode(0);
+
+    expect($llm->appels)->toBe(0);
+    Http::assertNothingSent();
     expect(Journalist::count())->toBe(0);
 });

@@ -20,6 +20,9 @@ it('returns signals.legal.siteweb when present', function () {
 
 it('returns first non-blacklist URL from Brave Search', function () {
     Config::set('services.brave.api_key', 'fake-brave-key');
+    // Ce test vérifie la recherche Brave quand l'interrupteur est ouvert
+    // (PR 0 : fermé par défaut, ce qui est voulu).
+    Config::set('crm.enrichissement.payant_actif', true);
     // Depuis le 2026-09-29, chaque requête Brave est réservée dans le quota
     // mensuel, et l'enrichissement a un sous-quota NUL par défaut. Compteur
     // factice en mémoire, sous-quota ouvert : pas de base en test unitaire.
@@ -42,6 +45,7 @@ it('returns first non-blacklist URL from Brave Search', function () {
 });
 
 it('falls back to Pages Jaunes when MOCK_SCRAPERS=false and Brave empty', function () {
+    Config::set('crm.enrichissement.annuaires_actifs', true);
     Config::set('services.brave.api_key', null);
     Config::set('services.scrapers.mock', false);
     Http::fake([

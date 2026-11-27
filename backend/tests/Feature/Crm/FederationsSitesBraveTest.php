@@ -47,7 +47,18 @@ const FSB_CLE = 'CLE-BRAVE-SECRETE-0123456789';
 beforeEach(function () {
     Config::set('services.brave.api_key', FSB_CLE);
     Config::set('crm.brave.quota_mensuel', 100);
+    Config::set('crm.enrichissement.payant_actif', true);
     Http::preventStrayRequests();
+});
+
+test('payant_actif fermé : sortie propre, aucune requête Brave', function () {
+    Config::set('crm.enrichissement.payant_actif', false);
+
+    $this->artisan('crm:federations:trouver-sites')
+        ->expectsOutputToContain('CRM_ENRICHISSEMENT_PAYANT_ACTIF=false')
+        ->assertExitCode(0);
+
+    Http::assertNothingSent();
 });
 
 function fsbEspace(): string

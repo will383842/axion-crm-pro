@@ -49,6 +49,9 @@ final class PoCompteurs
     /** Numéros lus hors des pages de mentions légales (null = les mêmes que `$telephones`). */
     public static ?array $horsMentions = null;
 
+    /** @var list<bool> Valeur de `$garderAnnuaires` reçue à chaque recherche de domaine. */
+    public static array $garderAnnuaires = [];
+
     /** Vrai : aucune page du site n'a répondu (panne réseau). */
     public static bool $aucunePage = false;
 
@@ -58,6 +61,7 @@ final class PoCompteurs
     public static function reset(): void
     {
         self::$n = [];
+        self::$garderAnnuaires = [];
         self::$domaines = [];
         self::$telephones = ['0100000077'];
         self::$horsMentions = null;
@@ -150,9 +154,10 @@ beforeEach(function () {
     {
         public function __construct() {}
 
-        public function findAvecMethode(Company $company, bool $sansBrave = false): ?array
+        public function findAvecMethode(Company $company, bool $sansBrave = false, bool $garderAnnuaires = false): ?array
         {
             PoCompteurs::$domaines[] = [(string) $company->denomination, $sansBrave];
+            PoCompteurs::$garderAnnuaires[] = $garderAnnuaires;
 
             return ['url' => 'https://zz-trouve.example/', 'methode' => 'brave'];
         }
@@ -237,6 +242,9 @@ function poLigne(int $id): object
 
 function poEnrichir(string $espace, int $id, bool $sansPayant): void
 {
+    if (! $sansPayant) {
+        config()->set('crm.enrichissement.payant_actif', true);
+    }
     WorkspaceContext::run($espace, function () use ($id, $sansPayant): void {
         $w = app(WaterfallOrchestrator::class);
         $c = Company::findOrFail($id);
@@ -331,7 +339,8 @@ it('EnrichirSiteOfficineJob : site et téléphone posés quand ils manquent, rec
     expect($l->website)->toBe('https://zz-trouve.example/')
         ->and($l->phone)->toBe('0100000077')
         ->and($l->denomination)->toBe('ZZ PERSONNE NOM')
-        ->and(PoCompteurs::$domaines)->toBe([['Pharmacie ZZ Enseigne', true]]);
+        ->and(PoCompteurs::$domaines)->toBe([['Pharmacie ZZ Enseigne', true]])
+        ->and(PoCompteurs::$garderAnnuaires)->toBe([true]);
 });
 
 it('EnrichirSiteOfficineJob : sans enseigne, le nom de la personne n est jamais cherché', function () {

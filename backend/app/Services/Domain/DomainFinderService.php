@@ -93,7 +93,7 @@ class DomainFinderService
      */
     public function find(Company $company): ?string
     {
-        return $this->findAvecMethode($company)['url'] ?? null;
+        return $this->findAvecMethode($company, ! config('crm.enrichissement.payant_actif', false))['url'] ?? null;
     }
 
     /**
@@ -107,10 +107,12 @@ class DomainFinderService
      * `SiteFiable`), `pages-jaunes`.
      *
      * `$sansBrave` : saute la stratégie Brave (plafond 0 pour ce chemin).
+     * `$garderAnnuaires` : le mode sans payant et le job officine gardent Pages
+     * Jaunes comme avant la PR 0, sans passer par l'interrupteur.
      *
      * @return array{url: string, methode: string}|null
      */
-    public function findAvecMethode(Company $company, bool $sansBrave = false): ?array
+    public function findAvecMethode(Company $company, bool $sansBrave = false, bool $garderAnnuaires = false): ?array
     {
         // Stratégie 1 : signals.legal.siteweb (toujours en priorité)
         $signals = $company->signals ?? [];
@@ -158,7 +160,8 @@ class DomainFinderService
         }
 
         // Stratégie 4 : Pages Jaunes — uniquement quand scrapers réels activés
-        if (config('services.scrapers.mock', true) === false) {
+        // ET interrupteur `crm.enrichissement.annuaires_actifs` ouvert (PR 0).
+        if (($garderAnnuaires || config('crm.enrichissement.annuaires_actifs', false)) && config('services.scrapers.mock', true) === false) {
             return self::trouve($this->searchPagesJaunes($company->denomination, $ville), self::METHODE_PAGES_JAUNES);
         }
 

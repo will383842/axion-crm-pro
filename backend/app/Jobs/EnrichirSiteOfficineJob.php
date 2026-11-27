@@ -73,7 +73,7 @@ class EnrichirSiteOfficineJob implements ShouldQueue
                 if ($enseigne !== '') {
                     $copie = clone $company;
                     $copie->denomination = $enseigne;
-                    $trouve = $domaines->findAvecMethode($copie, true);
+                    $trouve = $domaines->findAvecMethode($copie, true, true);
                 }
                 if ($trouve !== null) {
                     // Écriture conditionnelle : jamais par-dessus un site posé entre-temps.

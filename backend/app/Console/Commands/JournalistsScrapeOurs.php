@@ -61,6 +61,12 @@ class JournalistsScrapeOurs extends Command
             return self::FAILURE;
         }
 
+        if (! config('crm.enrichissement.payant_actif')) {
+            $this->warn('Rien à faire : CRM_ENRICHISSEMENT_PAYANT_ACTIF=false (aucun appel LLM payant). Activez le flag après validation.');
+
+            return self::SUCCESS;
+        }
+
         $limit = max(1, (int) $this->option('limit'));
         $processed = 0;
         $created = 0;

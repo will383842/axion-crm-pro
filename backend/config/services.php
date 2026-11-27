@@ -172,4 +172,32 @@ return [
         'hash_chain_secret' => (string) env('AUDIT_HASH_CHAIN_SECRET', ''),
     ],
 
+    /* ---------------------------------------------------------------------
+     | Claude (enrichissement des sites) : cles choisies par configuration
+     | ---------------------------------------------------------------------
+     | `cles` : alias vers la valeur de la variable d'environnement du compte.
+     | `cles_enrichissement` : liste ORDONNEE des alias a utiliser ; quand un
+     | compte n'a plus de credit, on passe au suivant. Seul l'alias est ecrit
+     | dans les journaux, jamais la cle. Le modele est fixe : la table de prix
+     | (`PrixClaude`) ne connait que celui-la. Apres modification : `config:cache`.
+     | --------------------------------------------------------------------- */
+    'anthropic' => [
+        'cles' => [
+            'compte_a' => (string) env('ANTHROPIC_API_KEY_COMPTE_A', ''),
+            'compte_b' => (string) env('ANTHROPIC_API_KEY_COMPTE_B', ''),
+            'compte_c' => (string) env('ANTHROPIC_API_KEY_COMPTE_C', ''),
+        ],
+        'cles_enrichissement' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('CRM_CLAUDE_CLES_ENRICHISSEMENT', '')),
+        ))),
+        'modele' => 'claude-haiku-5-5',
+        'version_api' => '2023-06-01',
+        'domaines_bloques' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('CRM_CLAUDE_DOMAINES_BLOQUES', '')),
+        ))),
+        'plafond_total_usd' => env('CRM_CLAUDE_PLAFOND_TOTAL_USD') !== null ? (float) env('CRM_CLAUDE_PLAFOND_TOTAL_USD') : null,
+    ],
+
 ];

@@ -90,6 +90,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
 
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
@@ -148,12 +149,22 @@ jobs:
           sudo chown -R runner: "$GITHUB_WORKSPACE/.git" && sudo chmod -R go-w "$GITHUB_WORKSPACE/.git"
           sudo -u essai -H git config --global --add safe.directory "$GITHUB_WORKSPACE"
           chmod 644 "$RUNNER_TEMP/reglages-essai.json"
+          # Auto-controle avant le modele : l'utilisateur isole ne doit ni ecrire dans les fichiers de commandes du runner
+          # (GITHUB_ENV, GITHUB_PATH...) ni obtenir sudo. Sinon on echoue sans lancer le modele.
+          for f in "$GITHUB_ENV" "$GITHUB_PATH" "$GITHUB_OUTPUT" "$GITHUB_STATE" "$GITHUB_STEP_SUMMARY"; do
+            if [ -n "$f" ] && sudo -u essai test -w "$f"; then
+              echo "::error::Isolement insuffisant : l'utilisateur essai peut ecrire dans un fichier de commandes du runner."; exit 1
+            fi
+          done
+          if sudo -u essai sudo -n true 2>/dev/null; then
+            echo "::error::Isolement insuffisant : l'utilisateur essai peut utiliser sudo."; exit 1
+          fi
 
       - name: Lancer Claude Code (modele tiers)
         env:
           NOM: ${{ inputs.nom }}
           ANTHROPIC_BASE_URL: ${{ inputs.fournisseur == 'kimi' && 'https://api.moonshot.ai/anthropic' || 'https://api.deepseek.com/anthropic' }}
-          ANTHROPIC_AUTH_TOKEN: ${{ inputs.fournisseur == 'kimi' && secrets.KIMI_API_KEY || secrets.DEEPSEEK_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ inputs.fournisseur == 'kimi' && secrets.KIMI_API_KEY || inputs.fournisseur == 'deepseek' && secrets.DEEPSEEK_API_KEY || '' }}
           CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
           CLAUDE_CODE_ATTRIBUTION_HEADER: "0"
         run: |
@@ -183,10 +194,19 @@ jobs:
             --disallowedTools "WebFetch" "WebSearch" "Bash(node:*)" "Bash(npm:*)" "Bash(npx:*)" "Bash(git commit:*)" "Bash(git config:*)" \
             > "$RUNNER_TEMP/essai/essai-$NOM.json" 2> "$RUNNER_TEMP/essai/essai-$NOM.err"
           CODE=$?
-          sudo pkill -KILL -u essai || true; sudo chown -R runner: "$GITHUB_WORKSPACE"
           set -e
           # Depot public : aucune sortie du modele n'est journalisee, seulement le code de sortie.
           [ "$CODE" -eq 0 ] || { echo "::error::claude s'est termine avec le code $CODE"; exit 1; }
+
+      # Nettoyage TOUJOURS execute, avant tout upload : tue tout processus restant du modele (deux passes), puis reprend la
+      # propriete de l'espace de travail. Separe de l'etape du modele pour ne pas dependre de sa fin.
+      - name: Nettoyer apres le modele (toujours)
+        if: always()
+        run: |
+          sudo pkill -KILL -u essai || true
+          sleep 1
+          sudo pkill -KILL -u essai || true
+          sudo chown -R runner: "$GITHUB_WORKSPACE"
 
       - name: Produire le correctif
         env:
@@ -252,14 +272,15 @@ jobs:
             const fs = require("fs");
             const j = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/essai/essai-" + process.env.NOM + ".json", "utf8"));
             const s = Array.isArray(j) ? (j.find(x => x.type === "result") || {}) : j;
-            if (s.is_error || s.subtype !== "success") { console.error("::error::Sortie en erreur ou non terminee (subtype=" + s.subtype + ")."); process.exit(1); }
+            if (s.is_error || s.subtype !== "success") { console.error("::error::Sortie en erreur ou non terminee (subtype=" + String(s.subtype).replace(/[^a-z_]/g, "").slice(0, 20) + ")."); process.exit(1); }
             const noms = Object.keys(s.modelUsage || {});
-            console.log("Modeles utilises : " + JSON.stringify(noms.filter(n => /^[A-Za-z0-9._:\/\[\]-]{1,40}$/.test(n) && !/^sk-/i.test(n))));
+            const sur = x => /^[A-Za-z0-9._:\/\[\]-]{1,40}$/.test(x) && !/^sk-/i.test(x);
+            console.log("Modeles utilises : " + JSON.stringify(noms.filter(sur)));
             if (noms.length === 0) { console.error("::error::modelUsage vide : modele reel non verifiable."); process.exit(1); }
             const claude = noms.filter(n => /claude|anthropic/i.test(n));
-            if (claude.length) { console.error("::error::Repli silencieux sur un modele Claude : " + claude.join(", ")); process.exit(1); }
+            if (claude.length) { console.error("::error::Repli silencieux sur un modele Claude : " + claude.filter(sur).join(", ")); process.exit(1); }
             const norme = x => x.replace(/\[[^\]]*\]$/, "").toLowerCase();
-            if (!noms.some(n => norme(n) === norme(process.env.MODELE))) { console.error("::error::Modele attendu absent (" + process.env.MODELE + ") parmi " + noms.join(", ")); process.exit(1); }
+            if (!noms.some(n => norme(n) === norme(process.env.MODELE))) { console.error("::error::Modele attendu absent (" + process.env.MODELE + ") parmi " + noms.filter(sur).join(", ")); process.exit(1); }
           '
 
       - name: Appliquer le correctif
@@ -275,6 +296,10 @@ jobs:
           git -c core.quotePath=false diff --cached --no-renames --name-only > "$RUNNER_TEMP/touches.txt"
           if [ ! -s "$RUNNER_TEMP/touches.txt" ]; then echo "::error::Diff vide : rien n'a ete code."; exit 1; fi
           if grep -q '^"' "$RUNNER_TEMP/touches.txt"; then echo "::error::Nom de fichier entre guillemets (caracteres speciaux)."; exit 1; fi
+          # Aucun nom de fichier n'est affiche avant d'avoir verifie qu'il ne contient que des caracteres sobres (journal public).
+          if grep -Evq '^[][A-Za-z0-9._/@()+-]{1,200}$' "$RUNNER_TEMP/touches.txt"; then
+            echo "::error::Nom de fichier a caracteres non autorises ou trop long (liste non affichee)."; exit 1
+          fi
           echo "Fichiers touches :"; cat "$RUNNER_TEMP/touches.txt"
           # Chemins interdits (insensible a la casse). A TOUT niveau : .git* (dont .github, .gitignore, .gitleaks*), Dockerfile*,
           # docker-compose*, .dockerignore, .env*, .npmrc, .mcp.json, .claude/, AGENTS.md, CLAUDE.md, package.json, composer.json,
@@ -284,7 +309,7 @@ jobs:
           # backend/tests/Feature/NonRegression/ dont LISTE.json, backend/tests/ci/, harnais Pest, frontend/tests/non-regression/,
           # backend/phpstan*, phpunit*, pint.json, frontend/eslint-suppressions*), et backend/database/migrations/ : seul prisma/
           # a ete explicitement autorise pour axion-ia ; les migrations du CRM restent donc interdites jusqu'a decision du proprietaire.
-          INTERDIT='(^|/)\.git[^/]*|(^|/)\.dockerignore$|(^|/)(Dockerfile|docker-compose|Caddyfile)[^/]*$|(^|/)\.env|(^|/)\.npmrc$|(^|/)\.mcp\.json$|(^|/)\.claude/|(^|/)(AGENTS|CLAUDE)\.md$|(^|/)(package|composer)\.json$|(^|/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|npm-shrinkwrap\.json|bun\.lockb?|composer\.lock|pnpm-workspace\.yaml)$|(^|/)tsconfig[^/]*\.json$|(^|/)[^/]*\.config\.[^/]*$|(^|/)(Makefile|\.nvmrc|\.editorconfig|\.trivyignore\.yaml)$|(^|/)\.(eslintrc|prettierrc|prettierignore)[^/]*$|^(infra/|envoi-serveur/|backend/database/migrations/|backend/tests/(Feature/Infra/|Feature/NonRegression/|ci/|Pest\.php$|bootstrap\.php$|TestCase\.php$|QUARANTAINE\.md$)|frontend/tests/non-regression/|frontend/eslint-suppressions[^/]*$|backend/(phpstan|phpunit)[^/]*$|backend/pint\.json$)|^frontend/tests/couverture-e2e\.test\.ts$|^frontend/tests/e2e/couverture-e2e\.json$|^backend/tests/Support/|^workers/tests/(collecte-vitest-complete|drapeau-simulacres)\.test\.ts$|^backend/app/Envoi/Gardes/|/Garde[^/]*\.php$|secret|\.pem$|\.key$|credential'
+          INTERDIT='(^|/)\.git[^/]*|(^|/)\.dockerignore$|(^|/)(Dockerfile|docker-compose|Caddyfile)[^/]*$|(^|/)\.env|(^|/)\.npmrc$|(^|/)\.mcp\.json$|(^|/)\.claude/|(^|/)(AGENTS|CLAUDE)\.md$|(^|/)(package|composer)\.json$|(^|/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|npm-shrinkwrap\.json|bun\.lockb?|composer\.lock|pnpm-workspace\.yaml)$|(^|/)tsconfig[^/]*\.json$|(^|/)[^/]*\.config\.[^/]*$|(^|/)(Makefile|\.nvmrc|\.editorconfig|\.trivyignore\.yaml)$|(^|/)\.(eslintrc|prettierrc|prettierignore)[^/]*$|^(infra/|envoi-serveur/|backend/database/migrations/|backend/tests/(Feature/Infra/|Feature/NonRegression/|ci/|Pest\.php$|bootstrap\.php$|TestCase\.php$|QUARANTAINE\.md$)|frontend/tests/non-regression/|frontend/eslint-suppressions[^/]*$|backend/(phpstan|phpunit)[^/]*$|backend/pint\.json$)|^frontend/tests/couverture-e2e\.test\.ts$|^frontend/tests/e2e/couverture-e2e\.json$|^backend/tests/Support/|^workers/tests/(collecte-vitest-complete|drapeau-simulacres)\.test\.ts$|^backend/app/Envoi/Gardes/|/Garde[^/]*\.php$|secret|\.pem$|\.key$|credential|(^|/)\.pnpmfile\.c?js$|(^|/)\.vscode/|(^|/)\.devcontainer/|(^|/)\.husky/'
           if grep -Eiq "$INTERDIT" "$RUNNER_TEMP/touches.txt"; then
             echo "::error::Fichier(s) interdit(s) touche(s) :"; grep -Ei "$INTERDIT" "$RUNNER_TEMP/touches.txt"; exit 1
           fi

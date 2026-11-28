@@ -163,7 +163,7 @@ jobs:
             echo "::error::Isolement insuffisant : l'utilisateur essai peut utiliser sudo."; exit 1
           fi
           # L'utilisateur isole doit pouvoir lancer pnpm et claude depuis la copie (outils lisibles hors de /home/runner).
-          sudo -u essai -H env "PATH=$PATH" sh -c 'cd /srv/essai && pnpm --version && claude --version' >/dev/null || { echo "::error::essai ne peut pas lancer pnpm ou claude."; exit 1; }
+          sudo -u essai -H env "PATH=$PATH" sh -c 'cd /srv/essai && pnpm --version && claude --version && pnpm --dir frontend exec vitest --version && pnpm --dir workers exec vitest --version && php -v && php backend/vendor/bin/pest --version' >/dev/null || { echo "::error::essai ne peut pas lancer pnpm, claude, vitest, php ou pest."; exit 1; }
 
       - name: Lancer Claude Code (modele tiers)
         env:
@@ -222,6 +222,12 @@ jobs:
           # Reprise des fichiers de la copie du modele (processus deja tues par l'etape de nettoyage). .git et les dependances
           # installees et non suivies (node_modules, backend/vendor) ne sont ni ecrases ni effaces. Liens, peripheriques et tubes
           # ne sont pas suivis comme fichiers speciaux ; un lien symbolique est refuse plus bas.
+          # Fermeture de la course : plus aucun processus ni tache de l'utilisateur isole ne peut toucher la copie pendant la reprise.
+          sudo crontab -r -u essai 2>/dev/null || true
+          sudo usermod -L essai
+          sudo pkill -KILL -u essai || true
+          sudo chown root:root /srv/essai
+          sudo chmod 700 /srv/essai
           sudo rsync -a --delete --no-owner --no-group --no-devices --no-specials --exclude=/.git --exclude=node_modules --exclude=/backend/vendor /srv/essai/ "$GITHUB_WORKSPACE/"
           sudo chown -R runner: "$GITHUB_WORKSPACE"
           git -c core.fsmonitor=false -c core.hooksPath=/dev/null add -A
@@ -307,6 +313,10 @@ jobs:
         run: |
           if git diff --cached --no-renames --raw | awk '$1 ~ /^:(120000|160000)$/ || $2 ~ /^(120000|160000)$/ {f=1} END{exit !f}'; then
             echo "::error::Lien symbolique ou sous-module dans le correctif."; exit 1
+          fi
+          # Aucun changement de mode (dont le passage en executable) et aucun nouveau fichier executable.
+          if git diff --cached --no-renames --raw | awk '($1 != ":000000" && $2 != "000000" && substr($1,2) != $2) || ($1 == ":000000" && $2 == "100755") {f=1} END{exit !f}'; then
+            echo "::error::Changement de mode ou fichier executable dans le correctif."; exit 1
           fi
           git -c core.quotePath=false diff --cached --no-renames --name-only > "$RUNNER_TEMP/touches.txt"
           if [ ! -s "$RUNNER_TEMP/touches.txt" ]; then echo "::error::Diff vide : rien n'a ete code."; exit 1; fi

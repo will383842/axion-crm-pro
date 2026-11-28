@@ -85,6 +85,7 @@ jobs:
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
+          dest: ${{ runner.tool_cache }}/setup-pnpm
           version: ${{ env.PNPM_VERSION }}
 
       - uses: actions/setup-node@v7
@@ -145,10 +146,12 @@ jobs:
       - name: Isoler le modele (utilisateur sans sudo)
         run: |
           sudo useradd -m -s /bin/bash essai
-          sudo chown -R essai: "$GITHUB_WORKSPACE"
-          sudo chown -R runner: "$GITHUB_WORKSPACE/.git" && sudo chmod -R go-w "$GITHUB_WORKSPACE/.git"
-          sudo -u essai -H git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          chmod 644 "$RUNNER_TEMP/reglages-essai.json"
+          # /home/runner est en 750 : l'utilisateur isole ne peut pas traverser jusqu'a l'espace de travail. Le modele
+          # travaille donc sur une COPIE dans /srv/essai ; l'espace de travail du runner (et son .git) reste hors de sa portee.
+          sudo install -d -o essai -g essai -m 700 /srv/essai
+          sudo cp -a "$GITHUB_WORKSPACE/." /srv/essai/ && sudo chown -R essai: /srv/essai
+          sudo install -m 644 "$RUNNER_TEMP/reglages-essai.json" /srv/reglages-essai.json
+          sudo -u essai -H git config --global --add safe.directory /srv/essai
           # Auto-controle avant le modele : l'utilisateur isole ne doit ni ecrire dans les fichiers de commandes du runner
           # (GITHUB_ENV, GITHUB_PATH...) ni obtenir sudo. Sinon on echoue sans lancer le modele.
           for f in "$GITHUB_ENV" "$GITHUB_PATH" "$GITHUB_OUTPUT" "$GITHUB_STATE" "$GITHUB_STEP_SUMMARY"; do
@@ -159,6 +162,8 @@ jobs:
           if sudo -u essai sudo -n true 2>/dev/null; then
             echo "::error::Isolement insuffisant : l'utilisateur essai peut utiliser sudo."; exit 1
           fi
+          # L'utilisateur isole doit pouvoir lancer pnpm et claude depuis la copie (outils lisibles hors de /home/runner).
+          sudo -u essai -H env "PATH=$PATH" sh -c 'cd /srv/essai && pnpm --version && claude --version' >/dev/null || { echo "::error::essai ne peut pas lancer pnpm ou claude."; exit 1; }
 
       - name: Lancer Claude Code (modele tiers)
         env:
@@ -177,6 +182,8 @@ jobs:
           export ANTHROPIC_DEFAULT_HAIKU_MODEL="$MODELE"
           export ANTHROPIC_SMALL_FAST_MODEL="$MODELE"
           mkdir -p "$RUNNER_TEMP/essai"
+          # Le modele travaille dans la copie /srv/essai ; la sortie JSON est ecrite par ce shell (runner) en chemin absolu.
+          cd /srv/essai
           # La fiche vient du fichier d'evenement du runner (depot public : jamais par env:, jamais affichee).
           FICHE="$(jq -r '.inputs.fiche // empty' "$GITHUB_EVENT_PATH")"
           [ -n "$FICHE" ] || { echo "::error::Fiche vide."; exit 1; }
@@ -187,7 +194,7 @@ jobs:
           FICHE :
           $FICHE" \
             --output-format json \
-            --settings "$RUNNER_TEMP/reglages-essai.json" \
+            --settings /srv/reglages-essai.json \
             --permission-mode acceptEdits \
             --setting-sources user --strict-mcp-config \
             --allowedTools "Read" "Edit" "Write" "Glob" "Grep" "Bash(pnpm --dir frontend exec vitest run:*)" "Bash(pnpm --dir workers exec vitest run:*)" "Bash(php backend/vendor/bin/pest:*)" "Bash(git status)" "Bash(git diff:*)" \
@@ -212,7 +219,15 @@ jobs:
         env:
           NOM: ${{ inputs.nom }}
         run: |
+          # Reprise des fichiers de la copie du modele (processus deja tues par l'etape de nettoyage). .git et les dependances
+          # installees et non suivies (node_modules, backend/vendor) ne sont ni ecrases ni effaces. Liens, peripheriques et tubes
+          # ne sont pas suivis comme fichiers speciaux ; un lien symbolique est refuse plus bas.
+          sudo rsync -a --delete --no-owner --no-group --no-devices --no-specials --exclude=/.git --exclude=node_modules --exclude=/backend/vendor /srv/essai/ "$GITHUB_WORKSPACE/"
+          sudo chown -R runner: "$GITHUB_WORKSPACE"
           git -c core.fsmonitor=false -c core.hooksPath=/dev/null add -A
+          if git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff --cached --no-renames --raw | awk '$1 ~ /^:(120000|160000)$/ || $2 ~ /^(120000|160000)$/ {f=1} END{exit !f}'; then
+            echo "::error::Lien symbolique ou sous-module dans le correctif du modele."; exit 1
+          fi
           git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff --cached --binary --full-index --no-renames "$GITHUB_SHA" > "$RUNNER_TEMP/essai/essai-$NOM.patch"
 
       - name: Sauver le correctif et la sortie JSON en artefact
@@ -290,7 +305,7 @@ jobs:
 
       - name: Garde des chemins interdits
         run: |
-          if git diff --cached --no-renames --raw | awk '{print $2}' | grep -Eq '^(120000|160000)$'; then
+          if git diff --cached --no-renames --raw | awk '$1 ~ /^:(120000|160000)$/ || $2 ~ /^(120000|160000)$/ {f=1} END{exit !f}'; then
             echo "::error::Lien symbolique ou sous-module dans le correctif."; exit 1
           fi
           git -c core.quotePath=false diff --cached --no-renames --name-only > "$RUNNER_TEMP/touches.txt"

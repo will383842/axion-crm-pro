@@ -83,7 +83,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -91,7 +91,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: ${{ env.PHP_VERSION }}
           extensions: pdo, pdo_pgsql, redis, intl, mbstring, bcmath, zip
@@ -141,6 +141,14 @@ jobs:
           }
           JSON
 
+      - name: Isoler le modele (utilisateur sans sudo)
+        run: |
+          sudo useradd -m -s /bin/bash essai
+          sudo chown -R essai: "$GITHUB_WORKSPACE"
+          sudo chown -R runner: "$GITHUB_WORKSPACE/.git" && sudo chmod -R go-w "$GITHUB_WORKSPACE/.git"
+          sudo -u essai -H git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          chmod 644 "$RUNNER_TEMP/reglages-essai.json"
+
       - name: Lancer Claude Code (modele tiers)
         env:
           NOM: ${{ inputs.nom }}
@@ -155,23 +163,27 @@ jobs:
           export ANTHROPIC_DEFAULT_OPUS_MODEL="$MODELE"
           export ANTHROPIC_DEFAULT_SONNET_MODEL="$MODELE"
           export CLAUDE_CODE_SUBAGENT_MODEL="$MODELE"
+          export ANTHROPIC_DEFAULT_HAIKU_MODEL="$MODELE"
+          export ANTHROPIC_SMALL_FAST_MODEL="$MODELE"
           mkdir -p "$RUNNER_TEMP/essai"
           # La fiche vient du fichier d'evenement du runner (depot public : jamais par env:, jamais affichee).
           FICHE="$(jq -r '.inputs.fiche // empty' "$GITHUB_EVENT_PATH")"
           [ -n "$FICHE" ] || { echo "::error::Fiche vide."; exit 1; }
           RAPPEL="CONSIGNES FIXES : travaille sur la fiche ci-dessous seulement. Ne touche jamais a .github/, aux Dockerfile*, a infra/, aux gardes et filets de non-regression (backend/tests/Feature/Infra/, backend/tests/Feature/NonRegression/, backend/tests/ci/, frontend/tests/non-regression/, phpstan*, phpunit*, eslint-suppressions*), aux migrations, ni aux fichiers de secrets ou d'environnement. Ne modifie ni package.json, composer.json ni les fichiers de verrouillage. Lance les tests cibles existants qui concernent ta fiche, s'il y en a : pnpm --dir frontend exec vitest run <fichier>, pnpm --dir workers exec vitest run <fichier>, ou php backend/vendor/bin/pest --configuration=backend/phpunit-ci.xml <fichier> (tests unitaires seulement : pas de base de donnees ici). Pas de commit : laisse les modifications dans l'arbre de travail."
           set +e
-          env -u GITHUB_ENV -u GITHUB_STEP_SUMMARY -u GITHUB_PATH -u GITHUB_OUTPUT claude -p "$RAPPEL
+          sudo -u essai -H --preserve-env=ANTHROPIC_BASE_URL,ANTHROPIC_AUTH_TOKEN,ANTHROPIC_MODEL,ANTHROPIC_DEFAULT_OPUS_MODEL,ANTHROPIC_DEFAULT_SONNET_MODEL,ANTHROPIC_DEFAULT_HAIKU_MODEL,ANTHROPIC_SMALL_FAST_MODEL,CLAUDE_CODE_SUBAGENT_MODEL,CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC,CLAUDE_CODE_ATTRIBUTION_HEADER env "PATH=$PATH" claude -p "$RAPPEL
 
           FICHE :
           $FICHE" \
             --output-format json \
             --settings "$RUNNER_TEMP/reglages-essai.json" \
             --permission-mode acceptEdits \
+            --setting-sources user --strict-mcp-config \
             --allowedTools "Read" "Edit" "Write" "Glob" "Grep" "Bash(pnpm --dir frontend exec vitest run:*)" "Bash(pnpm --dir workers exec vitest run:*)" "Bash(php backend/vendor/bin/pest:*)" "Bash(git status)" "Bash(git diff:*)" \
             --disallowedTools "WebFetch" "WebSearch" "Bash(node:*)" "Bash(npm:*)" "Bash(npx:*)" "Bash(git commit:*)" "Bash(git config:*)" \
             > "$RUNNER_TEMP/essai/essai-$NOM.json" 2> "$RUNNER_TEMP/essai/essai-$NOM.err"
           CODE=$?
+          sudo pkill -KILL -u essai || true; sudo chown -R runner: "$GITHUB_WORKSPACE"
           set -e
           # Depot public : aucune sortie du modele n'est journalisee, seulement le code de sortie.
           [ "$CODE" -eq 0 ] || { echo "::error::claude s'est termine avec le code $CODE"; exit 1; }
@@ -180,8 +192,8 @@ jobs:
         env:
           NOM: ${{ inputs.nom }}
         run: |
-          git add -A
-          git diff --cached --binary --full-index --no-renames "$GITHUB_SHA" > "$RUNNER_TEMP/essai/essai-$NOM.patch"
+          git -c core.fsmonitor=false -c core.hooksPath=/dev/null add -A
+          git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff --cached --binary --full-index --no-renames "$GITHUB_SHA" > "$RUNNER_TEMP/essai/essai-$NOM.patch"
 
       - name: Sauver le correctif et la sortie JSON en artefact
         if: always() && steps.valider.outcome == 'success'
@@ -192,6 +204,7 @@ jobs:
             ${{ runner.temp }}/essai/essai-${{ inputs.nom }}.json
             ${{ runner.temp }}/essai/essai-${{ inputs.nom }}.patch
           if-no-files-found: warn
+          retention-days: 1
 
   verifier-correctif:
     name: verifier le correctif (confiance, lecture seule)
@@ -241,9 +254,9 @@ jobs:
             const s = Array.isArray(j) ? (j.find(x => x.type === "result") || {}) : j;
             if (s.is_error || s.subtype !== "success") { console.error("::error::Sortie en erreur ou non terminee (subtype=" + s.subtype + ")."); process.exit(1); }
             const noms = Object.keys(s.modelUsage || {});
-            console.log("Modeles utilises : " + JSON.stringify(noms));
+            console.log("Modeles utilises : " + JSON.stringify(noms.filter(n => /^[A-Za-z0-9._:\/\[\]-]{1,40}$/.test(n) && !/^sk-/i.test(n))));
             if (noms.length === 0) { console.error("::error::modelUsage vide : modele reel non verifiable."); process.exit(1); }
-            const claude = noms.filter(n => /^claude-/i.test(n));
+            const claude = noms.filter(n => /claude|anthropic/i.test(n));
             if (claude.length) { console.error("::error::Repli silencieux sur un modele Claude : " + claude.join(", ")); process.exit(1); }
             const norme = x => x.replace(/\[[^\]]*\]$/, "").toLowerCase();
             if (!noms.some(n => norme(n) === norme(process.env.MODELE))) { console.error("::error::Modele attendu absent (" + process.env.MODELE + ") parmi " + noms.join(", ")); process.exit(1); }
@@ -271,7 +284,7 @@ jobs:
           # backend/tests/Feature/NonRegression/ dont LISTE.json, backend/tests/ci/, harnais Pest, frontend/tests/non-regression/,
           # backend/phpstan*, phpunit*, pint.json, frontend/eslint-suppressions*), et backend/database/migrations/ : seul prisma/
           # a ete explicitement autorise pour axion-ia ; les migrations du CRM restent donc interdites jusqu'a decision du proprietaire.
-          INTERDIT='(^|/)\.git[^/]*|(^|/)\.dockerignore$|(^|/)(Dockerfile|docker-compose|Caddyfile)[^/]*$|(^|/)\.env|(^|/)\.npmrc$|(^|/)\.mcp\.json$|(^|/)\.claude/|(^|/)(AGENTS|CLAUDE)\.md$|(^|/)(package|composer)\.json$|(^|/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|npm-shrinkwrap\.json|bun\.lockb?|composer\.lock|pnpm-workspace\.yaml)$|(^|/)tsconfig[^/]*\.json$|(^|/)[^/]*\.config\.[^/]*$|(^|/)(Makefile|\.nvmrc|\.editorconfig|\.trivyignore\.yaml)$|(^|/)\.(eslintrc|prettierrc|prettierignore)[^/]*$|^(infra/|envoi-serveur/|backend/database/migrations/|backend/tests/(Feature/Infra/|Feature/NonRegression/|ci/|Pest\.php$|bootstrap\.php$|TestCase\.php$|QUARANTAINE\.md$)|frontend/tests/non-regression/|frontend/eslint-suppressions[^/]*$|backend/(phpstan|phpunit)[^/]*$|backend/pint\.json$)|secret|\.pem$|\.key$|credential'
+          INTERDIT='(^|/)\.git[^/]*|(^|/)\.dockerignore$|(^|/)(Dockerfile|docker-compose|Caddyfile)[^/]*$|(^|/)\.env|(^|/)\.npmrc$|(^|/)\.mcp\.json$|(^|/)\.claude/|(^|/)(AGENTS|CLAUDE)\.md$|(^|/)(package|composer)\.json$|(^|/)(pnpm-lock\.yaml|package-lock\.json|yarn\.lock|npm-shrinkwrap\.json|bun\.lockb?|composer\.lock|pnpm-workspace\.yaml)$|(^|/)tsconfig[^/]*\.json$|(^|/)[^/]*\.config\.[^/]*$|(^|/)(Makefile|\.nvmrc|\.editorconfig|\.trivyignore\.yaml)$|(^|/)\.(eslintrc|prettierrc|prettierignore)[^/]*$|^(infra/|envoi-serveur/|backend/database/migrations/|backend/tests/(Feature/Infra/|Feature/NonRegression/|ci/|Pest\.php$|bootstrap\.php$|TestCase\.php$|QUARANTAINE\.md$)|frontend/tests/non-regression/|frontend/eslint-suppressions[^/]*$|backend/(phpstan|phpunit)[^/]*$|backend/pint\.json$)|^frontend/tests/couverture-e2e\.test\.ts$|^frontend/tests/e2e/couverture-e2e\.json$|^backend/tests/Support/|^workers/tests/(collecte-vitest-complete|drapeau-simulacres)\.test\.ts$|^backend/app/Envoi/Gardes/|/Garde[^/]*\.php$|secret|\.pem$|\.key$|credential'
           if grep -Eiq "$INTERDIT" "$RUNNER_TEMP/touches.txt"; then
             echo "::error::Fichier(s) interdit(s) touche(s) :"; grep -Ei "$INTERDIT" "$RUNNER_TEMP/touches.txt"; exit 1
           fi
@@ -286,7 +299,7 @@ jobs:
             const j = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/essai/essai-" + process.env.NOM + ".json", "utf8"));
             const s = Array.isArray(j) ? (j.find(x => x.type === "result") || {}) : j;
             const u = s.usage || {};
-            const sur = x => /^[A-Za-z0-9._:\/\[\]-]{1,80}$/.test(x);
+            const sur = x => /^[A-Za-z0-9._:\/\[\]-]{1,40}$/.test(x) && !/^sk-/i.test(x);
             const nb = v => Number.isFinite(Number(v)) ? String(Number(v)) : "?";
             // Depot public : la fiche n est PAS recopiee ici (le pilote la connait).
             const corps = [
@@ -326,3 +339,4 @@ jobs:
             ${{ runner.temp }}/essai/essai-${{ inputs.nom }}.json
             ${{ runner.temp }}/essai/essai-${{ inputs.nom }}.patch
           if-no-files-found: error
+          retention-days: 7

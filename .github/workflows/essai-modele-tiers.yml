@@ -309,7 +309,10 @@ jobs:
       - name: Appliquer le correctif
         env:
           NOM: ${{ inputs.nom }}
-        run: git apply --index --binary "$RUNNER_TEMP/essai/essai-$NOM.patch"
+        run: |
+          # Correctif vide (le modele n'a rien modifie, par exemple un essai de controle) : rien a appliquer, ce n'est pas une erreur.
+          if [ ! -s "$RUNNER_TEMP/essai/essai-$NOM.patch" ]; then echo "::notice::Correctif vide : le modele n'a modifie aucun fichier."; exit 0; fi
+          git apply --index --binary "$RUNNER_TEMP/essai/essai-$NOM.patch"
 
       - name: Garde des chemins interdits
         run: |

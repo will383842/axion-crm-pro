@@ -34,6 +34,11 @@ on:
         description: "Identifiant court de la fiche (minuscules, chiffres, tirets), sert a nommer la branche"
         required: true
         type: string
+      base:
+        description: "Branche de depart (vide = branche par defaut). Pour corriger une PR ouverte : le nom de sa branche."
+        required: false
+        type: string
+        default: ""
 
 permissions: {}
 
@@ -49,10 +54,12 @@ concurrency:
 jobs:
   coder:
     name: coder (non fiable)
-    # Meme garde que claude-credit-api.yml : proprietaire du depot, depuis main seulement.
+    # Meme garde que claude-credit-api.yml : proprietaire du depot, depuis main seulement (la branche de depart, elle, peut etre une PR : entree base).
     if: github.actor == github.repository_owner && github.triggering_actor == github.repository_owner && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    outputs:
+      base_sha: ${{ steps.base.outputs.sha }}
     permissions:
       contents: read
     steps:
@@ -78,9 +85,25 @@ jobs:
             *) echo "::error::Fournisseur inconnu : $FOURNISSEUR"; exit 1 ;;
           esac
 
+      - name: Resoudre la branche de depart en un commit fixe
+        id: base
+        env:
+          BASE: ${{ inputs.base }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ -z "$BASE" ]; then printf 'sha=%s\n' "$GITHUB_SHA" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if ! [[ "$BASE" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]{0,99}$ ]] || [[ "$BASE" == *..* || "$BASE" == */ || "$BASE" == *.lock || "$BASE" == *//* ]]; then
+            echo "::error::Entree base invalide : nom de branche attendu."; exit 1
+          fi
+          SHA=$(gh api "repos/$REPO/git/ref/heads/$BASE" --jq .object.sha) || { echo "::error::Branche de depart introuvable."; exit 1; }
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Commit de depart invalide."; exit 1; }
+          printf 'sha=%s\n' "$SHA" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ steps.base.outputs.sha }}
           persist-credentials: false
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -236,7 +259,7 @@ jobs:
           if git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff --cached --no-renames --raw | awk '$1 ~ /^:(120000|160000)$/ || $2 ~ /^(120000|160000)$/ {f=1} END{exit !f}'; then
             echo "::error::Lien symbolique ou sous-module dans le correctif du modele."; exit 1
           fi
-          git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff --cached --binary --full-index --no-renames "$GITHUB_SHA" > "$RUNNER_TEMP/essai/essai-$NOM.patch"
+          git -c core.fsmonitor=false -c core.hooksPath=/dev/null diff --cached --binary --full-index --no-renames HEAD > "$RUNNER_TEMP/essai/essai-$NOM.patch"
 
       - name: Sauver le correctif et la sortie JSON en artefact
         if: always() && steps.valider.outcome == 'success'
@@ -273,9 +296,15 @@ jobs:
           else MODELE='deepseek-flash'; fi
           printf 'MODELE=%s\n' "$MODELE" >> "$GITHUB_ENV"
 
+      - name: Verifier le commit de depart
+        env:
+          BASE_SHA: ${{ needs.coder.outputs.base_sha }}
+        run: '[[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Commit de depart absent ou invalide."; exit 1; }'
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ needs.coder.outputs.base_sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@v7

@@ -17,6 +17,7 @@
     "diag-role-applicatif.yml",
     "diag-website-status.yml",
     "e2e.yml",
+    "essai-modele-tiers.yml",
     "finess-sante-enrichir.yml",
     "passerelle-envoi.yml",
     "pharmacies-contacts-osm.yml",
